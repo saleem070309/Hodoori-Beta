@@ -2723,11 +2723,19 @@ body {
 .liquid-glass,
 .liquid-glass-prominent {
   will-change: transform, opacity !important;
-  transform: translate3d(0, 0, 0) !important;
   backface-visibility: hidden !important;
   perspective: 1000px !important;
   -webkit-backface-visibility: hidden !important;
   -webkit-perspective: 1000px !important;
+}
+
+/* Ensure drawer uses 3D transform acceleration safely without layout breaks */
+.assistant-sidebar-drawer {
+  transform: translate3d(100%, 0, 0) !important;
+}
+
+.assistant-sidebar-drawer.open {
+  transform: translate3d(0, 0, 0) !important;
 }
 
 /* Optimize scroll transitions on touch screens */
