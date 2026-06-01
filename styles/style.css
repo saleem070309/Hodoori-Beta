@@ -532,13 +532,16 @@ body {
   height: 38px;
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent !important;
+  transition: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .assistant-top-left-emblem:hover {
-  background: rgba(255, 171, 49, 0.15);
-  transform: rotate(8deg);
+  background: transparent !important;
+  transform: none !important;
 }
 
 .assistant-top-left-emblem svg,
@@ -546,7 +549,8 @@ body {
   width: 22px;
   height: 22px;
   stroke-width: 1.5;
-  transition: all 0.3s ease;
+  transition: none !important;
+  transform: none !important;
 }
 
 .theme-light-warm .assistant-top-left-emblem svg {
@@ -568,7 +572,7 @@ body {
 }
 
 .assistant-top-left-emblem:hover img {
-  transform: scale(1.1);
+  transform: none !important;
 }
 
 .assistant-top-center-dropdown {
@@ -762,7 +766,8 @@ body {
 .assistant-planet-logo {
   width: 100%;
   height: 100%;
-  object-contain: p-1;
+  object-fit: contain;
+  padding: 4px;
   filter: drop-shadow(0 10px 20px rgba(255, 107, 0, 0.25));
 }
 
@@ -2067,4 +2072,613 @@ input:checked~.toggle-bg {
     stroke-dashoffset: 439.82;
     transform: translate(100px, 100px) rotate(112deg);
   }
+}
+
+/* ==========================================================================
+   PREMIUM OVERRIDES FOR ADMIN PAGES DARK MODE (theme-dark-orange)
+   ========================================================================== */
+
+/* Cohesive High-contrast Text & Layout colors */
+.theme-dark-orange {
+  color: #f5f5f4 !important;
+}
+
+.theme-dark-orange .text-gray-800,
+.theme-dark-orange .text-gray-900,
+.theme-dark-orange .text-slate-800,
+.theme-dark-orange .text-slate-900,
+.theme-dark-orange h1,
+.theme-dark-orange h2,
+.theme-dark-orange h3,
+.theme-dark-orange h4 {
+  color: #f5f5f4 !important;
+}
+
+.theme-dark-orange .text-gray-500,
+.theme-dark-orange .text-gray-600,
+.theme-dark-orange .text-gray-700,
+.theme-dark-orange .text-slate-500,
+.theme-dark-orange .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark-orange .text-gray-400,
+.theme-dark-orange .text-slate-400 {
+  color: #9ca3af !important;
+}
+
+/* Statutory/Stats Cards Customization */
+.theme-dark-orange .liquid-glass,
+.theme-dark-orange .liquid-glass-prominent {
+  background: #17120e !important;
+  border-color: rgba(255, 167, 38, 0.18) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 16px -6px rgba(0, 0, 0, 0.2) !important;
+}
+
+.theme-dark-orange .liquid-glass-stat {
+  background: linear-gradient(135deg, #17120e 0%, #211913 100%) !important;
+  border: 1.5px solid rgba(255, 167, 38, 0.25) !important;
+  box-shadow: 0 8px 32px rgba(255, 167, 38, 0.04) !important;
+}
+
+.theme-dark-orange .stat-primary::before { background: #ffa726 !important; }
+.theme-dark-orange .stat-success::before { background: #4caf50 !important; }
+.theme-dark-orange .stat-error::before { background: #f44336 !important; }
+
+/* Dynamic List items (e.g., classes submitted, pending) */
+.theme-dark-orange #submittedList > div,
+.theme-dark-orange #notSubmittedList > div {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f5f5f4 !important;
+}
+
+/* General Layout backgrounds */
+.theme-dark-orange .tab-panel {
+  background-color: #0c0907 !important;
+}
+
+/* Dynamic Classes Grid and Header Cards */
+.theme-dark-orange .class-card-header,
+.theme-dark-orange .report-card-header {
+  background: linear-gradient(135deg, rgba(255, 167, 38, 0.15) 0%, rgba(255, 167, 38, 0.04) 100%) !important;
+  border-bottom: 1px solid rgba(255, 167, 38, 0.15) !important;
+}
+
+.theme-dark-orange .class-card-icon-box,
+.theme-dark-orange .report-header-icon-box {
+  background: #261e17 !important;
+  border: 1.5px solid rgba(255, 167, 38, 0.3) !important;
+}
+
+.theme-dark-orange .class-card-icon-box span,
+.theme-dark-orange .report-header-icon-box span {
+  color: #ffa726 !important;
+}
+
+/* Teacher management layout / lists */
+.theme-dark-orange .teacher-row {
+  background: #17120e !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-dark-orange .teacher-row:hover {
+  background: #261e17 !important;
+}
+
+.theme-dark-orange .teacher-row-actions button,
+.theme-dark-orange button.hover\:bg-primary\/5 {
+  background: #17120e !important;
+  border-color: rgba(255, 167, 38, 0.22) !important;
+  color: #ffa726 !important;
+}
+
+/* Modals & Inputs custom overrides */
+.theme-dark-orange .liquid-glass-modal {
+  background: #120e0b !important;
+  border-color: rgba(255, 167, 38, 0.28) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+}
+
+.theme-dark-orange .liquid-glass-overlay {
+  background: rgba(8, 5, 3, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.theme-dark-orange .liquid-glass-input,
+.theme-dark-orange input.liquid-glass-input,
+.theme-dark-orange select.liquid-glass-input,
+.theme-dark-orange textarea.liquid-glass-input {
+  background: #17120e !important;
+  border-color: rgba(255, 167, 38, 0.22) !important;
+  color: #f5f5f4 !important;
+}
+
+.theme-dark-orange .liquid-glass-input:focus,
+.theme-dark-orange input.liquid-glass-input:focus {
+  border-color: #ffa726 !important;
+  background: #261e17 !important;
+}
+
+/* Action buttons */
+.theme-dark-orange .liquid-button {
+  background: #17120e !important;
+  border-color: rgba(255, 167, 38, 0.22) !important;
+  color: #f5f5f4 !important;
+}
+
+.theme-dark-orange .liquid-button:hover {
+  background: #261e17 !important;
+  border-color: rgba(255, 167, 38, 0.35) !important;
+}
+
+.theme-dark-orange .liquid-button-prominent {
+  background: #ffa726 !important;
+  color: #0c0907 !important;
+  border-color: #ffa726 !important;
+  font-weight: 700 !important;
+}
+
+.theme-dark-orange .liquid-button-prominent:hover {
+  background: #ffb74d !important;
+  border-color: #ffb74d !important;
+}
+
+/* Miscellaneous utilities */
+.theme-dark-orange .bg-white {
+  background-color: #17120e !important;
+}
+
+.theme-dark-orange .border-gray-100 {
+  border-color: rgba(255, 167, 38, 0.18) !important;
+}
+
+.theme-dark-orange .bg-red-50 {
+  background-color: rgba(244, 67, 54, 0.12) !important;
+}
+
+.theme-dark-orange .border-red-100 {
+  border-color: rgba(244, 67, 54, 0.25) !important;
+}
+
+.theme-dark-orange .bg-gray-50 {
+  background-color: #1a1511 !important;
+}
+
+.theme-dark-orange .divide-y > * {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-dark-orange .border-black\/5 {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-dark-orange .border-dashed {
+  border-color: rgba(255, 167, 38, 0.2) !important;
+}
+
+.theme-dark-orange .hover\:border-primary\/50:hover {
+  border-color: #ffa726 !important;
+}
+
+/* Beautiful custom dark orange scrollbar for tab panels */
+.theme-dark-orange .tab-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.theme-dark-orange .tab-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.theme-dark-orange .tab-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 167, 38, 0.2);
+  border-radius: 99px;
+}
+
+.theme-dark-orange .tab-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 167, 38, 0.45);
+}
+
+/* ============================================
+   Redesigned Segmented Customization Panel
+   ============================================ */
+
+/* Redesign drop-down container to support dynamic size */
+.theme-light-warm .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu {
+  width: 360px !important;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 171, 49, 0.2);
+  box-shadow: 0 12px 30px rgba(255, 171, 49, 0.08);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.theme-dark-orange .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu {
+  width: 360px !important;
+  background: rgba(23, 18, 14, 0.96);
+  border: 1px solid rgba(255, 167, 38, 0.25);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  border-radius: 24px;
+  padding: 18px;
+}
+
+/* Customizer Tab Segmented Switcher */
+.customizer-tabs-container {
+  display: flex;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 4px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  direction: rtl;
+  position: relative; /* Hold absolute indicator */
+}
+
+.theme-dark-orange .customizer-tabs-container {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.customizer-tabs-indicator {
+  position: absolute;
+  border-radius: 12px;
+  transition: left 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+              width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+              top 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.theme-light-warm .customizer-tabs-indicator {
+  background: #ffab31;
+  box-shadow: 0 4px 10px rgba(255, 171, 49, 0.2);
+}
+
+.theme-dark-orange .customizer-tabs-indicator {
+  background: #ffa726;
+  box-shadow: 0 4px 10px rgba(255, 167, 38, 0.2);
+}
+
+.customizer-tab-btn {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.25s ease;
+  border: none;
+  background: transparent !important;
+  font-family: 'Tajawal', sans-serif;
+  position: relative;
+  z-index: 1; /* Stay above indicator */
+}
+
+.theme-light-warm .customizer-tab-btn {
+  color: #5c564f;
+}
+
+.theme-light-warm .customizer-tab-btn:hover {
+  color: #ffab31;
+}
+
+.theme-light-warm .customizer-tab-btn.active {
+  color: #ffffff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.theme-dark-orange .customizer-tab-btn {
+  color: #9ca3af;
+}
+
+.theme-dark-orange .customizer-tab-btn:hover {
+  color: #ffa726;
+}
+
+.theme-dark-orange .customizer-tab-btn.active {
+  color: #0c0907 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Customizer Content Panels */
+.customizer-tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  height: 250px !important; /* Fixed height to match 3 cards precisely and prevent shrinking */
+  overflow-y: auto;
+  padding-left: 2px;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
+}
+
+.customizer-tab-panel::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari/Webkit */
+}
+
+.customizer-tab-panel.active {
+  display: flex;
+  animation: fade-in 0.25s ease-out forwards; /* Premium smooth entrance */
+}
+
+/* Customizer Card Layout */
+.customizer-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+  direction: rtl;
+  text-align: right;
+  position: relative;
+}
+
+.theme-light-warm .customizer-card {
+  background: #fffbf7;
+  border-color: rgba(255, 171, 49, 0.08);
+}
+
+.theme-light-warm .customizer-card:hover {
+  border-color: rgba(255, 171, 49, 0.2);
+}
+
+.theme-light-warm .customizer-card.active {
+  background: #fff6ee;
+  border-color: rgba(255, 171, 49, 0.3);
+}
+
+.theme-dark-orange .customizer-card {
+  background: #120e0b;
+  border-color: rgba(255, 167, 38, 0.08);
+}
+
+.theme-dark-orange .customizer-card:hover {
+  border-color: rgba(255, 167, 38, 0.2);
+}
+
+.theme-dark-orange .customizer-card.active {
+  background: #1f1711;
+  border-color: rgba(255, 167, 38, 0.3);
+}
+
+/* Brand Logo (Right side in RTL) */
+.customizer-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+.theme-light-warm .customizer-card-icon {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.03);
+}
+
+.theme-dark-orange .customizer-card-icon {
+  background: #1c1713;
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+.customizer-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Detail Labels */
+.customizer-card-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.customizer-card-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+  font-family: 'Tajawal', sans-serif;
+}
+
+.theme-light-warm .customizer-card-title {
+  color: #2c2c2c;
+}
+
+.theme-dark-orange .customizer-card-title {
+  color: #f5f5f4;
+}
+
+.customizer-card-desc {
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.4;
+  font-family: 'Tajawal', sans-serif;
+}
+
+.theme-light-warm .customizer-card-desc {
+  color: #6e675f;
+}
+
+.theme-dark-orange .customizer-card-desc {
+  color: #a3a3a3;
+}
+
+/* Action Button / Link (Left side in RTL) */
+.customizer-card-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border: none;
+}
+
+.theme-light-warm .customizer-card-action {
+  background: rgba(255, 171, 49, 0.08);
+  color: #ffab31;
+}
+
+.theme-light-warm .customizer-card-action:hover {
+  background: #ffab31;
+  color: #ffffff;
+}
+
+.theme-dark-orange .customizer-card-action {
+  background: rgba(255, 167, 38, 0.08);
+  color: #ffa726;
+}
+
+.theme-dark-orange .customizer-card-action:hover {
+  background: #ffa726;
+  color: #0c0907;
+}
+
+/* Toggle switch support inside customizer cards */
+.customizer-card .toggle-switch {
+  cursor: pointer;
+}
+
+/* Disabled state */
+.customizer-card.disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+}
+.customizer-card.disabled .customizer-card-action {
+  pointer-events: none;
+  background: rgba(0,0,0,0.04) !important;
+  color: #888 !important;
+}
+
+/* ============================================
+   Sidebar Drawer Profile Section & Theme Picker
+   ============================================ */
+
+.assistant-drawer-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  margin-top: auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  direction: rtl;
+}
+
+.theme-light-warm .assistant-drawer-profile {
+  border-top: 1px solid rgba(255, 171, 49, 0.12);
+}
+
+.theme-dark-orange .assistant-drawer-profile {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.drawer-theme-popover {
+  position: absolute;
+  bottom: 74px;
+  left: 16px;
+  width: 190px;
+  border-radius: 20px;
+  padding: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom left;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.95);
+}
+
+.drawer-theme-popover.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.theme-light-warm .drawer-theme-popover {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 171, 49, 0.15);
+}
+
+.theme-dark-orange .drawer-theme-popover {
+  background: rgba(22, 18, 14, 0.95);
+  border: 1px solid rgba(255, 167, 38, 0.18);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.popover-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: all 0.2s ease;
+  font-family: 'Tajawal', sans-serif;
+  text-align: right;
+  direction: rtl;
+}
+
+.theme-light-warm .popover-item {
+  color: #44403c;
+}
+.theme-light-warm .popover-item:hover {
+  background: rgba(255, 171, 49, 0.1);
+  color: #ffab31;
+}
+.theme-light-warm .popover-item.active {
+  background: #ffab31;
+  color: #ffffff;
+}
+
+.theme-dark-orange .popover-item {
+  color: #d6d3d1;
+}
+.theme-dark-orange .popover-item:hover {
+  background: rgba(255, 167, 38, 0.12);
+  color: #ffa726;
+}
+.theme-dark-orange .popover-item.active {
+  background: #ffa726;
+  color: #0c0907;
+}
+
+.popover-title {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  margin-right: 4px;
+  font-family: 'Tajawal', sans-serif;
+}
+
+.theme-light-warm .popover-title {
+  color: #b0a898;
+}
+
+.theme-dark-orange .popover-title {
+  color: #5c564f;
 }

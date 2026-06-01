@@ -798,14 +798,98 @@
                             id="dropdown-chevron">expand_more</span>
                     </button>
                     <div class="dropdown-menu-options" id="theme-dropdown-menu">
-                        <button class="dropdown-item active" onclick="window.setAssistantTheme('light', this, event)">
-                            <span class="material-symbols-outlined text-[16px]">wb_sunny</span>
-                            <span>فاتح دافئ</span>
-                        </button>
-                        <button class="dropdown-item" onclick="window.setAssistantTheme('dark', this, event)">
-                            <span class="material-symbols-outlined text-[16px]">dark_mode</span>
-                            <span>داكن برتقالي</span>
-                        </button>
+                        <!-- Segmented Switcher Header -->
+                        <div class="customizer-tabs-container">
+                            <div id="customizer-tabs-indicator" class="customizer-tabs-indicator"></div>
+                            <button id="customizer-tab-plugins" class="customizer-tab-btn" onclick="window.switchCustomizerTab('plugins', event)">الاضافات</button>
+                            <button id="customizer-tab-connectors" class="customizer-tab-btn active" onclick="window.switchCustomizerTab('connectors', event)">التطبيقات</button>
+                            <button id="customizer-tab-skills" class="customizer-tab-btn" onclick="window.switchCustomizerTab('skills', event)">المهارات</button>
+                        </div>
+
+                        <!-- Tab Content: الاضافات (Extensions) -->
+                        <div id="customizer-panel-plugins" class="customizer-tab-panel">
+                            <!-- منبه الغياب الآلي -->
+                            <div class="customizer-card cursor-pointer" onclick="window.toggleCustomItem('plugin-absence')">
+                                <div class="customizer-card-icon text-red-500">
+                                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">alarm</span>
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">منبه الغياب الآلي</span>
+                                    <span class="customizer-card-desc">إرسال إشعارات تلقائية لأولياء الأمور عند تسجيل غياب الطالب</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="check-plugin-absence-custom" class="hidden">
+                                    <div class="switch-bg w-10 h-5 bg-gray-200 rounded-full relative transition-all" id="switch-bg-absence">
+                                        <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 right-0.5 transition-all" id="switch-dot-absence"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: التطبيقات (Apps) -->
+                        <div id="customizer-panel-connectors" class="customizer-tab-panel active">
+                            <!-- Gmail Card -->
+                            <div class="customizer-card active cursor-pointer" onclick="window.toggleCustomItem('conn-gmail')">
+                                <div class="customizer-card-icon text-red-500">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail">
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">Gmail</span>
+                                    <span class="customizer-card-desc">سوف يصبح بإمكان حضوري إرسال إيميلات بدلاً منك</span>
+                                </div>
+                                <button class="customizer-card-action">
+                                    <span class="material-symbols-outlined text-[16px]" id="gmail-custom-link-icon">link</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Canva Card (Locked / Coming Soon) -->
+                            <div class="customizer-card disabled">
+                                <div class="customizer-card-icon">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Canva_icon_2021.svg" alt="Canva">
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">Canva</span>
+                                    <span class="customizer-card-desc">لربط إبداعك وتصميمك بحضوري لتتمكن من استخدامها فيه</span>
+                                </div>
+                                <button class="customizer-card-action">
+                                    <span class="material-symbols-outlined text-[16px]">lock</span>
+                                </button>
+                            </div>
+
+                            <!-- Facebook Card (Locked / Coming Soon) -->
+                            <div class="customizer-card disabled">
+                                <div class="customizer-card-icon">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" alt="Facebook">
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">FaceBook</span>
+                                    <span class="customizer-card-desc">اربط صفحتك على فيسبوك لتجعل حضوري قادر على نشر المنشورات</span>
+                                </div>
+                                <button class="customizer-card-action">
+                                    <span class="material-symbols-outlined text-[16px]">lock</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: المهارات (Skills) -->
+                        <div id="customizer-panel-skills" class="customizer-tab-panel">
+                            <!-- Excel Report Skill -->
+                            <div class="customizer-card cursor-pointer" onclick="window.toggleCustomItem('skill-reports')">
+                                <div class="customizer-card-icon text-green-600">
+                                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">analytics</span>
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">مهارة ملفات إكسل</span>
+                                    <span class="customizer-card-desc">تمكين المساعد من تحليل تقارير إكسل والبيانات وحساب الطلاب</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="check-skill-reports-custom" class="hidden">
+                                    <div class="switch-bg w-10 h-5 bg-gray-200 rounded-full relative transition-all" id="switch-bg-reports">
+                                        <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 right-0.5 transition-all" id="switch-dot-reports"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1155,7 +1239,65 @@
                 } else {
                     dropdown.classList.add('open');
                     chevron.style.transform = 'rotate(180deg)';
+                    // Sync customization checkboxes upon opening
+                    syncDirectoryToggles();
+                    
+                    // Move the customizer sliding pill to the active tab after drawer finishes rendering (a tiny delay)
+                    setTimeout(() => {
+                        const activeBtn = document.querySelector('#theme-dropdown-menu .customizer-tab-btn.active');
+                        if (activeBtn) {
+                            const tabId = activeBtn.id.replace('customizer-tab-', '');
+                            window.moveCustomizerTabIndicator(tabId);
+                        }
+                    }, 50);
                 }
+            }
+        };
+
+        window.switchCustomizerTab = function (tabId, e) {
+            if (e) e.stopPropagation();
+            
+            // Toggle active classes on tab buttons
+            const tabButtons = document.querySelectorAll('#theme-dropdown-menu .customizer-tab-btn');
+            tabButtons.forEach(btn => {
+                const isActive = btn.id === `customizer-tab-${tabId}`;
+                btn.classList.toggle('active', isActive);
+            });
+
+            // Move the customizer tab sliding indicator pill
+            window.moveCustomizerTabIndicator(tabId);
+
+            // Toggle active classes on tab panels
+            const panels = document.querySelectorAll('#theme-dropdown-menu .customizer-tab-panel');
+            panels.forEach(panel => {
+                const isActive = panel.id === `customizer-panel-${tabId}`;
+                panel.classList.toggle('active', isActive);
+            });
+        };
+
+        window.moveCustomizerTabIndicator = function (tabId) {
+            const container = document.querySelector('.customizer-tabs-container');
+            const indicator = document.getElementById('customizer-tabs-indicator');
+            const targetBtn = document.getElementById(`customizer-tab-${tabId}`);
+            if (!container || !indicator || !targetBtn) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const btnRect = targetBtn.getBoundingClientRect();
+
+            // Calculate left relative offset inside the switcher bar
+            const leftOffset = btnRect.left - containerRect.left;
+            
+            indicator.style.left = leftOffset + 'px';
+            indicator.style.width = btnRect.width + 'px';
+            indicator.style.height = btnRect.height + 'px';
+            indicator.style.top = (btnRect.top - containerRect.top) + 'px';
+        };
+
+        window.toggleDrawerSettings = function (e) {
+            if (e) e.stopPropagation();
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover) {
+                popover.classList.toggle('open');
             }
         };
 
@@ -1189,25 +1331,21 @@
                 }
             }
 
-            // Update active state in dropdown
-            const items = document.querySelectorAll('#theme-dropdown-menu .dropdown-item');
-            items.forEach(item => item.classList.remove('active'));
-            if (element) {
-                element.classList.add('active');
-            } else {
-                const targetIdx = theme === 'light' ? 0 : 1;
-                if (items[targetIdx]) items[targetIdx].classList.add('active');
+            // Update active state in drawer settings popover
+            const popoverItems = document.querySelectorAll('#drawer-theme-popover .popover-item');
+            popoverItems.forEach(item => item.classList.remove('active'));
+            const activeIdx = theme === 'light' ? 0 : 1;
+            if (popoverItems[activeIdx]) {
+                popoverItems[activeIdx].classList.add('active');
             }
 
             // Save to localStorage
             localStorage.setItem('assistant_theme', theme);
 
-            // Close dropdown
-            const dropdown = document.getElementById('theme-dropdown-menu');
-            const chevron = document.getElementById('dropdown-chevron');
-            if (dropdown && chevron) {
-                dropdown.classList.remove('open');
-                chevron.style.transform = 'rotate(0deg)';
+            // Close popover
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover) {
+                popover.classList.remove('open');
             }
         };
 
@@ -1322,97 +1460,78 @@
             }
         };
 
-        let mediaRecorder = null;
-        let audioChunks = [];
+        let recognition = null;
         let isRecording = false;
 
-        window.triggerVoiceVisual = async function () {
+        window.triggerVoiceVisual = function () {
             const micIcon = document.getElementById('capsule-mic-icon');
             const input = document.getElementById('agent-input');
             if (!micIcon || !input) return;
 
+            // Check browser support for SpeechRecognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                UI.toast('⚠️ متصفحك لا يدعم التعرف على الصوت محلياً. يرجى استخدام متصفح Chrome أو Edge.');
+                return;
+            }
+
             if (isRecording) {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
+                if (recognition) {
+                    recognition.stop();
                 }
                 return;
             }
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioChunks = [];
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ar-JO'; // Arabic (Jordan) local language support
+                recognition.continuous = false;
+                recognition.interimResults = false;
 
-                let mimeType = 'audio/webm';
-                let format = 'webm';
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = 'audio/mp4';
-                    format = 'mp4';
-                }
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = '';
-                    format = 'wav';
-                }
+                recognition.onstart = () => {
+                    isRecording = true;
+                    micIcon.style.color = '#ffab31';
+                    micIcon.classList.add('animate-pulse');
+                    UI.toast('🎤 جاري الاستماع محلياً، تحدث الآن...');
+                };
 
-                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
+                recognition.onresult = (event) => {
+                    const resultText = event.results[0][0].transcript;
+                    if (resultText && resultText.trim()) {
+                        input.value = resultText;
+                        window.handleInputTyping(input);
                     }
                 };
 
-                mediaRecorder.onstop = async () => {
-                    micIcon.style.color = '';
-                    micIcon.classList.remove('animate-pulse');
-                    isRecording = false;
-
-                    stream.getTracks().forEach(track => track.stop());
-
-                    if (audioChunks.length === 0) return;
-
-                    const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/wav' });
-
-                    const reader = new FileReader();
-                    reader.readAsDataURL(audioBlob);
-                    reader.onloadend = async () => {
-                        const base64data = reader.result.split(',')[1];
-
-                        try {
-                            micIcon.style.color = '#ffab31';
-                            micIcon.classList.add('animate-pulse');
-
-                            const text = await Gemini.transcribeAudio(base64data, format);
-                            if (text && text.trim()) {
-                                input.value = text;
-                                window.handleInputTyping(input);
-                            }
-                        } catch (err) {
-                            console.error('Transcription error:', err);
-                            UI.toast('⚠️ فشل في التعرف على الصوت: ' + err.message);
-                        } finally {
-                            micIcon.style.color = '';
-                            micIcon.classList.remove('animate-pulse');
-                        }
-                    };
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    if (event.error === 'not-allowed') {
+                        UI.toast('⚠️ يرجى السماح للمتصفح بالوصول إلى المايكروفون.');
+                    } else if (event.error === 'no-speech') {
+                        UI.toast('⚠️ لم يتم سماع أي صوت. حاول مجدداً.');
+                    } else {
+                        UI.toast('⚠️ خطأ في التعرف على الصوت: ' + event.error);
+                    }
                 };
 
-                mediaRecorder.start();
-                isRecording = true;
+                recognition.onend = () => {
+                    isRecording = false;
+                    micIcon.style.color = '';
+                    micIcon.classList.remove('animate-pulse');
+                };
 
-                micIcon.style.color = '#ffab31';
-                micIcon.classList.add('animate-pulse');
+                recognition.start();
 
             } catch (err) {
-                console.error('Microphone error:', err);
-                UI.toast('⚠️ تعذر الوصول إلى المايكروفون: ' + err.message);
-
+                console.error('Speech recognition init error:', err);
+                UI.toast('⚠️ تعذر تشغيل المايكروفون: ' + err.message);
+                isRecording = false;
                 micIcon.style.color = '';
                 micIcon.classList.remove('animate-pulse');
-                isRecording = false;
             }
         };
 
-        // Click outside listeners to close custom dropdown
+        // Click outside listeners to close custom dropdowns
         document.addEventListener('click', function () {
             const dropdown = document.getElementById('theme-dropdown-menu');
             const chevron = document.getElementById('dropdown-chevron');
@@ -1420,14 +1539,35 @@
                 dropdown.classList.remove('open');
                 chevron.style.transform = 'rotate(0deg)';
             }
+            
+            // Close drawer theme popover
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover && popover.classList.contains('open')) {
+                popover.classList.remove('open');
+            }
         });
 
         // Initialize dynamic greeting and theme on page load
         document.addEventListener('DOMContentLoaded', async () => {
-            // Apply greeting
+            // Register stop propagation on theme dropdown menu so click inside won't close it
+            const dropdown = document.getElementById('theme-dropdown-menu');
+            if (dropdown) {
+                dropdown.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            // Sync customization controls on load
+            try {
+                await syncDirectoryToggles();
+            } catch (e) {
+                console.warn('Customization sync error on load:', e);
+            }
+
+            // Apply greeting and populate manager details
             try {
                 const currentUser = typeof Auth !== 'undefined' ? Auth.getCurrentUser() : null;
                 const firstName = currentUser && currentUser.name ? currentUser.name.trim().split(' ')[0] : 'مدير';
+                const fullName = currentUser && currentUser.name ? currentUser.name : 'مدير النظام';
+                
                 const greetingEl = document.getElementById('assistant-greeting-text');
                 if (greetingEl) {
                     const greetings = [
@@ -1445,8 +1585,14 @@
                     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
                     greetingEl.textContent = randomGreeting;
                 }
+
+                // Render manager profile name
+                const profileNameEl = document.getElementById('manager-name-display');
+                if (profileNameEl) {
+                    profileNameEl.textContent = fullName;
+                }
             } catch (e) {
-                console.warn('Greeting init error:', e);
+                console.warn('Greeting and Profile init error:', e);
             }
 
             // Apply theme
@@ -2977,18 +3123,23 @@
 
         window.toggleCustomItem = async function (itemId) {
             const checkbox = document.getElementById(`check-${itemId}`);
-            const card = checkbox.closest('.custom-card');
-
-            checkbox.checked = !checkbox.checked;
-            card.classList.toggle('active', checkbox.checked);
+            let newState = true;
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                newState = checkbox.checked;
+            } else {
+                const settings = (await DB.getSettings()) || {};
+                const customization = settings.customization || {};
+                newState = !customization[itemId];
+            }
 
             const settings = (await DB.getSettings()) || {};
             settings.customization = settings.customization || {};
-            settings.customization[itemId] = checkbox.checked;
+            settings.customization[itemId] = newState;
             await DB.saveSettings(settings);
 
-            applyCustomization(itemId, checkbox.checked);
-            UI.toast(checkbox.checked ? 'تم التفعيل بنجاح' : 'تم الإيقاف');
+            await syncDirectoryToggles();
+            UI.toast(newState ? 'تم التفعيل بنجاح' : 'تم الإيقاف');
         };
 
         async function syncDirectoryToggles() {
@@ -2998,13 +3149,50 @@
             const items = ['skill-reports', 'conn-gmail', 'plugin-absence'];
             items.forEach(id => {
                 const checked = !!customization[id];
+                
+                // 1. Sync Directory Modal
                 const checkbox = document.getElementById(`check-${id}`);
                 if (checkbox) {
                     const card = checkbox.closest('.custom-card');
                     checkbox.checked = checked;
-                    card.classList.toggle('active', checked);
-                    applyCustomization(id, checked);
+                    if (card) card.classList.toggle('active', checked);
                 }
+
+                // 2. Sync AI Customization Dropdown
+                const customCheckbox = document.getElementById(`check-${id}-custom`);
+                if (customCheckbox) {
+                    customCheckbox.checked = checked;
+                    const customCard = customCheckbox.closest('.customizer-card');
+                    if (customCard) customCard.classList.toggle('active', checked);
+                    
+                    // Switch styling animation
+                    const suffix = id === 'plugin-absence' ? 'absence' : 'reports';
+                    const bg = document.getElementById(`switch-bg-${suffix}`);
+                    const dot = document.getElementById(`switch-dot-${suffix}`);
+                    if (bg && dot) {
+                        if (checked) {
+                            bg.style.backgroundColor = 'var(--color-primary)';
+                            dot.style.right = 'calc(100% - 18px)';
+                        } else {
+                            bg.style.backgroundColor = '';
+                            dot.style.right = '2px';
+                        }
+                    }
+                }
+
+                // Gmail specifically can also have a visual icon shift (link vs link_off)
+                if (id === 'conn-gmail') {
+                    const linkIcon = document.getElementById('gmail-custom-link-icon');
+                    const customCard = document.querySelector('[onclick="window.toggleCustomItem(\'conn-gmail\')"]');
+                    if (customCard) {
+                        customCard.classList.toggle('active', checked);
+                    }
+                    if (linkIcon) {
+                        linkIcon.textContent = checked ? 'link_off' : 'link';
+                    }
+                }
+
+                applyCustomization(id, checked);
             });
         }
 
@@ -3489,6 +3677,33 @@
             <div class="assistant-drawer-item" id="drawer-item-ai" onclick="switchTab('ai', 2); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined">smart_toy</span>
                 <span>المساعد الذكي</span>
+            </div>
+        </div>
+        <!-- Manager Profile & Settings Button Footer -->
+        <div class="assistant-drawer-profile relative">
+            <div class="flex items-center gap-3">
+                <img id="manager-avatar-img" src="assets/manager_avatar.png" alt="المدير" class="w-10 h-10 rounded-full border border-primary/20 object-cover shadow-sm" />
+                <div class="flex flex-col">
+                    <span id="manager-name-display" class="font-black text-sm text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">جاري التحميل...</span>
+                    <span class="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider" style="font-family: 'Tajawal', sans-serif;">مدير النظام</span>
+                </div>
+            </div>
+            <!-- Settings Button -->
+            <button id="drawer-settings-btn" class="w-8 h-8 rounded-xl bg-gray-50 dark:bg-neutral-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-gray-100 dark:border-neutral-700/50 transition-all cursor-pointer relative" onclick="window.toggleDrawerSettings(event)">
+                <span class="material-symbols-outlined text-[18px]">settings</span>
+            </button>
+            
+            <!-- Floating Theme Switcher Popover -->
+            <div id="drawer-theme-popover" class="drawer-theme-popover absolute bottom-16 left-4 z-50 p-4 w-44 rounded-2xl shadow-xl border border-gray-100/50 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md flex flex-col gap-2">
+                <div class="popover-title">المظهر</div>
+                <button class="popover-item active" onclick="window.setAssistantTheme('light', null, event)">
+                    <span class="material-symbols-outlined text-[16px] text-yellow-500">wb_sunny</span>
+                    <span>فاتح دافئ</span>
+                </button>
+                <button class="popover-item" onclick="window.setAssistantTheme('dark', null, event)">
+                    <span class="material-symbols-outlined text-[16px] text-orange-500">dark_mode</span>
+                    <span>داكن برتقالي</span>
+                </button>
             </div>
         </div>
     </div>
