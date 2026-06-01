@@ -2700,3 +2700,40 @@ input:checked~.toggle-bg {
 .theme-dark-orange .popover-title {
   color: #5c564f;
 }
+
+/* ==========================================================================
+   GPU Hardware Acceleration & Performance Tuning (Mobile 60fps Optimization)
+   ========================================================================== */
+
+/* Apply global font rendering efficiency */
+body {
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Force hardware accelerated layers for heavily animated elements */
+.assistant-sidebar-drawer,
+.drawer-theme-popover,
+.dropdown-menu-options,
+.customizer-tabs-indicator,
+#nav-indicator,
+.tab-panel,
+.customizer-card,
+.liquid-glass,
+.liquid-glass-prominent {
+  will-change: transform, opacity !important;
+  transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  perspective: 1000px !important;
+  -webkit-backface-visibility: hidden !important;
+  -webkit-perspective: 1000px !important;
+}
+
+/* Optimize scroll transitions on touch screens */
+.tab-panel,
+.customizer-tab-panel,
+.assistant-drawer-content {
+  -webkit-overflow-scrolling: touch !important; /* Smooth elastic iOS scrolling */
+  scroll-behavior: smooth !important;
+}
