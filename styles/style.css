@@ -2303,6 +2303,24 @@ input:checked~.toggle-bg {
   padding: 18px;
 }
 
+@media (max-width: 639px) {
+  .theme-light-warm .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu,
+  .theme-dark-orange .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu {
+    position: fixed !important;
+    top: 60px !important;
+    left: 16px !important;
+    right: 16px !important;
+    width: auto !important;
+    transform: translateX(0) scale(0.95) !important;
+    transform-origin: top center !important;
+  }
+  
+  .theme-light-warm .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu.open,
+  .theme-dark-orange .assistant-top-center-dropdown .dropdown-menu-options#theme-dropdown-menu.open {
+    transform: translateX(0) scale(1) !important;
+  }
+}
+
 /* Customizer Tab Segmented Switcher */
 .customizer-tabs-container {
   display: flex;
