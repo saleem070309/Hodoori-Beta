@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#faf7f2"> <!-- Using var(--color-cream) -->
+    <title>تحضير الصف | المعلم</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <link href="styles/style.css" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffab31",
+                        "on-primary": "#faf7f2",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff",
+                        "surface-bright": "#fffefb",
+                        "tertiary": "#ebf1f6",
+                        "on-surface-variant": "#666050"
+                    },
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: var(--color-cream);
+            min-height: 100vh;
+        }
+
+        /* Apple-style Segmented Control */
+        .segmented-control {
+            display: flex;
+            background: rgba(180, 160, 140, 0.1);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 2px;
+            position: relative;
+            width: 140px;
+            height: 34px;
+            border: 1px solid rgba(180, 160, 140, 0.15);
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .segmented-control button {
+            flex: 1;
+            position: relative;
+            z-index: 2;
+            font-size: 11px;
+            font-weight: 700;
+            color: #666050;
+            transition: color 0.3s ease, transform 0.1s ease;
+            outline: none;
+        }
+
+        .segmented-control button.active {
+            color: #faf7f2;
+        }
+
+        .segmented-control button:active {
+            transform: scale(0.92);
+        }
+
+        .segmented-control .highlight {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            /* Start from the right in RTL */
+            right: 2px;
+            width: calc(50% - 2px);
+            border-radius: 10px;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1.1);
+            z-index: 1;
+        }
+
+        .highlight-present {
+            /* 0 is right side in RTL */
+            transform: translateX(0);
+            background: var(--color-primary);
+            box-shadow: none;
+        }
+
+        .highlight-absent {
+            /* Move left by 100% in RTL */
+            transform: translateX(-100%);
+            background: var(--color-primary);
+            box-shadow: none;
+        }
+
+        /* Physics-based tap feel */
+        .segmented-control:active {
+            transform: scale(0.96);
+            transition: transform 0.1s ease;
+        }
+
+        .segmented-control:active .highlight {
+            transform: scaleX(0.98);
+        }
+
+        @keyframes logo-pulse {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.6);
+                opacity: 0;
+            }
+        }
+
+        .animate-pulse-ring {
+            animation: logo-pulse 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            scrollbar-width: none;
+            /* Firefox */
+        }
+    </style>
+</head>
+
+<body class="text-gray-800 pb-12 font-sans">
+
+
+    <!-- Splash Loading Screen -->
+    <div id="splashScreen" style="display: none !important;"
+        class="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center transition-all duration-700">
+        <div class="relative mb-8">
+            <div
+                class="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] liquid-glass flex items-center justify-center overflow-hidden relative z-10">
+                <img src="assets/brand-logo.png" alt="Logo" class="w-full h-full object-contain p-4" />
+            </div>
+            <div class="absolute inset-0 rounded-[2rem] border-[1.5px] border-primary animate-pulse-ring z-0"></div>
+        </div>
+        <h2 class="text-2xl font-black refractive-text mb-4">جاري تهيئة النظام الذكي</h2>
+        <div class="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden mb-4">
+            <div id="splashProgress" class="h-full bg-primary transition-all duration-500 w-10"></div>
+        </div>
+        <p id="splashStatus" class="text-gray-500 text-sm font-medium none text-center px-6">جاري تحميل ملامح
+            الوجوه وحفظها على الهاتف...</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav
+        class="liquid-glass-nav sticky top-0 w-full z-50 px-4 sm:px-6 py-2.5 sm:py-4 flex justify-between items-center rounded-b-xl sm:rounded-b-2xl">
+        <div class="flex items-center gap-2 sm:gap-3 relative z-10">
+            <div onclick="window.location.href='index.html'"
+                class="liquid-glass-icon icon-error w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl cursor-pointer flex items-center justify-center">
+                <span class="material-symbols-outlined text-red-400 text-lg sm:text-xl leading-none">logout</span>
+            </div>
+            <h1 id="teacherName"
+                class="font-bold text-sm sm:text-xl refractive-text truncate max-w-[100px] sm:max-w-none">تحضير الصف
+            </h1>
+        </div>
+        <div id="classNameDisplay" onclick="resetClassSelection()"
+            class="liquid-glass-chip px-3 sm:px-4 py-1.5 rounded-full text-primary text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-primary/15 transition-all active:none relative z-10">
+            اختر الصف
+        </div>
+    </nav>
+
+    <main class="px-4 sm:px-6 mt-6 sm:mt-8 space-y-6 sm:space-y-8 max-w-2xl mx-auto relative z-10">
+        <!-- Class Selection View -->
+        <section id="classSelector" class="space-y-4 sm:space-y-6">
+            <div class="text-center space-y-1 sm:space-y-2">
+                <h2 class="text-xl sm:text-2xl font-black refractive-text">اختر الصف للمعالجة</h2>
+                <p class="text-gray-600 text-xs sm:text-sm">يرجى اختيار الشعبة التي ترغب في أخذ حضورها الآن</p>
+            </div>
+            <div id="classesGrid" class="grid grid-cols-1 gap-4">
+                <!-- Classes will be injected here -->
+            </div>
+        </section>
+
+        <!-- Attendance View (Hidden by Default) -->
+        <div id="attendanceView" class="hidden space-y-8">
+            <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div onclick="openAiModal()"
+                    class="liquid-glass liquid-glass-interactive liquid-glass-tint-primary rounded-xl p-4 sm:p-6 flex flex-row sm:flex-col items-center justify-center sm:justify-center h-full gap-4 sm:gap-0">
+                    <div class="liquid-glass-icon icon-primary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:mb-4 shrink-0">
+                        <span class="material-symbols-outlined text-primary text-xl sm:text-3xl"
+                            style="font-variation-settings: 'FILL' 1;">face_retouching_natural</span>
+                    </div>
+                    <div class="sm:text-center text-right">
+                        <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-0.5 sm:mb-1 leading-tight">التحضير
+                            بالوجه</h2>
+                        <p class="text-gray-600 text-[10px]">مسح جماعي للطلاب</p>
+                    </div>
+                </div>
+
+                <div onclick="openQrModal()"
+                    class="liquid-glass liquid-glass-interactive liquid-glass-tint-tertiary rounded-xl p-4 sm:p-6 flex flex-row sm:flex-col items-center justify-center sm:justify-center h-full gap-4 sm:gap-0">
+                    <div class="liquid-glass-icon icon-primary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:mb-4 shrink-0">
+                        <span class="material-symbols-outlined text-primary text-xl sm:text-3xl"
+                            style="font-variation-settings: 'FILL' 1;">qr_code_scanner</span>
+                    </div>
+                    <div class="sm:text-center text-right">
+                        <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-0.5 sm:mb-1 leading-tight">التحضير بـ
+                            QR</h2>
+                        <p class="text-gray-600 text-[10px]">مسح التواقيع الفردية</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats Section -->
+            <section class="grid grid-cols-2 gap-4">
+                <div
+                    class="liquid-glass liquid-glass-tint-primary rounded-xl p-4 sm:p-6 flex flex-col items-center justify-center space-y-1 sm:space-y-2">
+                    <span class="text-gray-600 text-[10px] sm:text-sm font-medium">الطلاب</span>
+                    <span id="totalStudents" class="text-2xl sm:text-4xl font-extrabold refractive-text">0</span>
+                    <div class="liquid-glass-progress min-w-[30px] w-1/3">
+                        <div class="liquid-glass-progress-bar w-full"></div>
+                    </div>
+                </div>
+                <div
+                    class="liquid-glass liquid-glass-tint-tertiary rounded-xl p-4 sm:p-6 flex flex-col items-center justify-center space-y-1 sm:space-y-2">
+                    <span class="text-gray-600 text-[10px] sm:text-sm font-medium">الحاضرين</span>
+                    <span id="presentCount" class="text-2xl sm:text-4xl font-extrabold text-primary">0</span>
+                    <div class="liquid-glass-progress min-w-[30px] w-1/3">
+                        <div id="presentProgress" class="liquid-glass-progress-bar w-0"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AI Diagnostic Logs -->
+            <div id="aiLogsContainer" class="hidden mb-6">
+                <div class="flex items-center justify-between px-2 mb-2">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">سجل تحليل الذكاء الاصطناعي</h3>
+                    <div class="w-2 h-2 rounded-full bg-primary none"></div>
+                </div>
+                <div id="aiLogs"
+                    class="liquid-glass liquid-glass-subtle p-4 rounded-xl max-h-40 overflow-y-auto text-[10px] space-y-2 font-mono liquid-glass-scrollbar">
+                </div>
+            </div>
+
+            <!-- Student List -->
+            <section class="space-y-4">
+                <div class="flex justify-between items-center px-2">
+                    <h3 class="text-lg font-bold">قائمة الطلاب</h3>
+                    <button onclick="markAll('present')"
+                        class="liquid-glass-chip flex items-center gap-1 text-xs px-4 py-2 rounded-xl text-primary cursor-pointer">
+                        <span class="material-symbols-outlined text-[14px]">done_all</span> تحضير الكل
+                    </button>
+                </div>
+
+                <div id="studentList" class="space-y-3">
+                    <!-- Students will be injected here -->
+                </div>
+            </section>
+
+            <!-- Save button -->
+            <div class="pt-8 w-full">
+                <button onclick="saveAttendance()"
+                    class="liquid-button liquid-button-prominent w-full py-5 font-bold rounded-xl flex items-center justify-center gap-3">
+                    إرسال تقرير الحضور
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- AI Full-Screen Modal -->
+    <div id="aiModal" class="hidden fixed inset-0 z-50 bg-black text-white overflow-hidden opacity-0 transition-opacity duration-500 flex flex-col">
+        <!-- Header Overlay -->
+        <header class="absolute top-0 inset-x-0 z-30 p-4 flex justify-between items-center bg-transparent">
+            <button onclick="closeAiModal()" class="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center active:scale-90 transition-all">
+                <span class="material-symbols-outlined text-white">close</span>
+            </button>
+            <div class="text-center">
+                <h3 class="text-lg font-black tracking-tight text-white drop-shadow-md">نظام التحليل المباشر</h3>
+                <p id="aiCameraText" class="text-[10px] font-bold text-primary animate-pulse">جاري تهيئة الكاميرا...</p>
+            </div>
+            <div class="w-12 flex justify-end">
+                <span id="aiPresentCounter" class="bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-white whitespace-nowrap">0 / 0</span>
+            </div>
+        </header>
+
+        <!-- Main Camera Viewport -->
+        <main class="flex-1 relative overflow-hidden bg-black flex items-center justify-center" data-purpose="camera-viewfinder">
+            <video id="videoAi" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700"></video>
+            <canvas id="canvasAi" class="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none transition-transform duration-700"></canvas>
+            
+            <!-- Student Carousel Overlay (Moved inside to be over camera) -->
+            <section id="studentCarousel" class="absolute bottom-0 inset-x-0 z-20 w-full bg-transparent py-4">
+                <div id="carouselItems" class="flex overflow-x-auto no-scrollbar snap-x snap-mandatory px-4 gap-4 items-end min-h-[100px]">
+                    <!-- Students injected via JS -->
+                </div>
+            </section>
+
+            <!-- Removed Center Crosshair -->
+
+            <!-- Development Upload Input -->
+            <input type="file" id="devFileInput" class="hidden" accept="image/*" onchange="handleDevFileUpload(event)">
+        </main>
+
+
+
+        <!-- Premium Footer Controls -->
+        <footer class="h-32 w-full bg-[#F5F5F7]/90 backdrop-blur-lg shrink-0 flex items-center justify-center px-6 relative z-30" dir="ltr">
+            <div class="flex items-center justify-between w-full max-w-sm">
+                <!-- Video/Live Mode Button (Left) -->
+                <div class="flex flex-col items-center gap-1.5">
+                    <button id="recordBtn" onclick="toggleRecordMode()" class="w-14 h-14 rounded-full bg-[#FFAE2B] shadow-lg flex items-center justify-center active:scale-95 transition-all group">
+                        <span class="material-symbols-outlined text-white text-2xl group-active:scale-110">videocam</span>
+                    </button>
+                    <span class="text-[9px] font-black text-gray-500 uppercase tracking-tighter">تحليل مباشر</span>
+                </div>
+                
+                <!-- Main Shutter Button (Center) -->
+                <button id="captureBtn" onclick="captureImageAi()" class="w-[80px] h-[80px] rounded-full border-[4px] border-[#FFAE2B] p-1.5 flex items-center justify-center active:scale-90 transition-all shadow-xl relative">
+                    <div class="w-full h-full rounded-full bg-[#FFAE2B] shadow-inner flex items-center justify-center">
+                    </div>
+                </button>
+                
+                <!-- Camera Flip Button (Right) -->
+                <div class="flex flex-col items-center gap-1.5">
+                    <button onclick="switchAiCamera()" class="w-14 h-14 rounded-full bg-[#FFAE2B] shadow-lg flex items-center justify-center active:scale-95 transition-all group">
+                        <span class="material-symbols-outlined text-white text-2xl group-active:scale-110">flip_camera_ios</span>
+                    </button>
+                    <span class="text-[9px] font-black text-gray-500 uppercase tracking-tighter">قلب الكاميرا</span>
+                </div>
+            </div>
+
+            <!-- Dev Hidden Label -->
+            <button onclick="document.getElementById('devFileInput').click()" 
+                class="absolute bottom-2 right-4 text-[8px] font-black text-gray-300 opacity-30 hover:opacity-100 transition-opacity">
+                (للتطوير فقط - سيحذف لاحقاً)
+            </button>
+        </footer>
+    </div>
+
+
+
+
+    <!-- QR Modal -->
+    <div id="qrModal"
+        class="hidden fixed inset-0 z-50 liquid-glass-overlay flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="w-full max-w-sm flex flex-col items-center justify-center relative" id="qrModalContent">
+            <button onclick="closeQrModal()"
+                class="liquid-glass-icon icon-error absolute -top-14 right-0 w-11 h-11 rounded-xl z-10">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <div
+                class="text-right mb-6 w-full flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 px-2">
+                <div class="space-y-1">
+                    <h3 class="text-2xl font-bold refractive-text">تحضير هجين (QR & Face)</h3>
+                    <p class="text-gray-400 text-xs">مسح الرمز أو تثبيت الوجه للتسجيل التلقائي</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleQrMirror()"
+                        class="liquid-glass-chip text-primary px-3 py-2 rounded-xl flex items-center gap-1.5 text-[10px] font-bold">
+                        <span class="material-symbols-outlined text-[16px]">flip</span>
+                        عكس
+                    </button>
+                    <button onclick="switchQrCamera()"
+                        class="liquid-glass-chip text-primary px-3 py-2 rounded-xl flex items-center gap-1.5 text-[10px] font-bold">
+                        <span class="material-symbols-outlined text-[16px]">flip_camera_ios</span>
+                        تبديل
+                    </button>
+                </div>
+            </div>
+            <div class="liquid-glass-heavy w-full aspect-square rounded-xl overflow-hidden relative bg-black"
+                id="qrReaderContainer">
+                <div id="qr-reader" class="w-full h-full object-cover transition-transform duration-500 scale-x-[-1]">
+                </div>
+                <canvas id="canvasHybrid"
+                    class="absolute inset-0 w-full h-full transition-transform duration-500 scale-x-[-1] z-10 pointer-events-none"></canvas>
+
+
+                <!-- Temp Success Overlay -->
+                <div id="qrSuccessOverlay"
+                    class="absolute inset-0 bg-success/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200 rounded-xl">
+                    <div class="w-24 h-24 bg-white rounded-full flex items-center justify-between p-4 transition-all transform duration-300"
+                        id="qrSuccessIcon">
+                        <span class="material-symbols-outlined text-success text-6xl font-bold">check</span>
+                    </div>
+                    <h4 class="text-gray-800 font-bold text-2xl px-4 text-center mt-2" id="qrSuccessText">تم تحضير
+                        الطالب</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-gmail.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-gemini.js"></script>
+    <script src="scripts/module-face-api.js"></script>
+
+    <!-- Removed MediaPipe Helper -->
+    <script>
+        let user;
+        let currentClass = null;
+        let students = [];
+        let attendance = {};
+
+        async function init() {
+            const splash = document.getElementById('splashScreen');
+            const progress = document.getElementById('splashProgress');
+            const status = document.getElementById('splashStatus');
+
+            try {
+                const startTime = performance.now();
+                const logTime = (msg) => {
+                    const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+                    console.log(`[INIT LOG] ${elapsed}s: ${msg}`);
+                    status.innerText = msg;
+                };
+
+                user = Auth.checkAuth('teacher');
+                if (!user) return;
+
+                // 1. Initialize DB
+                logTime("جاري الاتصال بقاعدة البيانات...");
+                progress.style.width = "40%";
+                await DB.init();
+
+                // Fetch and display school name + teacher name
+                let welcomeText = `أهلاً، ${user.name}`;
+                if (user.schoolId) {
+                    const school = await DB.getSchool(user.schoolId);
+                    if (school) {
+                        welcomeText += ` | ${school.name}`;
+                    }
+                }
+                document.getElementById('teacherName').innerText = welcomeText;
+
+                // 2. Load basic UI Data
+                logTime("جاري جلب الفصول والطلاب...");
+                progress.style.width = "60%";
+
+                if (!currentClass) {
+                    await renderClassSelector();
+                } else {
+                    renderAttendanceView();
+                }
+
+                // 3. Preload and warm up Face AI models
+                logTime("جاري تشغيل وتهيئة محرك الذكاء الاصطناعي للوجوه...");
+                progress.style.width = "90%";
+                try {
+                    await FaceDetection.init();
+                    await FaceDetection.warmUp();
+                    logTime("تم تهيئة محرك الذكاء الاصطناعي بنجاح!");
+                } catch (faceErr) {
+                    console.warn("Face AI pre-load failed or offline, will retry on-demand:", faceErr);
+                    logTime("تنبيه: فشل تهيئة محرك الوجوه (قد تكون غير متصل بالإنترنت)، سيتم المحاولة لاحقاً.");
+                }
+
+                progress.style.width = "100%";
+                logTime("النظام جاهز تماماً!");
+
+                // Hide Splash with delay for smooth transition
+                setTimeout(() => {
+                    splash.style.opacity = '0';
+                    splash.style.pointerEvents = 'none';
+                    setTimeout(() => splash.remove(), 700);
+                }, 500);
+
+            } catch (e) {
+                console.error("Initialization Error:", e);
+                UI.toast('حدث خطأ أثناء تحميل البيانات', 'error');
+                document.getElementById('splashStatus').innerText = `فشل التحميل: ${e.message || 'خطأ غير معروف'}. يرجى التحقق من الاتصال وإعادة المحاولة.`;
+            }
+        }
+
+        async function renderClassSelector() {
+            const grid = document.getElementById('classesGrid');
+            const classes = await DB.getClasses();
+
+            // جلب تقارير اليوم للتحقق من الصفوف المقفلة
+            const today = new Date().toISOString().split('T')[0];
+            const todayRecords = await DB.getRecords(today);
+            const sentClassIds = todayRecords.map(r => r.classId);
+
+            document.getElementById('classSelector').classList.remove('hidden');
+            document.getElementById('attendanceView').classList.add('hidden');
+            document.getElementById('classNameDisplay').innerText = 'اختر الصف';
+
+            if (classes.length === 0) {
+                grid.innerHTML = '<p class="text-center text-gray-500">لا توجد صفوف مضافة حالياً</p>';
+                return;
+            }
+
+            grid.innerHTML = classes.map(c => {
+                const isSent = sentClassIds.includes(c.id);
+                return `
+                <div onclick="${isSent ? "UI.toast('تم إرسال تقرير هذا الصف بالفعل اليوم', 'info')" : `selectClass('${c.id}')`}"
+                    class="liquid-glass ${isSent ? 'opacity-60 grayscale-[0.5]' : 'liquid-glass-interactive liquid-glass-tint-primary'} rounded-xl p-4 sm:p-6 flex items-center justify-between transition-all">
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <div class="liquid-glass-icon ${isSent ? 'bg-gray-200 text-gray-400' : 'icon-primary'} w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center">
+                            <span class="material-symbols-outlined text-xl sm:text-2xl">${isSent ? 'lock' : 'class'}</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg ${isSent ? 'text-gray-500' : 'text-gray-800'}">${c.name}</h3>
+                            <p class="text-[10px] sm:text-xs text-gray-600">${isSent ? 'تم إرسال التقرير بنجاح ✅' : `الشعبة: ${c.section}`}</p>
+                        </div>
+                    </div>
+                    ${isSent ?
+                        '<span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">مقفل</span>' :
+                        '<span class="material-symbols-outlined text-gray-600 text-sm sm:text-base">arrow_back_ios</span>'
+                    }
+                </div>`;
+            }).join('');
+        }
+
+        async function selectClass(id) {
+            const classes = await DB.getClasses();
+            currentClass = classes.find(c => c.id === id);
+            students = await DB.getStudents(id);
+            attendance = {};
+            students.forEach(s => attendance[s.id] = 'absent');
+
+            renderAttendanceView();
+        }
+
+        async function resetClassSelection() {
+            currentClass = null;
+            await renderClassSelector();
+        }
+
+        function renderAttendanceView() {
+            document.getElementById('classSelector').classList.add('hidden');
+            document.getElementById('attendanceView').classList.remove('hidden');
+            document.getElementById('classNameDisplay').innerText = `${currentClass.name} - ${currentClass.section}`;
+            renderList();
+        }
+
+        function renderList() {
+            const list = document.getElementById('studentList');
+            if (students.length === 0) {
+                UI.showSkeleton(list, 'list-item', 5);
+            }
+
+            const total = students.length;
+            const present = Object.values(attendance).filter(v => v === 'present').length;
+
+            document.getElementById('totalStudents').innerText = total;
+            document.getElementById('presentCount').innerText = present;
+            document.getElementById('presentProgress').style.width = `${(present / (total || 1)) * 100}%`;
+
+            if (total === 0) {
+                list.innerHTML = '<p class="text-center text-gray-500 liquid-glass border-none shadow-none p-10 rounded-2xl">لا يوجد طلاب في هذا الصف</p>';
+                return;
+            }
+
+            list.innerHTML = students.map(s => `
+                <div class="liquid-glass border-none shadow-none rounded-[1.25rem] p-3 sm:p-4 flex items-center justify-between transition-all gap-2" id="row-${s.id}">
+                    <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+                        <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg sm:text-2xl shrink-0" 
+                             style="background: ${UI.getAvatarColor(s.id)}">
+                            ${s.name ? s.name.trim().charAt(0) : '?'}
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="font-bold text-gray-800 text-sm sm:text-base truncate">${s.name}</h4>
+                            <p class="text-gray-500 text-[10px] font-mono truncate">ID: ${s.academicId || s.id}</p>
+                        </div>
+                    </div>
+                    <div class="segmented-control shrink-0">
+                        <div id="highlight-${s.id}" class="highlight ${attendance[s.id] === 'present' ? 'highlight-present' : 'highlight-absent'}"></div>
+                        <button id="btn-present-${s.id}" onclick="setStatus('${s.id}', 'present')" 
+                            class="${attendance[s.id] === 'present' ? 'active' : ''}">
+                            حاضر
+                        </button>
+                        <button id="btn-absent-${s.id}" onclick="setStatus('${s.id}', 'absent')" 
+                            class="${attendance[s.id] === 'absent' ? 'active' : ''}">
+                            غائب
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setStatus(id, status) {
+            attendance[id] = status;
+
+            // تحديث مباشر للعناصر للسماح بالأنيميشن
+            const highlight = document.getElementById(`highlight-${id}`);
+            const btnPresent = document.getElementById(`btn-present-${id}`);
+            const btnAbsent = document.getElementById(`btn-absent-${id}`);
+
+            if (highlight && btnPresent && btnAbsent) {
+                if (status === 'present') {
+                    highlight.classList.add('highlight-present');
+                    highlight.classList.remove('highlight-absent');
+                    btnPresent.classList.add('active');
+                    btnAbsent.classList.remove('active');
+                } else {
+                    highlight.classList.add('highlight-absent');
+                    highlight.classList.remove('highlight-present');
+                    btnAbsent.classList.add('active');
+                    btnPresent.classList.remove('active');
+                }
+            }
+
+            // تحديث شريط التقدم والإحصائيات
+            const total = students.length;
+            const present = Object.values(attendance).filter(v => v === 'present').length;
+            document.getElementById('presentCount').innerText = present;
+            document.getElementById('presentProgress').style.width = `${(present / (total || 1)) * 100}%`;
+        }
+
+        function markAll(status) {
+            students.forEach(s => attendance[s.id] = status);
+            renderList();
+        }
+
+        // QR Camera & Logic
+        let html5QrcodeScanner = null;
+        let currentFacingMode = "environment";
+
+        function openQrModal() {
+            const modal = document.getElementById('qrModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            startQrScanner();
+        }
+
+        function closeQrModal() {
+            const modal = document.getElementById('qrModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            stopQrScanner();
+        }
+
+        async function startQrScanner() {
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("qr-reader");
+            }
+
+            // Start QR Scanner (Don't await to keep UI responsive)
+            html5QrcodeScanner.start(
+                { facingMode: currentFacingMode },
+                {
+                    fps: 15,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    // Use a lower resolution for faster startup on i3
+                    videoConstraints: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                },
+                onScanSuccess,
+                (errorMessage) => { }
+            ).then(async () => {
+                // Once QR is up, try to attach FaceDetection
+                // 1. Lazy load Face AI models if not ready
+                if (!FaceDetection.isModelsLoaded) {
+                    console.log("Loading models on-demand...");
+                    await FaceDetection.init();
+                    await FaceDetection.warmUp();
+                }
+
+                const checkVideo = setInterval(() => {
+                    const qrVideo = document.querySelector('#qr-reader video');
+                    if (qrVideo && qrVideo.readyState >= 2) {
+                        clearInterval(checkVideo);
+                        const canvasHybrid = document.getElementById('canvasHybrid');
+                        // Use setElements instead of init to skip redundant model checks
+                        FaceDetection.setElements(qrVideo, canvasHybrid);
+                        FaceDetection.onCapture = (descriptor) => handleCapturedDescriptor(descriptor, true);
+                        FaceDetection.start(true, true); // Tiny model, auto-lock
+                    }
+                }, 100);
+                // Safety timeout
+                setTimeout(() => clearInterval(checkVideo), 5000);
+            }).catch(err => {
+                console.error("QR Scanner Start Error: ", err);
+                UI.alert('تعذر الوصول للكاميرا', 'لا يمكن فتح الكاميرا لمسح الرمز حالياً.');
+            });
+        }
+
+        function stopQrScanner() {
+            FaceDetection.stop();
+            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+                html5QrcodeScanner.stop().catch(console.error);
+            }
+        }
+
+
+
+        let lastScannedUrl = "";
+        let lastScanTime = 0;
+
+        function onScanSuccess(decodedText, decodedResult) {
+            const now = Date.now();
+            if (decodedText === lastScannedUrl && (now - lastScanTime) < 2000) {
+                return;
+            }
+            lastScannedUrl = decodedText;
+            lastScanTime = now;
+
+            const student = students.find(s => s.id === decodedText);
+
+            if (student) {
+                attendance[student.id] = 'present';
+                renderList();
+                showQrSuccess(`تم الحضور:\n${student.name}`);
+            } else {
+                showQrSuccess(`طالب غير مسجل`, true);
+            }
+        }
+
+        function showQrSuccess(text, isError = false) {
+            const overlay = document.getElementById('qrSuccessOverlay');
+            const icon = document.getElementById('qrSuccessIcon');
+            const textEl = document.getElementById('qrSuccessText');
+
+            textEl.innerText = text;
+
+            if (isError) {
+                overlay.classList.replace('bg-success/90', 'bg-error/90');
+                icon.innerHTML = `<span class="material-symbols-outlined text-error text-6xl font-bold">close</span>`;
+            } else {
+                overlay.classList.replace('bg-error/90', 'bg-success/90');
+                icon.innerHTML = `<span class="material-symbols-outlined text-success text-6xl font-bold">check</span>`;
+            }
+
+            overlay.classList.remove('opacity-0');
+            setTimeout(() => {
+                icon.classList.replace('scale-50', 'scale-100');
+            }, 10);
+
+            setTimeout(() => {
+                overlay.classList.add('opacity-0');
+                icon.classList.replace('scale-100', 'scale-50');
+            }, 1500);
+        }
+
+        // --- AI Camera Logic (Refactored for Full Screen) ---
+        let streamAi = null;
+        let isAiAnalysisActive = false;
+        let isAnimationActive = false;
+        let animationTimeout = null;
+        let aiFacingMode = 'environment';
+        let aiMirrored = false;
+
+        function openAiModal() {
+            const modal = document.getElementById('aiModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            
+            renderCarousel();
+            startAiCamera();
+        }
+
+        function closeAiModal() {
+            const modal = document.getElementById('aiModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 500);
+            stopAiCamera();
+        }
+
+        function renderCarousel() {
+            const container = document.getElementById('carouselItems');
+            if (!students.length) return;
+
+            container.innerHTML = students.map(s => {
+                const isPresent = attendance[s.id] === 'present';
+                const bgColor = isPresent ? '#22c55e' : '#ef4444'; // Green or Red
+
+                return `
+                <article class="flex flex-col items-center shrink-0 snap-center transition-all duration-300" id="carousel-student-${s.id}">
+                    <div class="relative">
+                        <div id="avatar-${s.id}" class="w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-[2px] border-white/30 mb-2 overflow-hidden transition-all duration-300"
+                             style="background-color: ${bgColor}">
+                            <span class="text-white text-2xl font-black">${s.name.trim().charAt(0)}</span>
+                        </div>
+                    </div>
+                    <h3 class="text-white font-bold text-[10px] drop-shadow-md tracking-tight text-center max-w-[60px] truncate">${s.name.split(' ')[0]}</h3>
+                </article>
+            `}).join('');
+            
+            updateAiCounter();
+        }
+
+        function toggleStudentStatus(id) {
+            // Disabled per user request (view only)
+            return;
+        }
+
+        function updateAiCounter() {
+            const counter = document.getElementById('aiPresentCounter');
+            if (counter) {
+                const total = students.length;
+                const present = Object.values(attendance).filter(v => v === 'present').length;
+                counter.innerText = `${present} / ${total}`;
+            }
+        }
+
+        async function startAiCamera() {
+            try {
+                const video = document.getElementById('videoAi');
+                const canvas = document.getElementById('canvasAi');
+                const statusText = document.getElementById('aiCameraText');
+
+                statusText.innerText = 'جاري تحميل الموديلات...';
+                
+                if (!FaceDetection.isModelsLoaded) {
+                    await FaceDetection.init();
+                    await FaceDetection.warmUp();
+                }
+
+                streamAi = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: aiFacingMode
+                    }
+                });
+                
+                video.srcObject = streamAi;
+                await video.play();
+
+                // Setup FaceDetection Elements
+                FaceDetection.setElements(video, canvas);
+                
+                // Set mirroring based on camera
+                aiMirrored = (aiFacingMode === 'user');
+                updateAiMirrorUI();
+
+                statusText.innerText = 'جاهز للتحليل';
+                statusText.classList.remove('animate-pulse');
+
+                // Start Detection Loop (Manual Mode by default)
+                startDetectionLoop();
+
+            } catch (err) {
+                console.error("Camera Start Error:", err);
+                UI.toast('فشل فتح الكاميرا', 'error');
+                closeAiModal();
+            }
+        }
+
+        function stopAiCamera() {
+            isAiAnalysisActive = false;
+            FaceDetection.stop();
+            if (streamAi) {
+                streamAi.getTracks().forEach(t => t.stop());
+                streamAi = null;
+            }
+        }
+
+        function updateAiMirrorUI() {
+            const video = document.getElementById('videoAi');
+            const canvas = document.getElementById('canvasAi');
+            if (aiMirrored) {
+                video.style.transform = 'scaleX(-1)';
+                canvas.style.transform = 'scaleX(-1)';
+            } else {
+                video.style.transform = 'scaleX(1)';
+                canvas.style.transform = 'scaleX(1)';
+            }
+        }
+
+        async function switchAiCamera() {
+            aiFacingMode = aiFacingMode === 'environment' ? 'user' : 'environment';
+            stopAiCamera();
+            setTimeout(startAiCamera, 300);
+        }
+
+        function toggleRecordMode() {
+            const btn = document.getElementById('recordBtn');
+            const statusText = document.getElementById('aiCameraText');
+            
+            isAiAnalysisActive = !isAiAnalysisActive;
+
+            if (isAiAnalysisActive) {
+                btn.classList.add('ring-4', 'ring-primary/50', 'animate-pulse');
+                btn.querySelector('span').innerText = 'stop_circle';
+                btn.querySelector('span').classList.add('text-red-500');
+                statusText.innerText = 'جاري التحليل المباشر...';
+                statusText.classList.add('text-primary');
+            } else {
+                btn.classList.remove('ring-4', 'ring-primary/50', 'animate-pulse');
+                btn.querySelector('span').innerText = 'videocam';
+                btn.querySelector('span').classList.remove('text-red-500');
+                statusText.innerText = 'التحليل المباشر متوقف';
+                statusText.classList.remove('text-primary');
+                // Clear canvas
+                const ctx = document.getElementById('canvasAi').getContext('2d');
+                const videoAi = document.getElementById('videoAi');
+                ctx.clearRect(0, 0, videoAi.videoWidth, videoAi.videoHeight);
+            }
+        }
+
+        async function startDetectionLoop() {
+            const video = document.getElementById('videoAi');
+            const canvas = document.getElementById('canvasAi');
+            const ctx = canvas.getContext('2d');
+
+            const loop = async () => {
+                if (!streamAi) return;
+
+                if (isAnimationActive) {
+                    return requestAnimationFrame(loop);
+                }
+
+                if (video.readyState >= 2) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Use FaceAPI to detect all faces
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    const detections = await faceapi.detectAllFaces(video, options)
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    detections.forEach(det => {
+                        const { x, y, width, height } = det.detection.box;
+                        const centerX = x + width / 2;
+                        const centerY = y + height * 0.45; // Moved up slightly
+                        const radius = width * 0.6; // Slightly tighter
+
+                        // Identify the face
+                        const match = FaceDetection.findBestMatch(det.descriptor, students);
+                        
+                        // Draw UI Feedback
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                        ctx.lineWidth = 4;
+                        
+                        if (match) {
+                            ctx.strokeStyle = '#22c55e'; // Green
+                            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)'; // Transparent Green
+                            
+                            // Auto-capture if live analysis is on
+                            if (isAiAnalysisActive && attendance[match.id] !== 'present') {
+                                markStudentPresent(match, video, det.detection.box);
+                            }
+                        } else {
+                            ctx.strokeStyle = '#ef4444'; // Red
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'; // Transparent Red
+                        }
+                        
+                        ctx.fill();
+                        ctx.stroke();
+                    });
+                }
+
+                requestAnimationFrame(loop);
+            };
+
+            loop();
+        }
+
+        function markStudentPresent(student, video = null, box = null) {
+            attendance[student.id] = 'present';
+            renderList(); // Update main list
+
+            // Update Carousel UI
+            const avatar = document.getElementById(`avatar-${student.id}`);
+            const statusIcon = document.getElementById(`status-icon-${student.id}`);
+            const studentItem = document.getElementById(`carousel-student-${student.id}`);
+
+            if (avatar) {
+                if (video && box) {
+                    // Crop Face Image
+                    const faceCanvas = document.createElement('canvas');
+                    faceCanvas.width = 160;
+                    faceCanvas.height = 160;
+                    const fCtx = faceCanvas.getContext('2d');
+                    
+                    // Add some padding to the crop
+                    const pad = box.width * 0.2;
+                    fCtx.drawImage(video, 
+                        box.x - pad, box.y - pad, box.width + pad*2, box.height + pad*2, 
+                        0, 0, 160, 160
+                    );
+
+                    avatar.innerHTML = `<img src="${faceCanvas.toDataURL()}" class="w-full h-full object-cover" />`;
+                }
+                
+                avatar.style.backgroundColor = '#22c55e'; // Green
+                avatar.classList.add('border-success');
+                
+                // Animation effect
+                if (studentItem) {
+                    studentItem.classList.add('scale-110');
+                    setTimeout(() => studentItem.classList.remove('scale-110'), 500);
+                }
+                
+                UI.toast(`تم تحضير: ${student.name}`, 'success');
+            }
+        }
+
+        async function handleCapturedDescriptor(descriptor, isAuto = true) {
+            const match = FaceDetection.findBestMatch(descriptor, students);
+            if (match) {
+                if (attendance[match.id] !== 'present') {
+                    markStudentPresent(match);
+                }
+            } else if (!isAuto) {
+                UI.toast('لم يتم التعرف على الوجه', 'warning');
+            }
+        }
+
+        async function captureImageAi() {
+            if (isAnimationActive || !streamAi) return;
+            isAnimationActive = true;
+            
+            const video = document.getElementById('videoAi');
+            const canvas = document.getElementById('canvasAi');
+            const ctx = canvas.getContext('2d');
+            const statusText = document.getElementById('aiCameraText');
+            
+            // Pause video to freeze the frame
+            video.pause();
+            
+            // Draw the current frame as a background on canvas for the slide-down effect later
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            statusText.innerText = 'جاري تحليل الصورة...';
+            statusText.classList.add('text-primary', 'animate-pulse');
+
+            try {
+                // Detect faces
+                const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                const detections = await faceapi.detectAllFaces(video, options)
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+
+                if (detections.length === 0) {
+                    UI.toast('لم يتم العثور على وجوه', 'warning');
+                    resumeCamera();
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Step 1: Draw Orange circles sequentially
+                for (let i = 0; i < detections.length; i++) {
+                    const det = detections[i];
+                    drawFaceCircle(ctx, det.detection.box, '#f97316'); // Orange
+                    await new Promise(r => setTimeout(r, 100)); // 0.1s delay
+                }
+
+                // Step 2: Analyze sequentially
+                for (let i = 0; i < detections.length; i++) {
+                    const det = detections[i];
+                    const match = FaceDetection.findBestMatch(det.descriptor, students);
+                    
+                    if (match) {
+                        drawFaceCircle(ctx, det.detection.box, '#22c55e'); // Green
+                        if (attendance[match.id] !== 'present') {
+                            markStudentPresent(match, video, det.detection.box);
+                        }
+                    } else {
+                        drawFaceCircle(ctx, det.detection.box, '#ef4444'); // Red
+                    }
+                    await new Promise(r => setTimeout(r, 100)); // 0.1s delay
+                }
+
+                statusText.innerText = 'تم الانتهاء من التحليل';
+                statusText.classList.remove('animate-pulse');
+                
+                // Add click listener to skip wait
+                const skipWait = (e) => {
+                    // Prevent triggering if clicked on carousel buttons
+                    if(e.target.closest('button') || e.target.closest('article')) return; 
+                    resumeCamera();
+                };
+                
+                const modal = document.getElementById('aiModal');
+                modal.addEventListener('click', skipWait);
+
+                // Wait 3 seconds then resume (slide down effect simulated by clearing canvas and unpausing)
+                animationTimeout = setTimeout(() => {
+                    modal.removeEventListener('click', skipWait);
+                    resumeCamera();
+                }, 3000);
+
+            } catch (err) {
+                console.error(err);
+                resumeCamera();
+            }
+        }
+
+        function drawFaceCircle(ctx, box, color) {
+            const { x, y, width, height } = box;
+            const centerX = x + width / 2;
+            const centerY = y + height * 0.45; // Moved up slightly
+            const radius = width * 0.6; // Slightly tighter
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = color;
+            
+            const fillColors = {
+                '#f97316': 'rgba(249, 115, 22, 0.2)', // orange
+                '#22c55e': 'rgba(34, 197, 94, 0.2)', // green
+                '#ef4444': 'rgba(239, 68, 68, 0.2)'  // red
+            };
+            ctx.fillStyle = fillColors[color] || 'rgba(0,0,0,0)';
+            
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function resumeCamera() {
+            if (animationTimeout) clearTimeout(animationTimeout);
+            isAnimationActive = false;
+            
+            const video = document.getElementById('videoAi');
+            const canvas = document.getElementById('canvasAi');
+            
+            // Step 1: Resume live video behind the canvas
+            if (video.paused) video.play();
+
+            // Step 2: Slide down the entire canvas (image + circles)
+            // Combine mirroring (scaleX) with sliding (translateY)
+            const mirrorPart = aiMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+            canvas.style.transition = 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s';
+            canvas.style.transform = `${mirrorPart} translateY(100%)`;
+            canvas.style.opacity = '0';
+            
+            setTimeout(() => {
+                // Step 3: Clear and reset canvas after animation
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                canvas.style.transition = 'none';
+                canvas.style.transform = mirrorPart;
+                canvas.style.opacity = '1';
+                
+                setTimeout(() => {
+                    canvas.style.transition = 'transform 0.7s';
+                }, 50);
+                
+                const statusText = document.getElementById('aiCameraText');
+                statusText.innerText = isAiAnalysisActive ? 'جاري التحليل المباشر...' : 'جاهز للتحليل';
+                if (isAiAnalysisActive) statusText.classList.add('animate-pulse');
+            }, 800); 
+        }
+
+        async function handleDevFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            UI.toast('جاري تحليل الصورة المرفوعة...', 'info');
+            const img = await faceapi.bufferToImage(file);
+            
+            const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptors();
+
+            if (detections.length === 0) {
+                UI.toast('لم يتم العثور على وجوه في الصورة', 'warning');
+                return;
+            }
+
+            detections.forEach(det => {
+                const match = FaceDetection.findBestMatch(det.descriptor, students);
+                if (match) {
+                    markStudentPresent(match, img, det.detection.box);
+                } else {
+                    UI.toast('تم اكتشاف وجه غير معروف', 'warning');
+                }
+            });
+        }
+
+
+        let qrMirrored = false;
+        function toggleQrMirror() {
+            qrMirrored = !qrMirrored;
+            updateQrMirrorUI();
+        }
+
+        function updateQrMirrorUI() {
+            const video = document.querySelector('#qr-reader video');
+            const canvas = document.getElementById('canvasHybrid');
+            if (qrMirrored) {
+                if (video) video.classList.add('scale-x-[-1]');
+                canvas.classList.add('scale-x-[-1]');
+            } else {
+                if (video) video.classList.remove('scale-x-[-1]');
+                canvas.classList.remove('scale-x-[-1]');
+            }
+        }
+
+        function switchQrCamera() {
+            currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+            // Default: mirror for front camera
+            qrMirrored = (currentFacingMode === "user");
+
+            stopQrScanner();
+            setTimeout(() => {
+                startQrScanner();
+                // We need to wait a bit for the video element to be created by the library
+                setTimeout(updateQrMirrorUI, 1000);
+            }, 300);
+        }
+
+
+
+        // Diagnostic Logs Listener
+        window.addEventListener('gemini-log', (e) => {
+            const container = document.getElementById('aiLogsContainer');
+            const logs = document.getElementById('aiLogs');
+            if (container && logs) {
+                container.classList.remove('hidden');
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const icon = e.detail.type === 'error' ? 'warning' : (e.detail.type === 'req' ? 'sync' : 'info');
+                const color = e.detail.type === 'error' ? 'text-error' : (e.detail.type === 'req' ? 'text-primary' : 'text-success');
+
+                const entry = document.createElement('div');
+                entry.className = `flex gap-2 items-start ${color} animate-fade-in`;
+                entry.innerHTML = `<span class="material-symbols-outlined text-[12px] mt-0.5">${icon}</span><div class="flex-1"><span class="text-[8px] opacity-70">[${time}]</span> <span>${e.detail.msg}</span></div>`;
+                logs.prepend(entry);
+            }
+        });
+
+        async function saveAttendance() {
+            const date = new Date().toISOString().split('T')[0];
+
+            // تحقق إضافي قبل الحفظ للتأكد من عدم التكرار
+            const existingRecords = await DB.getRecords(date);
+            if (existingRecords.some(r => r.classId === currentClass.id)) {
+                UI.toast('هذا الصف مقفل، تم إرسال تقريره مسبقاً', 'warning');
+                resetClassSelection();
+                return;
+            }
+
+            const list = Object.entries(attendance).map(([id, status]) => ({ studentId: id, status }));
+
+            try {
+                UI.toast('جاري حفظ التقرير...', 'info');
+                await DB.saveAttendance(date, currentClass.id, list, user.id, null);
+
+                // Send Email if Gmail is connected
+                if (GmailManager.isConnected()) {
+                    try {
+                        const presentCount = list.filter(s => s.status === 'present').length;
+                        const absentCount = list.filter(s => s.status === 'absent').length;
+                        const subject = `تقرير حضور: ${currentClass.name} - ${date}`;
+                        const body = `تم تسجيل حضور الصف: ${currentClass.name}\nالتاريخ: ${date}\nالمعلم: ${user.name}\n\nعدد الحاضرين: ${presentCount}\nعدد الغائبين: ${absentCount}\n\nتم الإرسال عبر نظام الحضور الذكي.`;
+
+                        // We can send to a fixed admin email or current user
+                        await GmailManager.sendEmail(user.email || 'admin@school.com', subject, body);
+                        UI.toast('تم إرسال نسخة للبريد الإلكتروني', 'success');
+                    } catch (emailErr) {
+                        console.error("Email Error:", emailErr);
+                        UI.toast('تعذر إرسال الإيميل، لكن تم حفظ التقرير', 'warning');
+                    }
+                }
+
+                await UI.alert('تم الإرسال بنجاح', 'تم تسجيل تقرير الحضور لهذا الصف. سيظهر الصف الآن كمقفل لبقية اليوم.');
+                resetClassSelection(); // العودة للقائمة لقفل الصف
+            } catch (e) {
+                console.error("Save Error:", e);
+                UI.toast('حدث خطأ أثناء حفظ التقرير', 'error');
+            }
+        }
+
+        // Update init to sync status
+        const originalInit = init;
+        init = async function () {
+            await originalInit();
+            if (typeof GmailManager !== 'undefined') {
+                await GmailManager.init();
+            }
+        };
+
+        init();
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Registration failed', err));
+            });
+        }
+    </script>
+</body>
+
+</html>

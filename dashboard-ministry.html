@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <meta name="theme-color" content="#faf7f2">
+    <title>بوابة الوزارة | نظام الحضور الذكي</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <link href="styles/style.css" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffa726",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff",
+                        "error": "#f44336"
+                    },
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --header-h: 56px;
+            --nav-h: 68px;
+        }
+
+        html, body { height: 100%; overflow: hidden; background-color: #faf7f2; font-family: 'Tajawal', sans-serif; }
+
+        #main-header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 50; height: var(--header-h);
+            background: rgba(250, 247, 242, 0.92); backdrop-filter: blur(24px); border-bottom: 1.5px solid #e0dcd0;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+        }
+
+        #tabs-wrapper {
+            position: fixed; top: var(--header-h); bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+            left: 0; right: 0; overflow: hidden;
+        }
+
+        .tab-panel { position: absolute; inset: 0; overflow-y: auto; padding: 16px; display: none; }
+        .tab-panel.active { display: block; }
+
+        #bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+            height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+            background: rgba(250, 247, 242, 0.95); backdrop-filter: blur(28px); border-top: 1.5px solid #e0dcd0;
+        }
+
+        #nav-inner { height: var(--nav-h); display: flex; align-items: center; justify-content: space-around; }
+
+        .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+        .nav-btn .nav-icon { font-size: 22px; color: #b0a898; }
+        .nav-btn .nav-label { font-size: 10px; font-weight: 700; color: #b0a898; }
+        .nav-btn.active .nav-icon, .nav-btn.active .nav-label { color: #ffa726; }
+    </style>
+</head>
+
+<body>
+    <header id="main-header">
+        <div>
+            <h1 class="text-sm font-extrabold text-gray-800">بوابة الوزارة</h1>
+            <p id="active-tab-title" class="text-[10px] font-bold text-primary">الإحصائيات العامة</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="Auth.logout()" class="w-9 h-9 rounded-xl liquid-glass-icon icon-error flex items-center justify-center">
+                <span class="material-symbols-outlined" style="font-size:16px">power_settings_new</span>
+            </button>
+        </div>
+    </header>
+
+    <div id="tabs-wrapper">
+        <!-- Overview Tab -->
+        <div id="tab-overview" class="tab-panel active">
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">إجمالي المدارس</p>
+                    <h2 id="totalSchools" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">إجمالي الطلاب</p>
+                    <h2 id="totalStudents" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+            </div>
+            <div class="liquid-glass p-4 rounded-2xl mb-6">
+                <h3 class="font-bold text-sm mb-4">توزيع المدارس حسب المحافظة</h3>
+                <div class="h-40 flex items-center justify-center text-gray-400 text-xs italic">
+                    رسم بياني توضيحي (قريباً)
+                </div>
+            </div>
+        </div>
+
+        <!-- Schools Tab -->
+        <div id="tab-schools" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-gray-800">إدارة المدارس</h3>
+                <button onclick="showAddSchoolModal()" class="liquid-button liquid-button-prominent text-white px-4 py-2 rounded-xl text-xs font-bold">+ مدرسة جديدة</button>
+            </div>
+            <div id="schoolsList" class="space-y-3">
+                <!-- Schools will be injected here -->
+            </div>
+        </div>
+
+        <!-- Principals Tab -->
+        <div id="tab-principals" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-gray-800">مدراء المدارس</h3>
+                <button onclick="showAddPrincipalModal()" class="liquid-button liquid-button-prominent text-white px-4 py-2 rounded-xl text-xs font-bold">+ مدير جديد</button>
+            </div>
+            <div id="principalsList" class="space-y-3">
+                <!-- Principals will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <nav id="bottom-nav">
+        <div id="nav-inner">
+            <button class="nav-btn active" onclick="switchTab('overview')">
+                <span class="material-symbols-outlined nav-icon">dashboard</span>
+                <span class="nav-label">الرئيسية</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('schools')">
+                <span class="material-symbols-outlined nav-icon">school</span>
+                <span class="nav-label">المدارس</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('principals')">
+                <span class="material-symbols-outlined nav-icon">badge</span>
+                <span class="nav-label">المدراء</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="fixed inset-0 liquid-glass-overlay z-50 hidden flex items-center justify-center p-4">
+        <!-- Add School Modal -->
+        <div id="schoolModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden">
+            <h2 class="text-xl font-black mb-6">إضافة مدرسة جديدة</h2>
+            <form onsubmit="handleSaveSchool(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">اسم المدرسة</label>
+                    <input type="text" id="schoolName" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">الموقع / العنوان</label>
+                    <input type="text" id="schoolAddress" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <button type="submit" class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl mt-4">حفظ المدرسة</button>
+                <button type="button" onclick="closeModal()" class="w-full text-gray-400 text-sm font-bold py-2">إلغاء</button>
+            </form>
+        </div>
+
+        <!-- Add Principal Modal -->
+        <div id="principalModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden">
+            <h2 class="text-xl font-black mb-6">إضافة مدير مدرسة</h2>
+            <form onsubmit="handleSavePrincipal(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">اسم المدير</label>
+                    <input type="text" id="pName" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">الرقم الوزاري</label>
+                    <input type="text" id="pMinistryId" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">كلمة السر</label>
+                    <input type="password" id="pPassword" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">المدرسة</label>
+                    <select id="pSchoolId" required class="w-full liquid-glass-input rounded-xl p-3">
+                        <!-- Schools will be loaded here -->
+                    </select>
+                </div>
+                <button type="submit" class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl mt-4">حفظ المدير</button>
+                <button type="button" onclick="closeModal()" class="w-full text-gray-400 text-sm font-bold py-2">إلغاء</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script>
+        // Check Auth
+        const user = Auth.checkAuth('ministry');
+        if (!user) window.location.href = 'index.html';
+
+        async function init() {
+            UI.setLoading(true);
+            await DB.init();
+            await refreshData();
+            UI.setLoading(false);
+        }
+
+        async function refreshData() {
+            const schools = await DB.getSchools();
+            const teachers = await DB.getTeachers(); // For ministry, this returns all teachers
+            const students = await DB.getStudents();
+
+            document.getElementById('totalSchools').textContent = schools.length;
+            document.getElementById('totalStudents').textContent = students.length;
+
+            renderSchools(schools);
+            renderPrincipals(teachers.filter(t => t.role === 'admin'));
+            
+            // Populate school select in principal modal
+            const schoolSelect = document.getElementById('pSchoolId');
+            schoolSelect.innerHTML = schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        }
+
+        function renderSchools(schools) {
+            const list = document.getElementById('schoolsList');
+            if (schools.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 py-10">لا توجد مدارس مضافة حالياً</p>';
+                return;
+            }
+            list.innerHTML = schools.map(s => `
+                <div class="liquid-glass p-4 rounded-2xl flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${s.name}</h4>
+                        <p class="text-[10px] text-gray-400">${s.address}</p>
+                    </div>
+                    <button onclick="handleDeleteSchool('${s.id}')" class="text-error">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderPrincipals(principals) {
+            const list = document.getElementById('principalsList');
+            if (principals.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 py-10">لا يوجد مدراء مضافون حالياً</p>';
+                return;
+            }
+            list.innerHTML = principals.map(p => `
+                <div class="liquid-glass p-4 rounded-2xl flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${p.name}</h4>
+                        <p class="text-[10px] text-gray-400">الرقم الوزاري: ${p.ministryId}</p>
+                    </div>
+                    <div class="text-left">
+                        <span class="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-lg">مدير مدرسة</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            const titles = { overview: 'الإحصائيات العامة', schools: 'إدارة المدارس', principals: 'مدراء المدارس' };
+            document.getElementById('active-tab-title').textContent = titles[tabId];
+        }
+
+        function showAddSchoolModal() {
+            UI.showModal('schoolModal');
+        }
+
+        function showAddPrincipalModal() {
+            UI.showModal('principalModal');
+        }
+
+        function closeModal() {
+            UI.hideModal();
+        }
+
+        async function handleSaveSchool(e) {
+            e.preventDefault();
+            const school = {
+                name: document.getElementById('schoolName').value,
+                address: document.getElementById('schoolAddress').value
+            };
+            await DB.addSchool(school);
+            UI.toast('تم إضافة المدرسة بنجاح');
+            closeModal();
+            refreshData();
+        }
+
+        async function handleSavePrincipal(e) {
+            e.preventDefault();
+            const principal = {
+                name: document.getElementById('pName').value,
+                ministryId: document.getElementById('pMinistryId').value,
+                password: document.getElementById('pPassword').value,
+                schoolId: document.getElementById('pSchoolId').value,
+                role: 'admin'
+            };
+            await DB.addTeacher(principal);
+            UI.toast('تم إضافة المدير بنجاح');
+            closeModal();
+            refreshData();
+        }
+
+        async function handleDeleteSchool(id) {
+            if (confirm('هل أنت متأكد من حذف هذه المدرسة؟ سيتم حذف جميع البيانات المرتبطة بها.')) {
+                await DB.deleteSchool(id);
+                UI.toast('تم حذف المدرسة');
+                refreshData();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

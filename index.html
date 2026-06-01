@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#faf7f2"> <!-- Using var(--color-cream) -->
+    <title>دخول | نظام الحضور الذكي</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <link href="styles/style.css" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffab31",
+                        "on-primary": "#1b1b1b",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff"
+                    },
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: var(--color-cream);
+            overflow-x: hidden;
+        }
+
+
+
+        @keyframes animate-fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: animate-fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center py-6 sm:py-12 px-4 sm:px-6 text-gray-800 font-sans">
+    <!-- Ambient Background -->
+    <div class="liquid-glass-ambient">
+        <div class="orb orb-primary"></div>
+        <div class="orb orb-tertiary"></div>
+        <div class="orb orb-accent"></div>
+    </div>
+
+    <div class="w-full max-w-full sm:max-w-md space-y-6 sm:space-y-8 relative z-10">
+        <!-- Logo & Title -->
+        <div class="text-center">
+            <div
+                class="liquid-glass-icon icon-primary w-20 h-20 sm:w-24 sm:h-24 rounded-xl mx-auto mb-4 sm:mb-6 border border-primary/20 flex items-center justify-center overflow-hidden">
+                <img src="assets/brand-logo.png" alt="Logo" class="w-full h-full object-contain p-2" />
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-bold refractive-text">بوابة الحضور الذكي</h1>
+            <p class="text-gray-500 mt-2 sm:mt-3 text-xs sm:text-sm">مرحباً بك، يرجى تسجيل الدخول للمتابعة</p>
+        </div>
+
+        <!-- Login Form Container -->
+        <div class="liquid-glass-container overflow-hidden rounded-xl">
+            <!-- Teacher Login Form -->
+            <div id="teacherForm"
+                class="liquid-glass liquid-glass-prominent p-6 sm:p-8 space-y-4 sm:space-y-6">
+                <div class="space-y-1 sm:space-y-2">
+                    <label class="text-xs sm:text-sm font-medium text-gray-600 refractive-text">الرقم
+                        الوزاري</label>
+                    <div class="relative">
+                        <span
+                            class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">badge</span>
+                        <input type="text" id="ministryId"
+                            class="liquid-glass-input w-full rounded-xl pr-12 py-3 sm:py-3.5 text-xs sm:text-sm"
+                            placeholder="أدخل رقمك الوزاري">
+                    </div>
+                </div>
+                <div class="space-y-1 sm:space-y-2">
+                    <label class="text-xs sm:text-sm font-medium text-gray-600 refractive-text">كلمة السر</label>
+                    <div class="relative">
+                        <span
+                            class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">lock</span>
+                        <input type="password" id="password"
+                            class="liquid-glass-input w-full rounded-xl pr-12 py-3 sm:py-3.5 text-xs sm:text-sm"
+                            placeholder="••••••••">
+                    </div>
+                </div>
+                <button onclick="handleLogin()"
+                    class="liquid-button liquid-button-prominent w-full py-3.5 sm:py-4 text-on-primary font-bold rounded-xl text-xs sm:text-sm">دخول
+                    النظام</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script>
+        let allClasses = [];
+        let allStudents = [];
+
+        async function handleLogin() {
+            const mid = document.getElementById('ministryId').value;
+            const pass = document.getElementById('password').value;
+
+            const btn = event.currentTarget;
+            UI.setLoading(true);
+            btn.disabled = true;
+
+            const result = await Auth.login(mid, pass);
+
+            if (result.success) {
+                UI.toast('تم الدخول بنجاح', 'success');
+                setTimeout(() => {
+                    if (result.user.role === 'ministry') {
+                        window.location.href = 'dashboard-ministry.html';
+                    } else if (result.user.role === 'admin') {
+                        window.location.href = 'dashboard-admin.html';
+                    } else {
+                        window.location.href = 'dashboard-teacher.html';
+                    }
+                }, 1000);
+            } else {
+                UI.setLoading(false);
+                btn.disabled = false;
+                UI.toast(result.message, 'error');
+            }
+        }
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Registration failed', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
