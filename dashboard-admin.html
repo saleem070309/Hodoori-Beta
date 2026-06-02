@@ -25,7 +25,6 @@
         import * as docx from 'https://cdn.jsdelivr.net/npm/docx@8.5.0/+esm';
         window.docx = docx;
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         tailwind.config = {
@@ -127,29 +126,6 @@
         }
 
         @media (min-width: 1024px) {
-            .assistant-sidebar-drawer {
-                transform: translateX(0) !important;
-                box-shadow: -4px 0 20px rgba(0,0,0,0.02) !important;
-                z-index: 40 !important;
-                width: 280px !important;
-            }
-            .assistant-drawer-overlay {
-                display: none !important;
-            }
-            .assistant-drawer-close-btn {
-                display: none !important;
-            }
-            .assistant-top-right-hamburger {
-                display: none !important;
-            }
-            #mobile-hamburger-btn {
-                display: none !important;
-            }
-            #tabs-wrapper, #main-header {
-                right: 280px !important;
-                left: 0 !important;
-                width: auto !important;
-            }
             #bottom-nav {
                 display: none !important;
             }
@@ -487,8 +463,8 @@
         }
 
         .agent-markdown p {
-            margin-bottom: 12px !important;
-            line-height: 1.8 !important;
+            margin-bottom: 8px !important;
+            line-height: 1.45 !important;
         }
 
         .agent-markdown p:last-child {
@@ -498,19 +474,19 @@
         /* Support for bullet and numbered lists */
         .agent-markdown ul {
             list-style-type: disc !important;
-            margin: 10px 24px 14px 0 !important;
+            margin: 8px 20px 10px 0 !important;
             padding-right: 0 !important;
         }
 
         .agent-markdown ol {
             list-style-type: decimal !important;
-            margin: 10px 24px 14px 0 !important;
+            margin: 8px 20px 10px 0 !important;
             padding-right: 0 !important;
         }
 
         .agent-markdown li {
-            margin-bottom: 6px !important;
-            line-height: 1.7 !important;
+            margin-bottom: 4px !important;
+            line-height: 1.45 !important;
             list-style-position: outside !important;
         }
 
@@ -642,11 +618,10 @@
 
     <!-- ─── Fixed Header (Sleek, transparent & 48px height) ─── -->
     <header id="main-header" style="display: none !important;">
-        <!-- Right side (First child in RTL): Animated Custom Hamburger Menu Icon -->
         <div class="assistant-top-right-hamburger lg:hidden" onclick="window.toggleAssistantDrawer(event)"
-            title="القائمة" style="display: flex !important; align-items: center; justify-content: center; width: 22px; height: 12px; cursor: pointer; z-index: 50;">
+            title="القائمة" style="z-index: 50;">
             <div class="assistant-hamburger-line assistant-hamburger-line-1"></div>
-            <div class="assistant-hamburger-line assistant-hamburger-line-2" style="margin-top: 4px;"></div>
+            <div class="assistant-hamburger-line assistant-hamburger-line-2"></div>
         </div>
 
         <!-- Left side (Last child in RTL): Brand Text "حضوري" with the AI logo -->
@@ -827,47 +802,62 @@
                         </div>
 
                         <!-- Tab Content: التطبيقات (Apps) -->
-                        <div id="customizer-panel-connectors" class="customizer-tab-panel active">
-                            <!-- Gmail Card -->
-                            <div class="customizer-card active cursor-pointer" onclick="window.toggleCustomItem('conn-gmail')">
-                                <div class="customizer-card-icon text-red-500">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail">
+                        <div id="customizer-panel-connectors" class="customizer-tab-panel active relative">
+                            <!-- List View -->
+                            <div id="connectors-list-view" class="flex flex-col gap-3 w-full h-full">
+                                <!-- Gmail Card -->
+                                <div class="customizer-card cursor-pointer hover:bg-gray-50/50 dark:hover:bg-neutral-800/50 transition-all" onclick="window.showConnectorDetail('gmail', event)">
+                                    <div class="customizer-card-icon text-red-500">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail">
+                                    </div>
+                                    <div class="customizer-card-details">
+                                        <span class="customizer-card-title">Gmail</span>
+                                        <span class="customizer-card-desc">سوف يصبح بإمكان حضوري إرسال إيميلات بدلاً منك</span>
+                                    </div>
+                                    <button class="customizer-card-action">
+                                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                                    </button>
                                 </div>
-                                <div class="customizer-card-details">
-                                    <span class="customizer-card-title">Gmail</span>
-                                    <span class="customizer-card-desc">سوف يصبح بإمكان حضوري إرسال إيميلات بدلاً منك</span>
-                                </div>
-                                <button class="customizer-card-action">
-                                    <span class="material-symbols-outlined text-[16px]" id="gmail-custom-link-icon">link</span>
-                                </button>
-                            </div>
-                            
-                            <!-- Canva Card (Locked / Coming Soon) -->
-                            <div class="customizer-card disabled">
-                                <div class="customizer-card-icon">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Canva_icon_2021.svg" alt="Canva">
-                                </div>
-                                <div class="customizer-card-details">
-                                    <span class="customizer-card-title">Canva</span>
-                                    <span class="customizer-card-desc">لربط إبداعك وتصميمك بحضوري لتتمكن من استخدامها فيه</span>
-                                </div>
-                                <button class="customizer-card-action">
-                                    <span class="material-symbols-outlined text-[16px]">lock</span>
-                                </button>
                             </div>
 
-                            <!-- Facebook Card (Locked / Coming Soon) -->
-                            <div class="customizer-card disabled">
-                                <div class="customizer-card-icon">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg" alt="Facebook">
+                            <!-- Gmail Detail View (Nested Details) -->
+                            <div id="connector-detail-gmail" class="hidden flex flex-col gap-2 w-full h-full animate-fade-in" style="direction: rtl; text-align: right;">
+                                <!-- Back Header -->
+                                <div class="flex items-center gap-2 border-b border-gray-100 dark:border-neutral-800 pb-2 mb-1">
+                                    <button class="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-neutral-800 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/10 transition-all cursor-pointer" onclick="window.hideConnectorDetail('gmail', event)">
+                                        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                                    </button>
+                                    <span class="text-xs font-black text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">تفاصيل ربط Gmail</span>
                                 </div>
-                                <div class="customizer-card-details">
-                                    <span class="customizer-card-title">FaceBook</span>
-                                    <span class="customizer-card-desc">اربط صفحتك على فيسبوك لتجعل حضوري قادر على نشر المنشورات</span>
+
+                                <!-- App Details -->
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 border border-gray-100 dark:border-neutral-700/50 flex items-center justify-center shrink-0">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail" class="w-6 h-6">
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-black text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">Gmail Connector</span>
+                                        <span class="text-[9px] font-bold text-gray-400" style="font-family: 'Tajawal', sans-serif;">إرسال البريد مباشرة عبر بريدك الشخصي</span>
+                                    </div>
                                 </div>
-                                <button class="customizer-card-action">
-                                    <span class="material-symbols-outlined text-[16px]">lock</span>
-                                </button>
+
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed font-medium" style="font-family: 'Tajawal', sans-serif;">
+                                    اربط حساب بريدك الإلكتروني الشخصي Gmail ليتمكن المساعد الذكي من إرسال تقارير الحضور وملخصات الغياب للمعلمين وأولياء الأمور مباشرة من إيميلك الخاص مجاناً وبأمان.
+                                </p>
+
+                                <!-- Connection Status & Action Buttons -->
+                                <div class="mt-auto pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div id="gmail-status-indicator-custom" class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                                        <span id="gmail-status-text-custom" class="text-[10px] font-black text-gray-400" style="font-family: 'Tajawal', sans-serif;">غير متصل</span>
+                                    </div>
+                                    
+                                    <!-- Auth / Link Button -->
+                                    <button id="gmail-auth-btn-custom" onclick="window.handleGmailToggle(event)" class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all cursor-pointer">
+                                        <span class="material-symbols-outlined text-[14px]">link</span>
+                                        <span style="font-family: 'Tajawal', sans-serif;">ربط الحساب</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -1026,6 +1016,10 @@
                         <option value="admin">مدير</option>
                     </select>
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
+                    <textarea id="tNotes" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-16 resize-none" placeholder="مثال: البريد الإلكتروني هو t.ahmad@school.com"></textarea>
+                </div>
                 <div class="flex flex-wrap gap-3 pt-4">
                     <button type="submit" id="tSaveBtn"
                         class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
@@ -1131,6 +1125,10 @@
                         <label for="sAppendFingerprint" class="text-[10px] font-bold text-gray-500">إضافة كبصمة إضافية
                             (لزيادة الدقة)</label>
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
+                    <textarea id="sNotes" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-16 resize-none" placeholder="مثال: البريد الإلكتروني هو parent.ahmad@example.com"></textarea>
                 </div>
                 <div class="flex gap-3 pt-4">
                     <button type="submit"
@@ -1292,6 +1290,86 @@
             indicator.style.height = btnRect.height + 'px';
             indicator.style.top = (btnRect.top - containerRect.top) + 'px';
         };
+
+        window.showConnectorDetail = function (connectorId, e) {
+            if (e) e.stopPropagation();
+            
+            // Hide connectors list view
+            const listView = document.getElementById('connectors-list-view');
+            if (listView) listView.style.display = 'none';
+
+            // Show connector detail view
+            const detailView = document.getElementById(`connector-detail-${connectorId}`);
+            if (detailView) {
+                detailView.classList.remove('hidden');
+                detailView.style.display = 'flex';
+                detailView.style.flexDirection = 'column';
+            }
+            
+            // Sync Gmail buttons inside detail view
+            window.syncGmailStatusInDetailView();
+        };
+
+        window.hideConnectorDetail = function (connectorId, e) {
+            if (e) e.stopPropagation();
+            
+            // Hide connector detail view
+            const detailView = document.getElementById(`connector-detail-${connectorId}`);
+            if (detailView) {
+                detailView.classList.add('hidden');
+                detailView.style.display = 'none';
+            }
+
+            // Show connectors list view
+            const listView = document.getElementById('connectors-list-view');
+            if (listView) listView.style.display = 'flex';
+        };
+
+        window.handleGmailToggle = function (e) {
+            if (e) e.stopPropagation();
+            if (typeof GmailManager === 'undefined') return;
+
+            if (GmailManager.isConnected()) {
+                GmailManager.logout();
+            } else {
+                GmailManager.login();
+            }
+            
+            // Slight delay to allow status update, then sync UI
+            setTimeout(() => {
+                window.syncGmailStatusInDetailView();
+            }, 300);
+        };
+
+        window.syncGmailStatusInDetailView = function () {
+            if (typeof GmailManager === 'undefined') return;
+            const isConnected = GmailManager.isConnected();
+            
+            const indicator = document.getElementById('gmail-status-indicator-custom');
+            const text = document.getElementById('gmail-status-text-custom');
+            const btn = document.getElementById('gmail-auth-btn-custom');
+            
+            if (indicator && text && btn) {
+                if (isConnected) {
+                    indicator.className = 'w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse';
+                    text.textContent = 'متصل بنجاح ✨';
+                    text.className = 'text-[10px] font-black text-green-600 dark:text-green-400';
+                    btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">link_off</span><span>قطع الاتصال</span>';
+                    btn.className = 'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-[10px] font-black hover:bg-red-100 transition-all cursor-pointer border border-red-100/50';
+                } else {
+                    indicator.className = 'w-2.5 h-2.5 rounded-full bg-gray-300';
+                    text.textContent = 'غير متصل';
+                    text.className = 'text-[10px] font-black text-gray-400';
+                    btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">link</span><span>ربط الحساب</span>';
+                    btn.className = 'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all cursor-pointer';
+                }
+            }
+        };
+
+        // Reactive Gmail connection listener
+        window.addEventListener('gmail_connected', () => {
+            window.syncGmailStatusInDetailView();
+        });
 
         window.toggleDrawerSettings = function (e) {
             if (e) e.stopPropagation();
@@ -2295,6 +2373,7 @@
             document.getElementById('tMinistryId').value = t.ministryId;
             document.getElementById('tPassword').value = t.password || '';
             document.getElementById('tRole').value = t.role || 'teacher';
+            document.getElementById('tNotes').value = t.notes || '';
             document.getElementById('tDeleteBtn').classList.remove('hidden');
             openModal('teacherModal');
         }
@@ -2347,6 +2426,7 @@
             document.getElementById('sName').value = s.name;
             document.getElementById('sId').value = s.academicId;
             document.getElementById('sPhone').value = s.phone || '';
+            document.getElementById('sNotes').value = s.notes || '';
             document.getElementById('sImgRequiredLabel').classList.add('hidden');
 
             // Check fingerprints
@@ -2485,7 +2565,8 @@
                 name: document.getElementById('tName').value,
                 ministryId: document.getElementById('tMinistryId').value,
                 password: document.getElementById('tPassword').value,
-                role: document.getElementById('tRole').value
+                role: document.getElementById('tRole').value,
+                notes: document.getElementById('tNotes').value.trim()
             };
             if (editId) {
                 await DB.updateTeacher(editId, data);
@@ -2546,7 +2627,8 @@
                 name: document.getElementById('sName').value.trim(),
                 academicId: document.getElementById('sId').value.trim(),
                 phone: document.getElementById('sPhone').value.trim(),
-                classId: document.getElementById('sClassId').value
+                classId: document.getElementById('sClassId').value,
+                notes: document.getElementById('sNotes').value.trim()
             };
 
             // Validate phone number format (Jordanian mobile)

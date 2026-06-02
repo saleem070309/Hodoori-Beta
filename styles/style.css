@@ -1179,7 +1179,7 @@ body {
   background: rgba(255, 171, 49, 0.05) !important;
   border-radius: 6px !important;
   color: #475569 !important;
-  line-height: 1.75 !important;
+  line-height: 1.45 !important;
   font-style: italic !important;
 }
 
@@ -2406,7 +2406,7 @@ input:checked~.toggle-bg {
   display: none;
   flex-direction: column;
   gap: 12px;
-  height: 250px !important; /* Fixed height to match 3 cards precisely and prevent shrinking */
+  height: 210px !important; /* Perfect height to accommodate nested detail views and prevent shrinking */
   overflow-y: auto;
   padding-left: 2px;
   scrollbar-width: none; /* Hide scrollbar for Firefox */

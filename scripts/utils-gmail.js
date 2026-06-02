@@ -9,6 +9,12 @@ const GmailManager = {
     tokenClient: null,
     accessToken: null,
 
+    getStorageKey(suffix) {
+        const user = typeof Auth !== 'undefined' ? Auth.getCurrentUser() : null;
+        const prefix = user ? `user_${user.id || user.ministryId}` : 'global';
+        return `gmail_${prefix}_${suffix}`;
+    },
+
     async init() {
         // التحقق من وجود المكتبة
         if (typeof google === 'undefined') {
@@ -24,8 +30,8 @@ const GmailManager = {
                     throw (response);
                 }
                 this.accessToken = response.access_token;
-                localStorage.setItem('gmail_access_token', this.accessToken);
-                localStorage.setItem('gmail_token_expiry', Date.now() + (response.expires_in * 1000));
+                localStorage.setItem(this.getStorageKey('access_token'), this.accessToken);
+                localStorage.setItem(this.getStorageKey('token_expiry'), Date.now() + (response.expires_in * 1000));
                 
                 if (typeof UI !== 'undefined') {
                     UI.toast('تم ربط حساب Gmail بنجاح ✨', 'success');
@@ -36,16 +42,22 @@ const GmailManager = {
         });
 
         // استعادة التوكن إذا كان موجوداً ولم ينتهِ
-        const savedToken = localStorage.getItem('gmail_access_token');
-        const expiry = localStorage.getItem('gmail_token_expiry');
+        const savedToken = localStorage.getItem(this.getStorageKey('access_token'));
+        const expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
         if (savedToken && expiry && Date.now() < parseInt(expiry)) {
             this.accessToken = savedToken;
             console.log('Gmail session restored');
+        } else {
+            this.accessToken = null;
         }
     },
 
     isConnected() {
-        const expiry = localStorage.getItem('gmail_token_expiry');
+        const expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
+        const savedToken = localStorage.getItem(this.getStorageKey('access_token'));
+        if (savedToken !== this.accessToken) {
+            this.accessToken = savedToken;
+        }
         return !!this.accessToken && expiry && Date.now() < parseInt(expiry);
     },
 
@@ -59,8 +71,8 @@ const GmailManager = {
 
     logout() {
         this.accessToken = null;
-        localStorage.removeItem('gmail_access_token');
-        localStorage.removeItem('gmail_token_expiry');
+        localStorage.removeItem(this.getStorageKey('access_token'));
+        localStorage.removeItem(this.getStorageKey('token_expiry'));
         UI.toast('تم فصل حساب Gmail', 'info');
     },
 

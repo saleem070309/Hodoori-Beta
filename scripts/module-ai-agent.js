@@ -10,9 +10,6 @@ const Agent = {
     isStreaming: false,
 
     async init() {
-        if (typeof emailjs !== 'undefined') {
-            emailjs.init("HNz0UjJRVZpAN8unm");
-        }
         if (typeof GmailManager !== 'undefined') {
             await GmailManager.init();
         }
@@ -74,7 +71,7 @@ const Agent = {
 4) chart — رسم بياني (bar, line, pie, doughnut)
 |||COMMAND|||{"type":"chart","chartType":"bar","labels":["أ","ب"],"values":[80,90],"title":"نسبة الحضور"}
 
-5) send_email — إرسال إيميل (Gmail API أو EmailJS)
+5) send_email — إرسال إيميل (Gmail API)
 |||COMMAND|||{"type":"send_email","to":"email@example.com","subject":"موضوع","message":"النص"}
 
 6) send_notification — إشعار دفع للهاتف
@@ -181,10 +178,10 @@ const Agent = {
                     return `• تقرير ID: ${r.id} | التاريخ: ${r.date} | الفصل: ${cls ? cls.name : r.classId} | الطلاب: ${r.details?.length || 0}`;
                 }).join('\n');
 
-            // تجهيز القوائم
-            const studentsList = studentStats.map(s => `• ${s.name || 'مسمى مفقود'} | ID (الرقم الأكاديمي): ${s.academicId || 'بدون رقم'} | هاتف ولي الأمر: ${s.phone || 'غير مسجل'} | الفصل: ${s.classId || 'غير محدد'} | النسبة: ${s.attendanceRate}%`).join('\n');
-            const classesList = classes.map(c => `• ${c.name || 'مسمى غير محدد'} (${c.section || '-'}) | ID: ${c.id}`).join('\n');
-            const teachersList = teachers.map(t => `• ${t.name || 'بدون اسم'} (${t.role || 'موظف'}) | ID: ${t.id}`).join('\n');
+            // تجهيز القوائم مع إرفاق الملاحظات إن وجدت
+            const studentsList = studentStats.map(s => `• ${s.name || 'مسمى مفقود'} | ID (الرقم الأكاديمي): ${s.academicId || 'بدون رقم'} | هاتف ولي الأمر: ${s.phone || 'غير مسجل'} | الفصل: ${s.classId || 'غير محدد'} | النسبة: ${s.attendanceRate}%${s.notes ? ` | ملاحظات: ${s.notes}` : ''}`).join('\n');
+            const classesList = classes.map(c => `• ${c.name || 'مسمى غير محدد'} (${c.section || '-'}) | ID: ${c.id}${c.notes ? ` | ملاحظات: ${c.notes}` : ''}`).join('\n');
+            const teachersList = teachers.map(t => `• ${t.name || 'بدون اسم'} (${t.role || 'موظف'}) | ID: ${t.id}${t.notes ? ` | ملاحظات: ${t.notes}` : ''}`).join('\n');
 
             // تعويض المتغيرات في القالب
             let finalPrompt = instructionTemplate
@@ -221,6 +218,12 @@ const Agent = {
 - يمكنك الآن إرسال تقارير عبر البريد الإلكتروني باستخدام أمر send_email.
 - اقترح على المستخدم إرسال ملخصات الحضور لمدير المدرسة عبر البريد عند انتهاء التحليل.`;
             }
+
+            // Add Gmail API connection state and guidance to AI system prompt
+            const isGmailConnected = (typeof GmailManager !== 'undefined' && GmailManager.isConnected());
+            finalPrompt += `\n\n### حالة اتصال بريد Gmail الشخصي للمستخدم:
+- حالة الربط الحالية: [${isGmailConnected ? 'متصل ومربوط بنجاح' : 'غير متصل وغير مربوط'}].
+- توجيهات هامة: ${isGmailConnected ? 'يمكنك الآن إرسال رسائل البريد الإلكتروني مباشرة وحرية باستخدام الأمر send_email.' : 'إذا طلب منك المستخدم إرسال إيميل أو تقرير بالبريد الإلكتروني، فيجب عليك إخباره بوضوح ولطف شديد بأنه لم يقم بربط إيميله الشخصي بعد، وتوجيهه خطوة بخطوة بالخطوات التالية تماماً: "لم تقم بربط بريدك الإلكتروني بعد. يرجى الضغط على زر التخصيص الموجود أعلى الشاشة، ثم اختيار قسم التطبيقات (التطبيقات)، والضغط على كرت Gmail، ثم الضغط على زر (ربط الحساب) وعمل تسجيل دخول بالبريد الذي تريده لتفعيل الإرسال الآمن والمجاني."'}`;
 
             return finalPrompt;
         } catch (e) {
@@ -924,25 +927,12 @@ const Agent = {
     },
 
     async sendEmail(to, subject, message) {
-        // إذا كان Gmail متصلاً، نستخدمه أولاً
+        // Enforce direct Gmail API integration
         if (typeof GmailManager !== 'undefined' && GmailManager.isConnected()) {
             console.log('[Agent] Sending via Gmail API...');
             return await GmailManager.sendEmail(to, subject, message);
         }
-
-        // السقوط للـ EmailJS كخيار احتياطي أو إذا لم يكن Gmail متصلاً
-        if (typeof emailjs === 'undefined') {
-            throw new Error('لم يتم ربط Gmail ولم يتم العثور على مكتبة EmailJS الاحتياطية');
-        }
-
-        console.log('[Agent] Falling back to EmailJS...');
-        const templateParams = {
-            to_email: to,
-            subject: subject,
-            message: message
-        };
-
-        return await emailjs.send("service_qtnp6zk", "template_a11cl9r", templateParams, "HNz0UjJRVZpAN8unm");
+        throw new Error('يرجى ربط حساب Gmail الخاص بك أولاً من قسم التطبيقات في المساعد الذكي لتتمكن من إرسال الإيميلات.');
     },
 
     async _handleSendNotification(messages, cmd) {
