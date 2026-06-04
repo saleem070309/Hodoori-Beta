@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#faf7f2">
@@ -89,7 +89,7 @@
 
 
     <!-- Notification Panel (Sidebar style) -->
-    <div id="notifOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex justify-start" onclick="closeNotifications()">
+    <div id="notifOverlay" class="fixed inset-0 bg-black/40 z-[100] hidden flex justify-start" onclick="closeNotifications()">
         <div class="w-full max-w-sm h-full liquid-glass-modal rounded-l-[2rem] shadow-none flex flex-col transform translate-x-full transition-transform duration-300" id="notifPanel" onclick="event.stopPropagation()">
             <div class="p-6 flex justify-between items-center border-b border-black/[0.05]">
                 <h2 class="text-xl font-black text-gray-800 flex items-center gap-2">
@@ -181,7 +181,7 @@
 
                     return `
                         <div class="liquid-glass-prominent p-6 rounded-[2rem] flex flex-col items-center text-center space-y-4 cursor-pointer relative overflow-hidden group" onclick="window.location.href='portal-student.html?id=${s.academicId || s.id}'">
-                            <div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-12 translate-x-12 blur-2xl group-hover:bg-primary/10 transition-all"></div>
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-12 translate-x-12 group-hover:bg-primary/10 transition-all"></div>
                             
                             <div class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-white text-2xl font-black overflow-hidden" style="background: ${s.avatar ? 'transparent' : UI.getAvatarColor(s.id)}">
                                 ${s.avatar ? `<img src="${UI.formatImgUrl(s.avatar)}" onclick="UI.viewImage(this.src); event.stopPropagation()" class="w-full h-full object-cover cursor-pointer interactive">` : s.name.charAt(0)}
