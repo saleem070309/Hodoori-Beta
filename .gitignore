@@ -25,6 +25,10 @@ build/
 .env.local
 .env.*.local
 
+# Secrets / Credentials
+docs/client_secret*
+*.secret.json
+
 # Logs
 *.log
 npm-debug.log*
