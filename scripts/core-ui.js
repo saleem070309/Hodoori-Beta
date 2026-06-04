@@ -34,31 +34,43 @@ const UI = {
     },
 
     toast(message, type = 'success') {
+        let container = document.getElementById('iphone-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'iphone-toast-container';
+            document.body.appendChild(container);
+        }
+
         const toast = document.createElement('div');
         const icon = type === 'success' ? 'check_circle' : (type === 'error' ? 'cancel' : 'info');
-        const colors = {
-            success: 'bg-background text-green-600 border-green-200',
-            error: 'bg-background text-red-600 border-red-200',
-            info: 'bg-background text-primary border-primary/20'
-        };
 
-        toast.className = `fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-6 py-4 rounded-2xl border ${colors[type]} z-[1000] transition-all duration-500 opacity-0`;
+        toast.className = 'iphone-toast';
         toast.innerHTML = `
-            <span class="material-symbols-outlined">${icon}</span>
-            <span class="font-bold text-sm">${message}</span>
+            <div class="iphone-toast-icon ${type}">
+                <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1">${icon}</span>
+            </div>
+            <div class="iphone-toast-message">${message}</div>
         `;
-        document.body.appendChild(toast);
+        container.appendChild(toast);
 
         // Animate in
         requestAnimationFrame(() => {
-            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('active');
+            }, 10);
         });
 
         // Auto remove
         setTimeout(() => {
-            toast.classList.add('opacity-0');
-            setTimeout(() => toast.remove(), 500);
-        }, 3000);
+            toast.classList.remove('active');
+            toast.classList.add('removing');
+            setTimeout(() => {
+                toast.remove();
+                if (container.childNodes.length === 0) {
+                    container.remove();
+                }
+            }, 450);
+        }, 3500);
     },
 
     /**
@@ -310,13 +322,13 @@ const UI = {
         
         overlay.innerHTML = `
             <div class="absolute top-6 right-6 z-[2001] flex gap-2">
-                <button id="imgZoomIn" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white interactive">
+                <button id="imgZoomIn" class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white interactive">
                     <span class="material-symbols-outlined">zoom_in</span>
                 </button>
-                <button id="imgZoomOut" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white interactive">
+                <button id="imgZoomOut" class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white interactive">
                     <span class="material-symbols-outlined">zoom_out</span>
                 </button>
-                <button id="imgClose" class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white interactive">
+                <button id="imgClose" class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white interactive">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>

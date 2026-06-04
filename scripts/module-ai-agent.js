@@ -260,7 +260,7 @@ const Agent = {
             // Chat Container
             const container = document.createElement('div');
             container.id = 'agent-container';
-            container.className = 'hidden fixed bottom-24 left-4 right-4 h-[75vh] z-[100] bg-white/10 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 flex flex-col transition-all duration-400 opacity-0 translate-y-4';
+            container.className = 'hidden fixed bottom-24 left-4 right-4 h-[75vh] z-[100] bg-white/10 rounded-[2.5rem] border border-white/20 flex flex-col transition-all duration-400 opacity-0 translate-y-4';
             container.innerHTML = `
                 <div class="px-5 py-4 flex justify-between items-center border-b border-white/10 shrink-0">
                     <div class="flex items-center gap-3">

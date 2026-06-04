@@ -3520,12 +3520,12 @@
     </script>
     <!-- Customization Modal (New Card-based UI) -->
     <div id="directoryModal" class="fixed inset-0 z-[120] hidden flex items-center justify-center p-0 sm:p-4">
-        <div class="absolute inset-0 bg-black/10 backdrop-blur-sm" onclick="window.hideDirectoryModal()"></div>
+        <div class="absolute inset-0 bg-black/10" onclick="window.hideDirectoryModal()"></div>
         <div
             class="bg-white w-full h-full sm:h-[600px] sm:max-w-4xl sm:rounded-[2.5rem] relative overflow-hidden flex flex-col sm:flex-row modal-animate-in">
             <!-- Close Button (X) -->
             <button onclick="window.hideDirectoryModal()"
-                class="absolute top-6 left-6 z-50 w-10 h-10 rounded-xl bg-white/80 backdrop-blur-md shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all sm:hidden">
+                class="absolute top-6 left-6 z-50 w-10 h-10 rounded-xl bg-white/80 shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all sm:hidden">
                 <span class="material-symbols-outlined">close</span>
             </button>
             <button onclick="window.hideDirectoryModal()"
@@ -3658,7 +3658,7 @@
 
     <!-- Absence Alarm Modal (Plugin UI) -->
     <div id="absenceAlarmModal" class="fixed inset-0 z-[130] hidden flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/10 backdrop-blur-sm" onclick="window.closeAbsenceAlarmModal()"></div>
+        <div class="absolute inset-0 bg-black/10" onclick="window.closeAbsenceAlarmModal()"></div>
         <div
             class="bg-white w-full max-w-lg rounded-[2.5rem] relative p-8 flex flex-col gap-6 modal-animate-in max-h-[90vh] overflow-y-auto hide-scrollbar">
             <!-- Close Button (X) -->
@@ -3760,6 +3760,10 @@
                 <span class="icon material-symbols-outlined">smart_toy</span>
                 <span>المساعد الذكي</span>
             </div>
+            <div class="assistant-drawer-item text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" id="drawer-item-logout" onclick="Auth.logout(); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined text-red-500">logout</span>
+                <span>تسجيل الخروج</span>
+            </div>
         </div>
         <!-- Manager Profile & Settings Button Footer -->
         <div class="assistant-drawer-profile relative">
@@ -3776,7 +3780,7 @@
             </button>
             
             <!-- Floating Theme Switcher Popover -->
-            <div id="drawer-theme-popover" class="drawer-theme-popover absolute bottom-16 left-4 z-50 p-4 w-44 rounded-2xl shadow-xl border border-gray-100/50 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md flex flex-col gap-2">
+            <div id="drawer-theme-popover" class="drawer-theme-popover absolute bottom-16 left-4 z-50 p-4 w-44 rounded-2xl shadow-xl border border-gray-100/50 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 flex flex-col gap-2">
                 <div class="popover-title">المظهر</div>
                 <button class="popover-item active" onclick="window.setAssistantTheme('light', null, event)">
                     <span class="material-symbols-outlined text-[16px] text-yellow-500">wb_sunny</span>

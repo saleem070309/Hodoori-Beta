@@ -68,7 +68,7 @@ const NotificationManager = {
 
         const modal = document.createElement('div');
         modal.id = 'notif-prompt-modal';
-        modal.className = 'fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in';
+        modal.className = 'fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 animate-fade-in';
         modal.innerHTML = `
             <div class="bg-white rounded-[2.5rem] p-8 max-w-sm w-full border border-white/20 transform transition-all scale-100">
                 <div class="flex flex-col items-center text-center">
