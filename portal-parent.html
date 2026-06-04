@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#faf7f2">
+    <title>بوابة أولياء الأمور | نظام الحضور</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <link href="styles/style.css" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffab31",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff",
+                        "success": "#4caf50",
+                        "error": "#f44336"
+                    },
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="text-gray-800 font-sans p-4 sm:p-6 pb-24 overflow-x-hidden selection:bg-primary/30">
+    <!-- Liquid Glass Ambient Background -->
+    <div class="liquid-glass-ambient fixed inset-0 pointer-events-none">
+        <div class="glass-orb orb-1 opacity-20"></div>
+        <div class="glass-orb orb-2 opacity-10"></div>
+        <div class="glass-orb orb-3 opacity-15"></div>
+    </div>
+
+
+
+    <!-- Dashboard View -->
+    <div id="dashboardView" class="max-w-2xl mx-auto relative z-10 hidden">
+        <header class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+                <div id="parentAvatar" class="w-12 h-12 rounded-2xl liquid-glass flex items-center justify-center text-primary shadow-none">
+                    <span class="material-symbols-outlined">person</span>
+                </div>
+                <div>
+                    <h2 class="text-xl font-black refractive-text">أهلاً بك</h2>
+                    <p id="parentPhoneDisplay" class="text-xs font-bold text-gray-400">07XXXXXXXX</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="openNotifications()" class="w-12 h-12 rounded-2xl liquid-glass flex items-center justify-center text-gray-500 relative interactive">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <div id="notifBadge" class="hidden absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white none"></div>
+                </button>
+                <button onclick="logout()" class="w-12 h-12 rounded-2xl liquid-glass flex items-center justify-center text-error interactive">
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="space-y-6">
+            <div class="flex items-center justify-between px-2">
+                <h3 class="text-lg font-black refractive-text flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">school</span>
+                    الأبناء المسجلون
+                </h3>
+            </div>
+
+            <div id="childrenGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Child Cards will be injected here -->
+            </div>
+
+            <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-center space-y-4">
+                <div class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center text-gray-300">
+                    <span class="material-symbols-outlined text-4xl">child_care</span>
+                </div>
+                <p class="text-gray-400 font-bold">لم تقم بإضافة أي أبناء بعد</p>
+            </div>
+        </section>
+    </div>
+
+
+
+    <!-- Notification Panel (Sidebar style) -->
+    <div id="notifOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex justify-start" onclick="closeNotifications()">
+        <div class="w-full max-w-sm h-full liquid-glass-modal rounded-l-[2rem] shadow-none flex flex-col transform translate-x-full transition-transform duration-300" id="notifPanel" onclick="event.stopPropagation()">
+            <div class="p-6 flex justify-between items-center border-b border-black/[0.05]">
+                <h2 class="text-xl font-black text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">notifications</span>
+                    الإشعارات
+                </h2>
+                <button onclick="closeNotifications()" class="w-9 h-9 rounded-xl liquid-glass-icon icon-error flex items-center justify-center text-lg">×</button>
+            </div>
+            <div id="notifList" class="flex-1 overflow-y-auto p-4 space-y-4 liquid-glass-scrollbar">
+                <!-- Notifications go here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+
+    <script>
+        let currentParentPhone = localStorage.getItem('parent_phone');
+        let linkedChildren = JSON.parse(localStorage.getItem('linked_children') || '[]');
+
+        async function init() {
+            if (!currentParentPhone) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            document.getElementById('dashboardView').classList.remove('hidden');
+            document.getElementById('parentPhoneDisplay').innerText = currentParentPhone;
+            await renderDashboard();
+            subscribeToAllChildren();
+        }
+
+
+
+
+
+        function logout() {
+            localStorage.removeItem('parent_phone');
+            localStorage.removeItem('linked_children');
+            location.reload();
+        }
+
+        async function renderDashboard() {
+            const grid = document.getElementById('childrenGrid');
+            const empty = document.getElementById('emptyState');
+            
+            if (linkedChildren.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            
+            empty.classList.add('hidden');
+            UI.showSkeleton(grid, 'card', linkedChildren.length);
+            
+            try {
+                await DB.init();
+                const [students, classes, allRecords] = await Promise.all([
+                    DB.getStudents(),
+                    DB.getClasses(),
+                    DB.getCollection(DB.KEYS.RECORDS)
+                ]);
+
+                const myStudents = students.filter(s => linkedChildren.includes(s.academicId) || linkedChildren.includes(s.id));
+                const todayStr = new Date().toISOString().split('T')[0];
+
+                grid.innerHTML = myStudents.map(s => {
+                    const cls = classes.find(c => c.id === s.classId);
+                    const todayRecord = allRecords.find(r => r.date === todayStr && r.classId === s.classId);
+                    const studentDetail = todayRecord ? todayRecord.details.find(d => d.studentId === s.id || d.studentId === s.academicId) : null;
+                    
+                    let statusText = 'لم يتم التحضير';
+                    let statusClass = 'text-gray-400 bg-gray-100';
+                    let statusIcon = 'schedule';
+
+                    if (studentDetail) {
+                        if (studentDetail.status === 'present') {
+                            statusText = 'حاضر اليوم';
+                            statusClass = 'text-success bg-success/10 border-success/20';
+                            statusIcon = 'check_circle';
+                        } else {
+                            statusText = 'غائب اليوم';
+                            statusClass = 'text-error bg-error/10 border-error/20';
+                            statusIcon = 'cancel';
+                        }
+                    }
+
+                    return `
+                        <div class="liquid-glass-prominent p-6 rounded-[2rem] flex flex-col items-center text-center space-y-4 cursor-pointer relative overflow-hidden group" onclick="window.location.href='portal-student.html?id=${s.academicId || s.id}'">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-12 translate-x-12 blur-2xl group-hover:bg-primary/10 transition-all"></div>
+                            
+                            <div class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-white text-2xl font-black overflow-hidden" style="background: ${s.avatar ? 'transparent' : UI.getAvatarColor(s.id)}">
+                                ${s.avatar ? `<img src="${UI.formatImgUrl(s.avatar)}" onclick="UI.viewImage(this.src); event.stopPropagation()" class="w-full h-full object-cover cursor-pointer interactive">` : s.name.charAt(0)}
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-black text-gray-800">${s.name}</h4>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">${cls ? cls.name + ' - ' + cls.section : 'غير محدد'}</p>
+                            </div>
+                            
+                            <div class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border ${statusClass} text-[11px] font-black">
+                                <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1">${statusIcon}</span>
+                                ${statusText}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                await checkNotifications();
+
+            } catch (err) {
+                console.error(err);
+                UI.toast('خطأ في جلب بيانات الأبناء', 'error');
+            }
+        }
+
+
+
+        async function checkNotifications() {
+            if (linkedChildren.length === 0) return;
+            
+            try {
+                await DB.init();
+                const students = await DB.getStudents();
+                const myStudents = students.filter(s => linkedChildren.includes(s.academicId) || linkedChildren.includes(s.id));
+                
+                let allNotifs = [];
+                for (const s of myStudents) {
+                    const notifs = await DB.getNotifications({ id: s.academicId || s.id, classId: s.classId, isParent: true });
+                    allNotifs = [...allNotifs, ...notifs];
+                }
+                
+                // Unique by ID and Sort
+                const uniqueNotifs = Array.from(new Map(allNotifs.map(n => [n.id, n])).values())
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                window.parentNotifications = uniqueNotifs;
+                
+                // Badge logic
+                const lastSeenCount = parseInt(localStorage.getItem('parent_notif_count') || '0');
+                if (uniqueNotifs.length > lastSeenCount) {
+                    document.getElementById('notifBadge').classList.remove('hidden');
+                } else {
+                    document.getElementById('notifBadge').classList.add('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function openNotifications() {
+            const overlay = document.getElementById('notifOverlay');
+            const panel = document.getElementById('notifPanel');
+            const list = document.getElementById('notifList');
+
+            overlay.classList.remove('hidden');
+            setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+
+            // Mark as seen
+            localStorage.setItem('parent_notif_count', (window.parentNotifications || []).length);
+            document.getElementById('notifBadge').classList.add('hidden');
+
+            if (!window.parentNotifications || window.parentNotifications.length === 0) {
+                list.innerHTML = '<div class="p-12 text-center text-gray-400 text-sm font-bold">لا توجد إشعارات</div>';
+                return;
+            }
+
+            list.innerHTML = window.parentNotifications.map(n => `
+                <div class="liquid-glass-prominent p-4 rounded-2xl border border-black/5">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-black text-gray-800 text-sm">${n.title}</h4>
+                        <p class="text-[9px] font-bold text-gray-400">${new Date(n.timestamp).toLocaleDateString('ar-SA')}</p>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed mb-3">${n.message}</p>
+                    ${n.image ? `<img src="${UI.formatImgUrl(n.image)}" onclick="UI.viewImage(this.src)" class="w-full h-32 rounded-xl object-cover mb-2 border border-black/10 cursor-pointer interactive">` : ''}
+                </div>
+            `).join('');
+        }
+
+        function closeNotifications() {
+            const overlay = document.getElementById('notifOverlay');
+            const panel = document.getElementById('notifPanel');
+            panel.classList.add('translate-x-full');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+        }
+
+        function subscribeToAllChildren() {
+            if (typeof NotificationManager === 'undefined') return;
+            // This would require real-time listener support in NotificationManager
+            // For now we poll on render.
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

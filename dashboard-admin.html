@@ -1,0 +1,3798 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#faf7f2">
+    <title>لوحة التحكم | الإدارة</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Google+Sans+Arabic:wght@400;500;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <link href="styles/style.css?v=2.9" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module">
+        import * as docx from 'https://cdn.jsdelivr.net/npm/docx@8.5.0/+esm';
+        window.docx = docx;
+    </script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffa726",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff",
+                        "error": "#f44336"
+                    },
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --header-h: 48px;
+            --nav-h: 68px;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: #faf7f2;
+            font-family: 'Tajawal', sans-serif;
+            color: #2c2c2c;
+        }
+
+        /* ─── Shorter, Transparent and Flat Header ─── */
+        #main-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            height: 48px !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+        }
+
+        /* ─── Tabs Wrapper ─── */
+        #tabs-wrapper {
+            position: fixed;
+            top: var(--header-h);
+            bottom: env(safe-area-inset-bottom);
+            left: 0;
+            right: 0;
+            overflow: hidden;
+        }
+
+        /* ─── Tab Panels ─── */
+        .tab-panel {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px 16px 8px;
+            -webkit-overflow-scrolling: touch;
+            display: none;
+            will-change: transform;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        #tab-ai {
+            display: none;
+            flex-direction: column;
+            padding: 8px 12px;
+        }
+
+        #tab-ai.active {
+            display: flex !important;
+        }
+
+        /* Responsive Navigation and Sidebar Layout */
+        #bottom-nav {
+            display: none !important;
+        }
+
+        @media (max-width: 1023px) {
+            #mobile-hamburger-btn {
+                display: flex !important;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            #bottom-nav {
+                display: none !important;
+            }
+            #tabs-wrapper {
+                bottom: env(safe-area-inset-bottom) !important;
+            }
+        }
+
+        /* Drawer Item Active States */
+        .theme-light-warm .assistant-drawer-item.active {
+            background: rgba(255, 171, 49, 0.15) !important;
+            border-color: rgba(255, 171, 49, 0.3) !important;
+            color: #b25e00 !important;
+        }
+        .theme-dark-orange .assistant-drawer-item.active {
+            background: rgba(255, 167, 38, 0.15) !important;
+            border-color: rgba(255, 167, 38, 0.3) !important;
+            color: #ffa726 !important;
+        }
+
+        #nav-inner {
+            height: var(--nav-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            position: relative;
+            padding: 0 4px;
+        }
+
+        /* Sliding indicator pill */
+        #nav-indicator {
+            position: absolute;
+            top: 8px;
+            height: 44px;
+            background: rgba(255, 167, 38, 0.13);
+            border-radius: 18px;
+            border: 1.5px solid rgba(255, 167, 38, 0.22);
+            transition: left 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+                width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .nav-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 6px 2px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .nav-btn .nav-icon {
+            font-size: 22px;
+            line-height: 1;
+            color: #b0a898;
+            transition: color 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            font-family: 'Material Symbols Outlined';
+        }
+
+        .nav-btn .nav-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: #b0a898;
+            transition: color 0.25s ease;
+            white-space: nowrap;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        .nav-btn.active .nav-icon {
+            color: #ffa726;
+            transform: scale(1.18) translateY(-2px);
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .nav-btn.active .nav-label {
+            color: #ffa726;
+        }
+
+        #tab-ai {
+            padding: 8px 12px;
+            display: none;
+            height: 100%;
+        }
+
+        #tab-ai.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Agent message styles moved to global style.css */
+
+        /* ─── Tab Slide Animation ─── */
+        @keyframes tabSlideRight {
+            from {
+                transform: translateX(48px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes tabSlideLeft {
+            from {
+                transform: translateX(-48px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .slide-from-right {
+            animation: tabSlideRight 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+
+        .slide-from-left {
+            animation: tabSlideLeft 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+
+        /* ─── Utility ─── */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* ─── AI animations ─── */
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fade-in 0.3s ease-out forwards;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes logo-pulse {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.6);
+                opacity: 0;
+            }
+        }
+
+        .animate-pulse-ring {
+            animation: logo-pulse 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes bounce-dot {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        /* ─── Daily section cards ─── */
+        .class-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .class-chip-pending {
+            background: rgba(244, 67, 54, 0.07);
+            border: 1px solid rgba(244, 67, 54, 0.18);
+        }
+
+        .class-chip-done {
+            background: rgba(76, 175, 80, 0.07);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        /* ─── report card redesign (image-free) ─── */
+        .report-card-header {
+            position: relative;
+            overflow: hidden;
+            border-radius: 20px 20px 0 0;
+            height: 100px;
+            background: linear-gradient(135deg, rgba(255, 171, 49, 0.1) 0%, rgba(255, 171, 49, 0.05) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .report-header-glow {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: transparent;
+            z-index: 0;
+        }
+
+        .report-header-icon-box {
+            width: 44px;
+            height: 44px;
+            background: white;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .report-header-icon-box span {
+            color: var(--color-primary);
+            font-size: 22px;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        /* Scrollbar for main tabs */
+        .tab-panel::-webkit-scrollbar {
+            width: 0;
+        }
+
+        /* ─── Google Sans Arabic for AI Tab only ─── */
+        #tab-ai,
+        #tab-ai *:not(.material-symbols-outlined) {
+            font-family: 'Google Sans Arabic', 'Tajawal', sans-serif !important;
+        }
+
+        /* AI Response Bubble Redesign (Ultra Premium Glassmorphism) */
+        .agent-msg-ai-row {
+            display: flex !important;
+            flex-direction: column !important; /* Avatar above response */
+            align-items: flex-start !important;
+            gap: 8px !important;
+            margin-bottom: 24px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            direction: rtl !important;
+        }
+
+        .agent-msg-ai-avatar {
+            width: 38px !important;
+            height: 38px !important;
+            border-radius: 50% !important;
+            background: #ffffff !important;
+            border: 1.5px solid rgba(255, 167, 38, 0.2) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03) !important;
+            overflow: hidden !important;
+        }
+
+        .agent-msg-ai-avatar img {
+            width: 80% !important;
+            height: 80% !important;
+            object-fit: contain !important;
+        }
+
+        .agent-msg-ai-body {
+            flex: 1 !important;
+            border-radius: 0 !important;
+            padding: 4px 4px !important;
+            font-size: 0.95rem !important;
+            line-height: 1.8 !important;
+            font-family: 'Tajawal', sans-serif !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            border: none !important;
+            transition: all 0.3s ease !important;
+            width: auto !important;
+        }
+
+        /* Light Theme Styles */
+        .theme-light-warm .agent-msg-ai-body {
+            color: #2d2a26 !important;
+        }
+
+        /* Dark Theme Styles */
+        .theme-dark-orange .agent-msg-ai-body {
+            color: #f5f5f4 !important;
+        }
+        
+        .theme-dark-orange .agent-msg-ai-avatar {
+            background: #23201d !important;
+            border-color: rgba(255, 167, 38, 0.3) !important;
+        }
+
+        /* Premium Markdown & Typography Rendering (Overrides Tailwind resets) */
+        .agent-markdown {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        .agent-markdown p {
+            margin-bottom: 8px !important;
+            line-height: 1.45 !important;
+        }
+
+        .agent-markdown p:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        /* Support for bullet and numbered lists */
+        .agent-markdown ul {
+            list-style-type: disc !important;
+            margin: 8px 20px 10px 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .agent-markdown ol {
+            list-style-type: decimal !important;
+            margin: 8px 20px 10px 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .agent-markdown li {
+            margin-bottom: 4px !important;
+            line-height: 1.45 !important;
+            list-style-position: outside !important;
+        }
+
+        /* Bold / Emphasis tags */
+        .theme-light-warm .agent-markdown strong {
+            color: #b25e00 !important;
+            font-weight: 700 !important;
+        }
+
+        .theme-dark-orange .agent-markdown strong {
+            color: #ffa726 !important;
+            font-weight: 700 !important;
+        }
+
+        /* Heading elements inside chat */
+        .agent-markdown h1,
+        .agent-markdown h2,
+        .agent-markdown h3,
+        .agent-markdown h4 {
+            font-family: 'Tajawal', sans-serif !important;
+            font-weight: 800 !important;
+            margin-top: 18px !important;
+            margin-bottom: 8px !important;
+            line-height: 1.4 !important;
+        }
+
+        .theme-light-warm .agent-markdown h1,
+        .theme-light-warm .agent-markdown h2,
+        .theme-light-warm .agent-markdown h3,
+        .theme-light-warm .agent-markdown h4 {
+            color: #8c4a00 !important;
+        }
+
+        .theme-dark-orange .agent-markdown h1,
+        .theme-dark-orange .agent-markdown h2,
+        .theme-dark-orange .agent-markdown h3,
+        .theme-dark-orange .agent-markdown h4 {
+            color: #ffa726 !important;
+        }
+
+        .agent-markdown h1 { font-size: 1.35rem !important; }
+        .agent-markdown h2 { font-size: 1.22rem !important; }
+        .agent-markdown h3 { font-size: 1.12rem !important; }
+        .agent-markdown h4 { font-size: 1.02rem !important; }
+
+        /* Blockquotes */
+        .agent-markdown blockquote {
+            margin: 14px 0 !important;
+            padding: 10px 16px !important;
+            border-right: 4px solid #ffab31 !important;
+            border-left: none !important;
+            background: rgba(255, 171, 49, 0.06) !important;
+            border-radius: 6px !important;
+            color: #555555 !important;
+            font-style: italic !important;
+        }
+
+        .theme-dark-orange .agent-markdown blockquote {
+            border-right-color: #ffa726 !important;
+            background: rgba(255, 167, 38, 0.05) !important;
+            color: #dddddd !important;
+        }
+
+        /* Inline Code and Code Blocks */
+        .agent-markdown code {
+            font-family: 'Consolas', monospace !important;
+            font-size: 0.88em !important;
+            padding: 2px 6px !important;
+            border-radius: 6px !important;
+        }
+
+        .theme-light-warm .agent-markdown code {
+            color: #b25e00 !important;
+            background: rgba(255, 171, 49, 0.09) !important;
+        }
+
+        .theme-dark-orange .agent-markdown code {
+            color: #ffa726 !important;
+            background: rgba(255, 167, 38, 0.12) !important;
+        }
+
+        .agent-markdown pre {
+            margin: 12px 0 !important;
+            padding: 12px 16px !important;
+            border-radius: 12px !important;
+            overflow-x: auto !important;
+        }
+
+        .theme-light-warm .agent-markdown pre {
+            background: rgba(0, 0, 0, 0.02) !important;
+            border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .theme-dark-orange .agent-markdown pre {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .agent-markdown pre code {
+            background: none !important;
+            padding: 0 !important;
+            color: inherit !important;
+        }
+
+
+    </style>
+</head>
+
+<body>
+
+
+    <!-- Splash Loading Screen -->
+    <div id="splashScreen" style="display: none !important;"
+        class="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center transition-all duration-700">
+        <div class="relative mb-8">
+            <div
+                class="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] liquid-glass flex items-center justify-center overflow-hidden relative z-10">
+                <img src="assets/brand-logo.png" alt="Logo" class="w-full h-full object-contain p-4" />
+            </div>
+            <div class="absolute inset-0 rounded-[2rem] border-[1.5px] border-primary animate-pulse-ring z-0"></div>
+        </div>
+        <h2 class="text-2xl font-black refractive-text mb-4">جاري تهيئة النظام الإداري</h2>
+        <div class="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden mb-4">
+            <div id="splashProgress" class="h-full bg-primary transition-all duration-500 w-10"></div>
+        </div>
+        <p id="splashStatus" class="text-gray-500 text-sm font-medium none text-center px-6">جاري تحميل تقنيات
+            التعرف على الوجوه وحفظها...</p>
+    </div>
+
+    <!-- ─── Fixed Header (Sleek, transparent & 48px height) ─── -->
+    <header id="main-header" style="display: none !important;">
+        <div class="assistant-top-right-hamburger lg:hidden" onclick="window.toggleAssistantDrawer(event)"
+            title="القائمة" style="z-index: 50;">
+            <div class="assistant-hamburger-line assistant-hamburger-line-1"></div>
+            <div class="assistant-hamburger-line assistant-hamburger-line-2"></div>
+        </div>
+
+        <!-- Left side (Last child in RTL): Brand Text "حضوري" with the AI logo -->
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-black tracking-wide" style="font-family: 'Tajawal', sans-serif; color: var(--text-primary);">حضوري</span>
+            <img src="assets/AI-logo.png" alt="حضوري" style="width: 24px; height: 24px; object-fit: contain;" />
+        </div>
+    </header>
+
+
+    <!-- ─── Tabs Wrapper ─── -->
+    <div id="tabs-wrapper" style="top: 0px;">
+
+        <!-- ═══ TAB 0: المعلومات اليومية ═══ -->
+        <div id="tab-daily" class="tab-panel active">
+            <!-- hidden stat holders for backwards-compat -->
+            <span id="statTeachers" style="display:none">0</span>
+            <span id="statClasses" style="display:none">0</span>
+
+            <!-- Stats grid 2×2 -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-primary p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الطلاب</p>
+                    <h2 id="statStudents" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">نسبة الحضور</p>
+                    <h2 id="statAttendanceRate" class="text-2xl font-black text-gray-800">--%</h2>
+                </div>
+                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الحضور</p>
+                    <h2 id="statPresent" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-error p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الغياب</p>
+                    <h2 id="statAbsent" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+            </div>
+
+            <!-- Pending classes -->
+            <div class="liquid-glass liquid-glass-prominent rounded-2xl p-4 mb-3">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style="background:rgba(244,67,54,0.1)">
+                        <span class="material-symbols-outlined text-error"
+                            style="font-size:16px;font-variation-settings:'FILL' 1">cancel</span>
+                    </div>
+                    <span class="font-black text-sm text-gray-800">لم تسلّم التقرير</span>
+                    <span id="notSubmittedCount" class="mr-auto text-[10px] font-black px-2.5 py-0.5 rounded-full"
+                        style="background:rgba(244,67,54,0.1);color:#f44336">0</span>
+                </div>
+                <div id="notSubmittedList" class="space-y-2">
+                    <p class="text-gray-400 text-xs text-center py-2">جاري التحميل...</p>
+                </div>
+            </div>
+
+            <!-- Submitted classes -->
+            <div class="liquid-glass liquid-glass-prominent rounded-2xl p-4 mb-3">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style="background:rgba(76,175,80,0.1)">
+                        <span class="material-symbols-outlined"
+                            style="font-size:16px;color:#4caf50;font-variation-settings:'FILL' 1">check_circle</span>
+                    </div>
+                    <span class="font-black text-sm text-gray-800">سلّمت التقرير</span>
+                    <span id="submittedCount" class="mr-auto text-[10px] font-black px-2.5 py-0.5 rounded-full"
+                        style="background:rgba(76,175,80,0.1);color:#4caf50">0</span>
+                </div>
+                <div id="submittedList" class="space-y-2">
+                    <p class="text-gray-400 text-xs text-center py-2">جاري التحميل...</p>
+                </div>
+            </div>
+
+            <!-- Today's reports -->
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-black text-sm text-gray-800 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary" style="font-size:18px">today</span>
+                        تقارير اليوم
+                    </h3>
+                    <!-- Plugin: Absence Alarm Trigger (Dynamic) -->
+                    <button id="absence-alarm-btn" onclick="openAbsenceAlarmSettings()"
+                        class="hidden px-4 py-2 bg-red-50 text-red-500 border border-red-100 rounded-xl text-[10px] font-black flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all">
+                        <span class="material-symbols-outlined text-sm">alarm</span>
+                        منبه الغياب الآلي
+                    </button>
+                </div>
+                <div id="todayReportsGrid" class="grid grid-cols-1 gap-3"></div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB 1: التقارير ═══ -->
+        <div id="tab-reports" class="tab-panel">
+            <!-- Filter Bar -->
+            <div class="liquid-glass p-4 rounded-2xl mb-4">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 mb-1.5 font-bold">تصفية بالتاريخ</label>
+                        <input type="date" id="filterDate" onchange="renderReports()"
+                            class="w-full liquid-glass-input rounded-xl p-2.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 mb-1.5 font-bold">تصفية بالفصل</label>
+                        <select id="filterClass" onchange="renderReports()"
+                            class="w-full liquid-glass-input rounded-xl p-2.5 text-xs">
+                            <option value="">جميع الفصول</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 mb-1.5 font-bold">تصفية بالمعلم</label>
+                        <select id="filterTeacher" onchange="renderReports()"
+                            class="w-full liquid-glass-input rounded-xl p-2.5 text-xs">
+                            <option value="">جميع المعلمين</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="clearFilters()"
+                            class="w-full liquid-glass interactive py-2.5 px-3 rounded-xl text-xs font-bold text-gray-600">مسح
+                            التصفية</button>
+                    </div>
+                </div>
+            </div>
+            <div id="reportsGrid" class="grid grid-cols-1 gap-4"></div>
+        </div>
+
+        <!-- ═══ TAB 2: الذكاء الاصطناعي (AutoPilot Legendary Redesign) ═══ -->
+        <div id="tab-ai" class="tab-panel !p-0 flex flex-col theme-light-warm">
+            <!-- Background Ambient Glow Orbs (DOM-controlled) -->
+            <div id="ai-glow-left" class="ai-glow-orb ai-glow-orb--left"></div>
+            <div id="ai-glow-right" class="ai-glow-orb ai-glow-orb--right"></div>
+
+
+            <!-- Custom Premium Top Bar -->
+            <div class="assistant-top-bar">
+                <!-- Right (First Child in RTL): Hamburger -->
+                <div class="assistant-top-right-hamburger" onclick="window.toggleAssistantDrawer(event)"
+                    title="القائمة">
+                    <div class="assistant-hamburger-line assistant-hamburger-line-1"></div>
+                    <div class="assistant-hamburger-line assistant-hamburger-line-2"></div>
+                </div>
+
+                <!-- Center: Theme Dropdown (تخصيص) -->
+                <div class="assistant-top-center-dropdown">
+                    <button class="dropdown-trigger-btn" onclick="window.toggleThemeDropdown(event)">
+                        <span>تخصيص</span>
+                        <span class="material-symbols-outlined" style="font-size: 16px; transition: transform 0.3s;"
+                            id="dropdown-chevron">expand_more</span>
+                    </button>
+                    <div class="dropdown-menu-options" id="theme-dropdown-menu">
+                        <!-- Segmented Switcher Header -->
+                        <div class="customizer-tabs-container">
+                            <div id="customizer-tabs-indicator" class="customizer-tabs-indicator"></div>
+                            <button id="customizer-tab-plugins" class="customizer-tab-btn" onclick="window.switchCustomizerTab('plugins', event)">الاضافات</button>
+                            <button id="customizer-tab-connectors" class="customizer-tab-btn active" onclick="window.switchCustomizerTab('connectors', event)">التطبيقات</button>
+                            <button id="customizer-tab-skills" class="customizer-tab-btn" onclick="window.switchCustomizerTab('skills', event)">المهارات</button>
+                        </div>
+
+                        <!-- Tab Content: الاضافات (Extensions) -->
+                        <div id="customizer-panel-plugins" class="customizer-tab-panel">
+                            <!-- منبه الغياب الآلي -->
+                            <div class="customizer-card cursor-pointer" onclick="window.toggleCustomItem('plugin-absence')">
+                                <div class="customizer-card-icon text-red-500">
+                                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">alarm</span>
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">منبه الغياب الآلي</span>
+                                    <span class="customizer-card-desc">إرسال إشعارات تلقائية لأولياء الأمور عند تسجيل غياب الطالب</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="check-plugin-absence-custom" class="hidden">
+                                    <div class="switch-bg w-10 h-5 bg-gray-200 rounded-full relative transition-all" id="switch-bg-absence">
+                                        <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 right-0.5 transition-all" id="switch-dot-absence"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: التطبيقات (Apps) -->
+                        <div id="customizer-panel-connectors" class="customizer-tab-panel active relative">
+                            <!-- List View -->
+                            <div id="connectors-list-view" class="flex flex-col gap-3 w-full h-full">
+                                <!-- Gmail Card -->
+                                <div class="customizer-card cursor-pointer hover:bg-gray-50/50 dark:hover:bg-neutral-800/50 transition-all" onclick="window.showConnectorDetail('gmail', event)">
+                                    <div class="customizer-card-icon text-red-500">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail">
+                                    </div>
+                                    <div class="customizer-card-details">
+                                        <span class="customizer-card-title">Gmail</span>
+                                        <span class="customizer-card-desc">سوف يصبح بإمكان حضوري إرسال إيميلات بدلاً منك</span>
+                                    </div>
+                                    <button class="customizer-card-action">
+                                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Gmail Detail View (Nested Details) -->
+                            <div id="connector-detail-gmail" class="hidden flex flex-col gap-2 w-full h-full animate-fade-in" style="direction: rtl; text-align: right;">
+                                <!-- Back Header -->
+                                <div class="flex items-center gap-2 border-b border-gray-100 dark:border-neutral-800 pb-2 mb-1">
+                                    <button class="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-neutral-800 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/10 transition-all cursor-pointer" onclick="window.hideConnectorDetail('gmail', event)">
+                                        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                                    </button>
+                                    <span class="text-xs font-black text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">تفاصيل ربط Gmail</span>
+                                </div>
+
+                                <!-- App Details -->
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 border border-gray-100 dark:border-neutral-700/50 flex items-center justify-center shrink-0">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg" alt="Gmail" class="w-6 h-6">
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-black text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">Gmail Connector</span>
+                                        <span class="text-[9px] font-bold text-gray-400" style="font-family: 'Tajawal', sans-serif;">إرسال البريد مباشرة عبر بريدك الشخصي</span>
+                                    </div>
+                                </div>
+
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed font-medium" style="font-family: 'Tajawal', sans-serif;">
+                                    اربط حساب بريدك الإلكتروني الشخصي Gmail ليتمكن المساعد الذكي من إرسال تقارير الحضور وملخصات الغياب للمعلمين وأولياء الأمور مباشرة من إيميلك الخاص مجاناً وبأمان.
+                                </p>
+
+                                <!-- Connection Status & Action Buttons -->
+                                <div class="mt-auto pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div id="gmail-status-indicator-custom" class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                                        <span id="gmail-status-text-custom" class="text-[10px] font-black text-gray-400" style="font-family: 'Tajawal', sans-serif;">غير متصل</span>
+                                    </div>
+                                    
+                                    <!-- Auth / Link Button -->
+                                    <button id="gmail-auth-btn-custom" onclick="window.handleGmailToggle(event)" class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all cursor-pointer">
+                                        <span class="material-symbols-outlined text-[14px]">link</span>
+                                        <span style="font-family: 'Tajawal', sans-serif;">ربط الحساب</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: المهارات (Skills) -->
+                        <div id="customizer-panel-skills" class="customizer-tab-panel">
+                            <!-- Excel Report Skill -->
+                            <div class="customizer-card cursor-pointer" onclick="window.toggleCustomItem('skill-reports')">
+                                <div class="customizer-card-icon text-green-600">
+                                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">analytics</span>
+                                </div>
+                                <div class="customizer-card-details">
+                                    <span class="customizer-card-title">مهارة ملفات إكسل</span>
+                                    <span class="customizer-card-desc">تمكين المساعد من تحليل تقارير إكسل والبيانات وحساب الطلاب</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="check-skill-reports-custom" class="hidden">
+                                    <div class="switch-bg w-10 h-5 bg-gray-200 rounded-full relative transition-all" id="switch-bg-reports">
+                                        <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 right-0.5 transition-all" id="switch-dot-reports"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Left (Last Child in RTL): Clear Chat / New Chat Icon -->
+                <div class="assistant-top-left-emblem" onclick="Agent.clearChat()"
+                    title="مسح المحادثة وبدء دردشة جديدة">
+                    <img src="assets/icons/new_chat.svg" alt="محادثة جديدة" />
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div id="agent-messages"
+                class="flex-1 overflow-y-auto p-4 hide-scrollbar max-w-2xl mx-auto w-full relative">
+                <!-- Welcome Container (Blank State) -->
+                <div class="assistant-blank-state" id="assistant-blank-state">
+                    <div class="assistant-planet-logo-container">
+                        <img src="assets/AI-logo.png" class="assistant-planet-logo" alt="Logo" />
+                    </div>
+                    <h2 class="assistant-greeting-text" id="assistant-greeting-text">كيف الأجواء، مدير؟</h2>
+                </div>
+            </div>
+
+            <!-- New Capsule Input Area -->
+            <div class="assistant-bottom-area">
+                <div class="assistant-input-capsule">
+                    <!-- Left Button (Microphone / Send) -->
+                    <button id="agent-mic-btn" class="assistant-capsule-mic-btn" onclick="window.triggerVoiceVisual()"
+                        title="تحدث بصوتك">
+                        <span class="material-symbols-outlined" id="capsule-mic-icon">mic</span>
+                    </button>
+
+                    <!-- Textarea -->
+                    <textarea id="agent-input" class="assistant-capsule-textarea" placeholder="اسأل حضوري..." rows="1"
+                        autocomplete="off" oninput="window.handleInputTyping(this)"></textarea>
+
+                    <!-- Right Button (Plus / Send morph) -->
+                    <button id="agent-send-btn" onclick="document.getElementById('agent-file-input').click()"
+                        class="assistant-capsule-right-btn" title="إرفاق ملف">
+                        <span class="material-symbols-outlined" id="capsule-right-icon">add</span>
+                    </button>
+                    <input type="file" id="agent-file-input" class="hidden" onchange="Agent.handleFileUpload(this)">
+                </div>
+            </div>
+
+
+        </div>
+
+        <!-- ═══ TAB 3: إدارة المعلمين ═══ -->
+        <div id="tab-teachers" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-black text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary"
+                        style="font-size:20px;font-variation-settings:'FILL' 1">group</span>
+                    إدارة المعلمين
+                </h3>
+                <button onclick="showAddTeacherModal()"
+                    class="liquid-button liquid-button-prominent text-white px-4 py-2.5 rounded-xl text-xs font-black">+
+                    إضافة معلم</button>
+            </div>
+            <div class="liquid-glass-prominent rounded-2xl overflow-hidden">
+                <!-- Desktop Header -->
+                <div class="hidden sm:grid grid-cols-12 gap-4 p-4 px-5 border-b border-black/5">
+                    <div class="sm:col-span-8 text-gray-400 text-[9px] font-black uppercase tracking-widest">المعلم
+                    </div>
+                    <div class="sm:col-span-4 text-gray-400 text-[9px] font-black uppercase tracking-widest text-left">
+                        الإجراءات</div>
+                </div>
+                <div id="teacherTable" class="divide-y divide-black/5"></div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB 4: الطلاب والفصول ═══ -->
+        <div id="tab-classes" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-black text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary"
+                        style="font-size:20px;font-variation-settings:'FILL' 1">meeting_room</span>
+                    الطلاب والفصول
+                </h3>
+            </div>
+            <div id="classGrid" class="grid grid-cols-1 gap-5"></div>
+        </div>
+
+        <!-- ═══ TAB 5: الإشعارات ═══ -->
+        <div id="tab-notifications" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-black text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary"
+                        style="font-size:20px;font-variation-settings:'FILL' 1">notifications</span>
+                    إدارة الإشعارات
+                </h3>
+                <button onclick="showAddNotificationModal()"
+                    class="liquid-button liquid-button-prominent text-white px-4 py-2.5 rounded-xl text-xs font-black">+
+                    إرسال إشعار</button>
+            </div>
+            <div id="notificationsList" class="grid grid-cols-1 gap-4"></div>
+        </div>
+
+    </div><!-- /tabs-wrapper -->
+
+
+
+    <!-- ─── Modals ─── -->
+    <div id="modalOverlay" class="fixed inset-0 liquid-glass-overlay z-50 hidden flex items-center justify-center p-4">
+
+        <!-- Add/Edit Teacher Modal -->
+        <div id="teacherModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+            <!-- Close Button (X) -->
+            <button onclick="closeModal()"
+                class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <h2 id="teacherModalTitle" class="text-xl font-black text-gray-800 mb-6">إضافة معلم جديد</h2>
+            <form onsubmit="handleAddTeacher(event)" class="space-y-4 text-right">
+                <input type="hidden" id="tEditId">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اسم المعلم</label>
+                    <input type="text" id="tName" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الرقم الوزاري</label>
+                    <input type="text" id="tMinistryId" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">كلمة السر</label>
+                    <input type="password" id="tPassword" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الرتبة</label>
+                    <select id="tRole" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                        <option value="teacher">معلم</option>
+                        <option value="admin">مدير</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
+                    <textarea id="tNotes" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-16 resize-none" placeholder="مثال: البريد الإلكتروني هو t.ahmad@school.com"></textarea>
+                </div>
+                <div class="flex flex-wrap gap-3 pt-4">
+                    <button type="submit" id="tSaveBtn"
+                        class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
+                    <button type="button" id="tDeleteBtn" onclick="handleDeleteTeacherFromModal()"
+                        class="hidden flex-1 bg-red-50 text-error border border-red-200 font-black py-3.5 rounded-xl transition-all hover:bg-error hover:text-white">حذف</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Add/Edit Class Modal -->
+        <div id="classModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+            <!-- Close Button (X) -->
+            <button onclick="closeModal()"
+                class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <h2 id="classModalTitle" class="text-xl font-black text-gray-800 mb-6">إضافة فصل جديد</h2>
+            <form onsubmit="handleAddClass(event)" class="space-y-4 text-right">
+                <input type="hidden" id="cEditId">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اسم الفصل</label>
+                    <input type="text" id="cName" placeholder="مثال: الصف التاسع" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الشعبة</label>
+                    <input type="text" id="cSection" placeholder="مثال: أ" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit"
+                        class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Add/Edit Student Modal -->
+        <div id="studentModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+            <!-- Close Button (X) -->
+            <button onclick="closeModal()"
+                class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <h2 id="studentModalTitle" class="text-xl font-black text-gray-800 mb-6">إضافة طالب جديد</h2>
+            <form onsubmit="handleAddStudent(event)" class="space-y-4 text-right">
+                <input type="hidden" id="sClassId">
+                <input type="hidden" id="sEditId">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اسم الطالب</label>
+                    <input type="text" id="sName" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الرقم الوطني</label>
+                    <input type="text" id="sId" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">رقم هاتف ولي الأمر (إجباري - 10
+                        أرقام)</label>
+                    <input type="text" id="sPhone" placeholder="مثال: 0790000000" required pattern="07[789][0-9]{7}"
+                        title="يرجى إدخال رقم هاتف صالح يبدأ بـ 07 ويتكون من 10 أرقام"
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div id="sImagePreviewContainer" class="hidden mb-4 relative group">
+                    <div class="relative w-28 h-28 mx-auto">
+                        <img id="sImagePreview" src=""
+                            class="w-full h-full rounded-2xl object-cover border-4 border-primary/20 cursor-pointer interactive"
+                            onclick="UI.viewImage(this.src)">
+                        <div
+                            class="absolute -bottom-2 -right-2 bg-primary text-white w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
+                            <span class="material-symbols-outlined text-xs">check</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="sFingerprintStatus"
+                    class="hidden p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined">fingerprint</span>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-primary">البصمة الرقمية</p>
+                            <p id="sFingerprintCount" class="text-xs font-bold text-gray-700">مخزن: 0 بصمات</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearStudentFingerprints()"
+                        class="text-xs font-black text-error hover:underline">مسح الكل</button>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">صورة الطالب <span
+                            id="sImgRequiredLabel" class="text-error">(إجباري)</span></label>
+                    <div class="relative group">
+                        <input type="file" id="sImage" accept="image/*"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onchange="previewStudentImage(this)">
+                        <div
+                            class="liquid-glass-input rounded-xl p-3.5 flex items-center justify-between pointer-events-none">
+                            <span id="sImageName" class="text-gray-400 text-sm">اختر صورة الطالب...</span>
+                            <span class="material-symbols-outlined text-primary text-lg">image</span>
+                        </div>
+                    </div>
+                    <div id="sAppendFingerprintContainer" class="hidden mt-2 flex items-center gap-2 mr-1">
+                        <input type="checkbox" id="sAppendFingerprint" class="w-4 h-4 accent-primary">
+                        <label for="sAppendFingerprint" class="text-[10px] font-bold text-gray-500">إضافة كبصمة إضافية
+                            (لزيادة الدقة)</label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
+                    <textarea id="sNotes" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-16 resize-none" placeholder="مثال: البريد الإلكتروني هو parent.ahmad@example.com"></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit"
+                        class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Add/Edit Notification Modal -->
+        <div id="notificationModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+            <!-- Close Button (X) -->
+            <button onclick="closeModal()"
+                class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <h2 id="notificationModalTitle" class="text-xl font-black text-gray-800 mb-6">إرسال إشعار جديد</h2>
+            <form onsubmit="handleSendNotification(event)" class="space-y-4 text-right">
+                <input type="hidden" id="nEditId">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">إرسال إلى</label>
+                    <select id="nTargetType" onchange="toggleNotificationTargetFields()" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                        <option value="all">الجميع</option>
+                        <option value="class">صف محدد</option>
+                        <option value="student">طالب محدد</option>
+                        <option value="parent">ولي أمر طالب محدد</option>
+                    </select>
+                </div>
+                <div id="nTargetClassContainer" class="hidden">
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اختر الصف</label>
+                    <select id="nTargetClass" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm"></select>
+                </div>
+                <div id="nTargetStudentContainer" class="hidden">
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الرقم الوطني</label>
+                    <input type="text" id="nTargetStudent" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm"
+                        placeholder="مثال: 2024001">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">عنوان الإشعار</label>
+                    <input type="text" id="nTitle" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">نص الإشعار</label>
+                    <textarea id="nMessage" required
+                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-24"></textarea>
+                </div>
+                <div id="nImagePreviewContainer" class="hidden mb-4 relative group">
+                    <img id="nImagePreview" src=""
+                        class="w-full h-32 rounded-2xl object-cover border-2 border-primary/20 cursor-pointer interactive"
+                        onclick="UI.viewImage(this.src)">
+                    <button type="button" onclick="clearNotificationImage()"
+                        class="absolute top-2 left-2 bg-red-500 text-white p-1 rounded-full shadow-none">
+                        <span class="material-symbols-outlined text-xs">close</span>
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">صورة إضافية (اختياري)</label>
+                    <div class="relative group">
+                        <input type="file" id="nImage" accept="image/*"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onchange="previewNotificationImage(this)">
+                        <div
+                            class="liquid-glass-input rounded-xl p-3.5 flex items-center justify-between pointer-events-none">
+                            <span id="nImageName" class="text-gray-400 text-sm">اختر صورة...</span>
+                            <span class="material-symbols-outlined text-primary text-lg">image</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" id="nSubmitBtn"
+                        class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">إرسال</button>
+                </div>
+            </form>
+        </div>
+
+
+    </div><!-- /modalOverlay -->
+
+    <!-- Scripts -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-gmail.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-gemini.js"></script>
+    <script src="scripts/module-face-api.js"></script>
+    <script src="scripts/module-ai-agent.js"></script>
+
+    <script>
+        Auth.checkAuth('admin');
+
+        /* ══════════════════════════════════════
+           LEGENDARY ASSISTANT CUSTOM JS LOGIC
+         ══════════════════════════════════════ */
+        window.toggleThemeDropdown = function (e) {
+            if (e) e.stopPropagation();
+            const dropdown = document.getElementById('theme-dropdown-menu');
+            const chevron = document.getElementById('dropdown-chevron');
+            if (dropdown && chevron) {
+                const isOpen = dropdown.classList.contains('open');
+                if (isOpen) {
+                    dropdown.classList.remove('open');
+                    chevron.style.transform = 'rotate(0deg)';
+                } else {
+                    dropdown.classList.add('open');
+                    chevron.style.transform = 'rotate(180deg)';
+                    // Sync customization checkboxes upon opening
+                    syncDirectoryToggles();
+                    
+                    // Move the customizer sliding pill to the active tab after drawer finishes rendering (a tiny delay)
+                    setTimeout(() => {
+                        const activeBtn = document.querySelector('#theme-dropdown-menu .customizer-tab-btn.active');
+                        if (activeBtn) {
+                            const tabId = activeBtn.id.replace('customizer-tab-', '');
+                            window.moveCustomizerTabIndicator(tabId);
+                        }
+                    }, 50);
+                }
+            }
+        };
+
+        window.switchCustomizerTab = function (tabId, e) {
+            if (e) e.stopPropagation();
+            
+            // Toggle active classes on tab buttons
+            const tabButtons = document.querySelectorAll('#theme-dropdown-menu .customizer-tab-btn');
+            tabButtons.forEach(btn => {
+                const isActive = btn.id === `customizer-tab-${tabId}`;
+                btn.classList.toggle('active', isActive);
+            });
+
+            // Move the customizer tab sliding indicator pill
+            window.moveCustomizerTabIndicator(tabId);
+
+            // Toggle active classes on tab panels
+            const panels = document.querySelectorAll('#theme-dropdown-menu .customizer-tab-panel');
+            panels.forEach(panel => {
+                const isActive = panel.id === `customizer-panel-${tabId}`;
+                panel.classList.toggle('active', isActive);
+            });
+        };
+
+        window.moveCustomizerTabIndicator = function (tabId) {
+            const container = document.querySelector('.customizer-tabs-container');
+            const indicator = document.getElementById('customizer-tabs-indicator');
+            const targetBtn = document.getElementById(`customizer-tab-${tabId}`);
+            if (!container || !indicator || !targetBtn) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const btnRect = targetBtn.getBoundingClientRect();
+
+            // Calculate left relative offset inside the switcher bar
+            const leftOffset = btnRect.left - containerRect.left;
+            
+            indicator.style.left = leftOffset + 'px';
+            indicator.style.width = btnRect.width + 'px';
+            indicator.style.height = btnRect.height + 'px';
+            indicator.style.top = (btnRect.top - containerRect.top) + 'px';
+        };
+
+        window.showConnectorDetail = function (connectorId, e) {
+            if (e) e.stopPropagation();
+            
+            // Hide connectors list view
+            const listView = document.getElementById('connectors-list-view');
+            if (listView) listView.style.display = 'none';
+
+            // Show connector detail view
+            const detailView = document.getElementById(`connector-detail-${connectorId}`);
+            if (detailView) {
+                detailView.classList.remove('hidden');
+                detailView.style.display = 'flex';
+                detailView.style.flexDirection = 'column';
+            }
+            
+            // Sync Gmail buttons inside detail view
+            window.syncGmailStatusInDetailView();
+        };
+
+        window.hideConnectorDetail = function (connectorId, e) {
+            if (e) e.stopPropagation();
+            
+            // Hide connector detail view
+            const detailView = document.getElementById(`connector-detail-${connectorId}`);
+            if (detailView) {
+                detailView.classList.add('hidden');
+                detailView.style.display = 'none';
+            }
+
+            // Show connectors list view
+            const listView = document.getElementById('connectors-list-view');
+            if (listView) listView.style.display = 'flex';
+        };
+
+        window.handleGmailToggle = function (e) {
+            if (e) e.stopPropagation();
+            if (typeof GmailManager === 'undefined') return;
+
+            if (GmailManager.isConnected()) {
+                GmailManager.logout();
+            } else {
+                GmailManager.login();
+            }
+            
+            // Slight delay to allow status update, then sync UI
+            setTimeout(() => {
+                window.syncGmailStatusInDetailView();
+            }, 300);
+        };
+
+        window.syncGmailStatusInDetailView = function () {
+            if (typeof GmailManager === 'undefined') return;
+            const isConnected = GmailManager.isConnected();
+            
+            const indicator = document.getElementById('gmail-status-indicator-custom');
+            const text = document.getElementById('gmail-status-text-custom');
+            const btn = document.getElementById('gmail-auth-btn-custom');
+            
+            if (indicator && text && btn) {
+                if (isConnected) {
+                    indicator.className = 'w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse';
+                    text.textContent = 'متصل بنجاح ✨';
+                    text.className = 'text-[10px] font-black text-green-600 dark:text-green-400';
+                    btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">link_off</span><span>قطع الاتصال</span>';
+                    btn.className = 'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-[10px] font-black hover:bg-red-100 transition-all cursor-pointer border border-red-100/50';
+                } else {
+                    indicator.className = 'w-2.5 h-2.5 rounded-full bg-gray-300';
+                    text.textContent = 'غير متصل';
+                    text.className = 'text-[10px] font-black text-gray-400';
+                    btn.innerHTML = '<span class="material-symbols-outlined text-[14px]">link</span><span>ربط الحساب</span>';
+                    btn.className = 'flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all cursor-pointer';
+                }
+            }
+        };
+
+        // Reactive Gmail connection listener
+        window.addEventListener('gmail_connected', () => {
+            window.syncGmailStatusInDetailView();
+        });
+
+        window.toggleDrawerSettings = function (e) {
+            if (e) e.stopPropagation();
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover) {
+                popover.classList.toggle('open');
+            }
+        };
+
+        window.setAssistantTheme = function (theme, element, e) {
+            if (e) e.stopPropagation();
+            const panel = document.getElementById('tab-ai');
+            const drawer = document.getElementById('assistant-sidebar-drawer');
+
+            // Update UI theme classes globally on body
+            if (theme === 'light') {
+                document.body.classList.add('theme-light-warm');
+                document.body.classList.remove('theme-dark-orange');
+                if (panel) {
+                    panel.classList.add('theme-light-warm');
+                    panel.classList.remove('theme-dark-orange');
+                }
+                if (drawer) {
+                    drawer.classList.add('theme-light-warm');
+                    drawer.classList.remove('theme-dark-orange');
+                }
+            } else {
+                document.body.classList.add('theme-dark-orange');
+                document.body.classList.remove('theme-light-warm');
+                if (panel) {
+                    panel.classList.add('theme-dark-orange');
+                    panel.classList.remove('theme-light-warm');
+                }
+                if (drawer) {
+                    drawer.classList.add('theme-dark-orange');
+                    drawer.classList.remove('theme-light-warm');
+                }
+            }
+
+            // Update active state in drawer settings popover
+            const popoverItems = document.querySelectorAll('#drawer-theme-popover .popover-item');
+            popoverItems.forEach(item => item.classList.remove('active'));
+            const activeIdx = theme === 'light' ? 0 : 1;
+            if (popoverItems[activeIdx]) {
+                popoverItems[activeIdx].classList.add('active');
+            }
+
+            // Save to localStorage
+            localStorage.setItem('assistant_theme', theme);
+
+            // Close popover
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover) {
+                popover.classList.remove('open');
+            }
+        };
+
+        window.toggleAssistantDrawer = function (e) {
+            if (e) e.stopPropagation();
+            const drawer = document.getElementById('assistant-sidebar-drawer');
+            const overlay = document.getElementById('assistant-drawer-overlay');
+            if (drawer && overlay) {
+                const isOpen = drawer.classList.contains('open');
+                if (isOpen) {
+                    drawer.classList.remove('open');
+                    overlay.classList.remove('active');
+                } else {
+                    drawer.classList.add('open');
+                    overlay.classList.add('active');
+                }
+            }
+        };
+
+        window.triggerDrawerAction = function (promptText) {
+            const input = document.getElementById('agent-input');
+            if (input) {
+                input.value = promptText;
+                // trigger text area input event to update icons
+                window.handleInputTyping(input);
+
+                // Close drawer
+                window.toggleAssistantDrawer();
+
+                // Send message after a slight aesthetic delay
+                setTimeout(() => {
+                    Agent.sendMessage();
+                }, 300);
+            }
+        };
+
+        window.handleInputTyping = function (textarea) {
+            const micBtn = document.getElementById('agent-mic-btn');
+            const micIcon = document.getElementById('capsule-mic-icon');
+            const sendBtn = document.getElementById('agent-send-btn');
+            const icon = document.getElementById('capsule-right-icon');
+
+            const capsule = textarea.closest('.assistant-input-capsule');
+            if (capsule) {
+                // Disable transitions temporarily
+                const originalCapsuleTransition = capsule.style.transition;
+                const originalTextareaTransition = textarea.style.transition;
+                capsule.style.transition = 'none';
+                textarea.style.transition = 'none';
+
+                // Temporarily remove expanded class to measure true single-line scrollHeight
+                capsule.classList.remove('expanded');
+
+                // Force a synchronous browser reflow to apply style changes instantly
+                void textarea.offsetHeight;
+                void capsule.offsetHeight;
+
+                textarea.style.height = 'auto';
+                const sHeight = textarea.scrollHeight;
+
+                // Force unexpand if empty
+                if (textarea.value.trim() === '') {
+                    capsule.classList.remove('expanded');
+                    textarea.style.height = Math.min(sHeight, 150) + 'px';
+                }
+                // If scrollHeight is greater than 45px (meaning it wraps to 2 lines) or includes newlines
+                else if (sHeight > 45 || textarea.value.includes('\n')) {
+                    capsule.classList.add('expanded');
+                    // Recalculate and set height with the expanded layout rules applied
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+                } else {
+                    capsule.classList.remove('expanded');
+                    textarea.style.height = Math.min(sHeight, 150) + 'px';
+                }
+
+                // Force reflow and re-enable transitions
+                void textarea.offsetHeight;
+                capsule.style.transition = originalCapsuleTransition;
+                textarea.style.transition = originalTextareaTransition;
+            } else {
+                textarea.style.transition = 'none';
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+                void textarea.offsetHeight;
+                textarea.style.transition = '';
+            }
+
+            // Right button is ALWAYS the plus button for attaching files
+            if (sendBtn && icon) {
+                sendBtn.classList.remove('active-send');
+                sendBtn.title = "إرفاق ملف";
+                icon.textContent = "add";
+                sendBtn.onclick = () => document.getElementById('agent-file-input').click();
+            }
+
+            // Left button toggles between Microphone and Send (arrow upward)
+            if (micBtn && micIcon) {
+                if (textarea.value.trim().length > 0) {
+                    micBtn.classList.add('active-send');
+                    micBtn.title = "إرسال الرسالة";
+                    micIcon.textContent = "arrow_upward";
+                    micBtn.onclick = () => {
+                        Agent.sendMessage();
+                    };
+                } else {
+                    micBtn.classList.remove('active-send');
+                    micBtn.title = "تحدث بصوتك";
+                    micIcon.textContent = "mic";
+                    micBtn.onclick = () => window.triggerVoiceVisual();
+                }
+            }
+        };
+
+        let recognition = null;
+        let isRecording = false;
+
+        window.triggerVoiceVisual = function () {
+            const micIcon = document.getElementById('capsule-mic-icon');
+            const input = document.getElementById('agent-input');
+            if (!micIcon || !input) return;
+
+            // Check browser support for SpeechRecognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                UI.toast('⚠️ متصفحك لا يدعم التعرف على الصوت محلياً. يرجى استخدام متصفح Chrome أو Edge.');
+                return;
+            }
+
+            if (isRecording) {
+                if (recognition) {
+                    recognition.stop();
+                }
+                return;
+            }
+
+            try {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ar-JO'; // Arabic (Jordan) local language support
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    micIcon.style.color = '#ffab31';
+                    micIcon.classList.add('animate-pulse');
+                    UI.toast('🎤 جاري الاستماع محلياً، تحدث الآن...');
+                };
+
+                recognition.onresult = (event) => {
+                    const resultText = event.results[0][0].transcript;
+                    if (resultText && resultText.trim()) {
+                        input.value = resultText;
+                        window.handleInputTyping(input);
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    if (event.error === 'not-allowed') {
+                        UI.toast('⚠️ يرجى السماح للمتصفح بالوصول إلى المايكروفون.');
+                    } else if (event.error === 'no-speech') {
+                        UI.toast('⚠️ لم يتم سماع أي صوت. حاول مجدداً.');
+                    } else {
+                        UI.toast('⚠️ خطأ في التعرف على الصوت: ' + event.error);
+                    }
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    micIcon.style.color = '';
+                    micIcon.classList.remove('animate-pulse');
+                };
+
+                recognition.start();
+
+            } catch (err) {
+                console.error('Speech recognition init error:', err);
+                UI.toast('⚠️ تعذر تشغيل المايكروفون: ' + err.message);
+                isRecording = false;
+                micIcon.style.color = '';
+                micIcon.classList.remove('animate-pulse');
+            }
+        };
+
+        // Click outside listeners to close custom dropdowns
+        document.addEventListener('click', function () {
+            const dropdown = document.getElementById('theme-dropdown-menu');
+            const chevron = document.getElementById('dropdown-chevron');
+            if (dropdown && dropdown.classList.contains('open') && chevron) {
+                dropdown.classList.remove('open');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+            
+            // Close drawer theme popover
+            const popover = document.getElementById('drawer-theme-popover');
+            if (popover && popover.classList.contains('open')) {
+                popover.classList.remove('open');
+            }
+        });
+
+        // Initialize dynamic greeting and theme on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Register stop propagation on theme dropdown menu so click inside won't close it
+            const dropdown = document.getElementById('theme-dropdown-menu');
+            if (dropdown) {
+                dropdown.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            // Sync customization controls on load
+            try {
+                await syncDirectoryToggles();
+            } catch (e) {
+                console.warn('Customization sync error on load:', e);
+            }
+
+            // Apply greeting and populate manager details
+            try {
+                const currentUser = typeof Auth !== 'undefined' ? Auth.getCurrentUser() : null;
+                const firstName = currentUser && currentUser.name ? currentUser.name.trim().split(' ')[0] : 'مدير';
+                const fullName = currentUser && currentUser.name ? currentUser.name : 'مدير النظام';
+                
+                const greetingEl = document.getElementById('assistant-greeting-text');
+                if (greetingEl) {
+                    const greetings = [
+                        `كيف الأجواء اليوم، ${firstName}؟`,
+                        `طاب يومك، ${firstName}!`,
+                        `أهلاً بك، ${firstName}!`,
+                        `مرحباً مجدداً، ${firstName}!`,
+                        `أنرت لوحة التحكم، ${firstName}.`,
+                        `يوم سعيد، ${firstName}!`,
+                        `أهلاً ${firstName}، كيف حالك؟`,
+                        `مرحباً ${firstName}، مستعد للعمل؟`,
+                        `طاب صباحك، ${firstName}.`,
+                        `أهلاً ${firstName}، دعنا نبدأ!`
+                    ];
+                    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+                    greetingEl.textContent = randomGreeting;
+                }
+
+                // Render manager profile name
+                const profileNameEl = document.getElementById('manager-name-display');
+                if (profileNameEl) {
+                    profileNameEl.textContent = fullName;
+                }
+            } catch (e) {
+                console.warn('Greeting and Profile init error:', e);
+            }
+
+            // Apply theme
+            const savedTheme = localStorage.getItem('assistant_theme') || 'light';
+            window.setAssistantTheme(savedTheme, null);
+        });
+
+        /* ══════════════════════════════════════
+           TAB NAVIGATION SYSTEM (Fully Responsive & Premium)
+         ══════════════════════════════════════ */
+        const TAB_IDS = ['daily', 'reports', 'ai', 'teachers', 'classes', 'notifications'];
+        const TAB_TITLES = ['اليوم', 'التقارير', 'المساعد الذكي', 'المعلمون', 'الطلاب', 'الإشعارات'];
+        let currentTabIdx = 2; // Default to AI Assistant tab
+
+        window.switchTab = function (tabId, idx) {
+            // If idx is not provided, look it up in TAB_IDS
+            if (idx === undefined) {
+                idx = TAB_IDS.indexOf(tabId);
+            }
+            if (idx === -1) idx = 2;
+            currentTabIdx = idx;
+
+            // 1. Toggle Tab Panels
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+                panel.style.setProperty('display', 'none', 'important');
+            });
+            const activePanel = document.getElementById('tab-' + tabId);
+            if (activePanel) {
+                activePanel.classList.add('active');
+                if (tabId === 'ai') {
+                    activePanel.style.setProperty('display', 'flex', 'important');
+                } else {
+                    activePanel.style.setProperty('display', 'block', 'important');
+                }
+            }
+
+            // 2. Toggle Main Header and offset wrapper by header height
+            const header = document.getElementById('main-header');
+            const wrapper = document.getElementById('tabs-wrapper');
+            if (header && wrapper) {
+                if (tabId === 'ai') {
+                    header.style.setProperty('display', 'none', 'important');
+                    wrapper.style.setProperty('top', '0px', 'important');
+                } else {
+                    header.style.setProperty('display', 'flex', 'important');
+                    wrapper.style.setProperty('top', '48px', 'important');
+                }
+            }
+
+            // 3. Toggle Bottom Nav active state
+            document.querySelectorAll('#bottom-nav .nav-btn').forEach((btn, i) => {
+                if (i === idx) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // 4. Toggle Drawer Active Item
+            document.querySelectorAll('.assistant-sidebar-drawer .assistant-drawer-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const activeDrawerItem = document.getElementById('drawer-item-' + tabId);
+            if (activeDrawerItem) {
+                activeDrawerItem.classList.add('active');
+            }
+
+            // 5. Move Nav Indicator Pill
+            window.moveNavIndicator(idx);
+
+            // 6. Save active tab to localStorage so it persists on reload
+            localStorage.setItem('admin_active_tab', tabId);
+        };
+
+        window.moveNavIndicator = function (idx) {
+            const container = document.getElementById('nav-inner');
+            const indicator = document.getElementById('nav-indicator');
+            if (!container || !indicator) return;
+
+            const buttons = container.querySelectorAll('.nav-btn');
+            const targetBtn = buttons[idx];
+            if (!targetBtn) return;
+
+            // Calculate position and width of active button relative to container
+            const containerRect = container.getBoundingClientRect();
+            const btnRect = targetBtn.getBoundingClientRect();
+
+            // Calculate left relative position
+            const leftOffset = btnRect.left - containerRect.left;
+            
+            indicator.style.left = leftOffset + 'px';
+            indicator.style.width = btnRect.width + 'px';
+        };
+
+        window.initNavIndicator = function () {
+            // Retrieve last active tab from localStorage, or default to AI (2)
+            const savedTab = localStorage.getItem('admin_active_tab') || 'ai';
+            let idx = TAB_IDS.indexOf(savedTab);
+            if (idx === -1) idx = 2; // Default to AI Assistant
+
+            window.switchTab(savedTab, idx);
+        };
+
+        // Refresh all UI components
+        window.renderAll = async function () {
+            // Initialize UI
+            syncDirectoryToggles();
+            renderDailyInfo();
+            await Promise.all([
+                populateFilters(),
+                renderReports(),
+                renderTeachers(),
+                renderClasses(),
+                renderNotifications()
+            ]);
+        };
+
+        /* ══════════════════════════════════════
+           DAILY INFO RENDERER
+        ══════════════════════════════════════ */
+        async function renderDailyInfo() {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+            const [classes, allRecords, allStudents, teachers] = await Promise.all([
+                DB.getClasses(),
+                DB.getCollection(DB.KEYS.RECORDS),
+                DB.getCollection(DB.KEYS.STUDENTS),
+                DB.getTeachers()
+            ]);
+
+            const todayRecs = allRecords.filter(r => r.date === todayStr);
+
+            let totalPresent = 0, totalAbsent = 0;
+            todayRecs.forEach(r => {
+                (r.details || []).forEach(d => {
+                    if (d.status === 'present') totalPresent++;
+                    else totalAbsent++;
+                });
+            });
+            const total = totalPresent + totalAbsent;
+            const rate = total > 0 ? Math.round((totalPresent / total) * 100) : null;
+
+            // Update stat cards
+            document.getElementById('statStudents').textContent = allStudents.length;
+            document.getElementById('statTeachers').textContent = teachers.length;
+            document.getElementById('statClasses').textContent = classes.length;
+            document.getElementById('statAttendanceRate').textContent = rate !== null ? `${rate}%` : '--%';
+            document.getElementById('statPresent').textContent = totalPresent;
+            document.getElementById('statAbsent').textContent = totalAbsent;
+
+            // Submitted / Not submitted
+            const submittedIds = [...new Set(todayRecs.map(r => r.classId))];
+            const submitted = classes.filter(c => submittedIds.includes(c.id));
+            const notSubmitted = classes.filter(c => !submittedIds.includes(c.id));
+
+            document.getElementById('notSubmittedCount').textContent = notSubmitted.length;
+            document.getElementById('submittedCount').textContent = submitted.length;
+
+            // Not submitted list
+            const notList = document.getElementById('notSubmittedList');
+            if (notSubmitted.length === 0) {
+                notList.innerHTML = `<p class="text-center py-2 text-xs font-bold" style="color:var(--color-success)">🎉 جميع الفصول سلّمت التقارير!</p>`;
+            } else {
+                notList.innerHTML = notSubmitted.map(c => `
+                    <div class="class-chip class-chip-pending">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(244,67,54,0.12)">
+                            <span class="material-symbols-outlined text-error" style="font-size:15px">class</span>
+                        </div>
+                        <span class="font-bold text-gray-700 flex-1">${c.name} - ${c.section}</span>
+                        <span class="text-[9px] font-black uppercase tracking-wide" style="color:#f44336">لم يُسلَّم</span>
+                    </div>`).join('');
+            }
+
+            // Submitted list
+            const subList = document.getElementById('submittedList');
+            if (submitted.length === 0) {
+                subList.innerHTML = `<p class="text-gray-400 text-xs text-center py-2">لا توجد فصول سلّمت بعد</p>`;
+            } else {
+                subList.innerHTML = submitted.map(c => {
+                    const rec = todayRecs.find(r => r.classId === c.id);
+                    const present = rec?.details?.filter(d => d.status === 'present').length ?? 0;
+                    const cnt = rec?.details?.length ?? 0;
+                    const teacher = teachers.find(t => t.id === rec?.teacherId);
+                    return `
+                        <div class="class-chip class-chip-done">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(76,175,80,0.12)">
+                                <span class="material-symbols-outlined" style="font-size:15px;color:var(--color-success)">class</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-gray-700 truncate">${c.name} - ${c.section}</p>
+                                ${teacher ? `<p class="text-[9px] text-gray-400">${teacher.name}</p>` : ''}
+                            </div>
+                            <span class="font-black text-xs shrink-0" style="color:var(--color-success)">${present}/${cnt}</span>
+                        </div>`;
+                }).join('');
+            }
+
+            // Today's reports grid
+            const grid = document.getElementById('todayReportsGrid');
+            if (todayRecs.length === 0) {
+                grid.innerHTML = `<div class="liquid-glass p-6 text-center text-gray-400 rounded-2xl text-xs">لا توجد تقارير لليوم بعد</div>`;
+            } else {
+                grid.innerHTML = todayRecs.map(r => {
+                    const cls = classes.find(c => c.id === r.classId) || { name: 'صف', section: '' };
+                    const teacher = teachers.find(t => t.id === r.teacherId) || { name: 'غير معروف' };
+                    const p = r.details?.filter(d => d.status === 'present').length ?? 0;
+                    const t2 = r.details?.length ?? 0;
+                    const pct = t2 > 0 ? Math.round((p / t2) * 100) : 0;
+                    const pctColor = pct >= 75 ? 'var(--color-success)' : '#f44336';
+                    return `
+                        <div class="liquid-glass liquid-glass-prominent rounded-2xl overflow-hidden cursor-pointer" onclick="showFullReport('${r.id}')">
+                            <div class="report-card-header">
+                                <div class="report-header-glow"></div>
+                                <div class="report-header-icon-box">
+                                    <span class="material-symbols-outlined">analytics</span>
+                                </div>
+                                <div class="absolute bottom-3 right-4 z-10">
+                                    <p class="font-black text-sm text-gray-800">${cls.name} - ${cls.section}</p>
+                                    <p class="text-[10px] font-bold text-primary">${teacher.name}</p>
+                                </div>
+                            </div>
+                            <div class="p-3 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full" style="background:var(--color-primary)"></div>
+                                    <span class="text-xs font-bold text-gray-600">${p} حاضر · ${t2 - p} غائب</span>
+                                </div>
+                                <span class="text-sm font-black" style="color:${pctColor}">${pct}%</span>
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+        }
+
+        /* ══════════════════════════════════════
+           FILTERS & REPORTS
+        ══════════════════════════════════════ */
+        async function populateFilters() {
+            const classSelect = document.getElementById('filterClass');
+            const teacherSelect = document.getElementById('filterTeacher');
+            const [classes, teachers] = await Promise.all([DB.getClasses(), DB.getTeachers()]);
+
+            classSelect.innerHTML = '<option value="">جميع الفصول</option>' + classes.map(c => `<option value="${c.id}">${c.name} - ${c.section}</option>`).join('');
+            teacherSelect.innerHTML = '<option value="">جميع المعلمين</option>' + teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        }
+
+        function clearFilters() {
+            document.getElementById('filterDate').value = '';
+            document.getElementById('filterClass').value = '';
+            document.getElementById('filterTeacher').value = '';
+            renderReports();
+        }
+
+        async function renderReports() {
+            const grid = document.getElementById('reportsGrid');
+            UI.showSkeleton(grid, 'card', 2);
+
+            const [teachers, classes, allRecords] = await Promise.all([
+                DB.getTeachers(), DB.getClasses(), DB.getCollection(DB.KEYS.RECORDS)
+            ]);
+
+            const fDate = document.getElementById('filterDate').value;
+            const fClass = document.getElementById('filterClass').value;
+            const fTeacher = document.getElementById('filterTeacher').value;
+
+            let records = [...allRecords];
+            if (fDate) records = records.filter(r => r.date === fDate);
+            if (fClass) records = records.filter(r => r.classId === fClass);
+            if (fTeacher) records = records.filter(r => r.teacherId === fTeacher);
+            records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            if (records.length === 0) {
+                grid.innerHTML = '<div class="liquid-glass p-10 text-center text-gray-400 rounded-2xl text-sm">لا توجد تقارير مطابقة</div>';
+                return;
+            }
+
+            grid.innerHTML = records.map(r => {
+                if (!r.details || !Array.isArray(r.details)) return '';
+                const teacher = teachers.find(t => t.id === r.teacherId) || { name: 'غير معروف' };
+                const cls = classes.find(c => c.id === r.classId) || { name: 'صف محذوف' };
+                const presentCount = r.details.filter(d => d.status === 'present').length;
+                const totalCount = r.details.length;
+                return `
+                <div class="liquid-glass liquid-glass-prominent rounded-[1.5rem] overflow-hidden border border-black/5 hover:border-primary/30 transition-all">
+                    <div class="report-card-header cursor-pointer" onclick="showFullReport('${r.id}')">
+                        <div class="report-header-glow"></div>
+                        <div class="report-header-icon-box">
+                            <span class="material-symbols-outlined">assignment_turned_in</span>
+                        </div>
+                        <div class="absolute bottom-4 right-4 text-right">
+                            <h4 class="font-black text-base text-gray-800">${cls.name}</h4>
+                            <p class="text-xs font-bold text-primary">${teacher.name} • ${r.date}</p>
+                        </div>
+                    </div>
+                    <div class="p-4 flex justify-between items-center bg-white/30">
+                        <div>
+                            <p class="text-gray-400 font-bold uppercase tracking-widest text-[9px]">حالة الحضور</p>
+                            <p class="font-black text-primary text-sm mt-0.5">${presentCount} <span class="text-[10px] text-gray-400 font-medium">حاضر</span> / ${totalCount} <span class="text-[10px] text-gray-400 font-medium">إجمالي</span></p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="deleteReport('${r.id}', this)" class="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 text-error border border-red-100 hover:bg-error hover:text-white transition-all">
+                                <span class="material-symbols-outlined text-base">delete</span>
+                            </button>
+                            <button onclick="showFullReport('${r.id}')" class="bg-primary/10 text-primary px-4 py-2.5 rounded-xl border border-primary/20 hover:bg-primary hover:text-white transition-all font-black text-xs">التفاصيل</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function deleteReport(id, el) {
+            if (await UI.confirm('حذف التقرير', 'هل أنت متأكد من حذف هذا التقرير نهائياً؟')) {
+                const card = el.closest('.liquid-glass');
+                await UI.optimistic(card, DB.deleteRecord(id), 'فشل حذف التقرير');
+                renderDailyInfo();
+            }
+        }
+
+        let currentEditingReport = null;
+
+        async function showFullReport(id) {
+            const records = await DB.getCollection(DB.KEYS.RECORDS);
+            const record = records.find(r => r.id === id);
+            if (!record) return;
+            currentEditingReport = JSON.parse(JSON.stringify(record));
+            await renderReportDetailModal();
+        }
+
+        async function toggleStudentStatus(studentId) {
+            const detail = currentEditingReport.details.find(d => d.studentId === studentId);
+            if (detail) {
+                detail.status = detail.status === 'present' ? 'absent' : 'present';
+                await renderReportDetailModal();
+            }
+        }
+
+        async function saveReportChanges() {
+            await DB.updateRecordDetails(currentEditingReport.id, currentEditingReport.details);
+            document.getElementById('reportDetailModal').classList.add('hidden');
+            renderReports();
+        }
+
+        async function renderReportDetailModal() {
+            const record = currentEditingReport;
+            const teachers = await DB.getTeachers();
+            const classes = await DB.getClasses();
+
+            const teacher = teachers.find(t => t.id === record.teacherId) || { name: 'غير معروف' };
+            const cls = classes.find(c => c.id === record.classId) || { name: 'صف محذوف', section: '' };
+
+            let modal = document.getElementById('reportDetailModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'reportDetailModal';
+                modal.className = 'fixed inset-0 liquid-glass-overlay z-[100] hidden flex items-center justify-center p-4';
+                document.body.appendChild(modal);
+            }
+
+            const presentDetails = record.details.filter(d => d.status === 'present');
+            const absentDetails = record.details.filter(d => d.status === 'absent');
+
+            modal.innerHTML = `
+                <div class="liquid-glass-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2rem] p-4 sm:p-7 space-y-5 liquid-glass-scrollbar text-right">
+                    <div class="flex justify-between items-start">
+                        <button onclick="document.getElementById('reportDetailModal').classList.add('hidden')" class="w-10 h-10 rounded-xl liquid-glass-icon icon-error interactive flex items-center justify-center font-black text-lg">×</button>
+
+                        <div class="text-right">
+                            <h2 class="text-xl font-black text-gray-800">${cls.name} - ${cls.section}</h2>
+                            <p class="text-primary text-xs font-bold">${record.date} | بواسطة ${teacher.name}</p>
+                        </div>
+                    </div>
+                    <div class="report-card-header !h-32 sm:!h-40">
+                        <div class="report-header-glow"></div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="report-header-icon-box !w-16 !h-16">
+                                <span class="material-symbols-outlined !text-3xl">analytics</span>
+                            </div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-primary">تحليل أداء الفصل</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="liquid-glass p-4 rounded-2xl flex flex-col">
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">الملاحظات</p>
+                            <p class="text-xs italic text-gray-600 flex-1">${record.notes || 'لا يوجد ملاحظات'}</p>
+                        </div>
+                        <div class="liquid-glass p-4 rounded-2xl">
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">الإحصائيات</p>
+                            <p class="text-base font-black text-primary">${presentDetails.length} حاضر / ${record.details.length} طالباً</p>
+                        </div>
+                    </div>
+                    ${record.image ? `
+                    <div class="liquid-glass p-4 rounded-2xl">
+                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-2">صورة الإثبات</p>
+                        <img src="${UI.formatImgUrl(record.image)}" onclick="UI.viewImage(this.src)" 
+                             class="w-full h-40 object-cover rounded-xl border border-black/10 cursor-pointer interactive">
+                    </div>
+                    ` : ''}
+                    <div>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-3">الطلاب (اضغط لتغيير الحالة)</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            ${record.details.map(d => `
+                                <button onclick="toggleStudentStatus('${d.studentId}')"
+                                    class="flex items-center gap-2 p-2.5 rounded-xl border transition-all text-right ${d.status === 'present' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}">
+                                    <span class="material-symbols-outlined text-sm shrink-0" style="font-variation-settings:'FILL' 1">${d.status === 'present' ? 'check_circle' : 'cancel'}</span>
+                                    <span class="text-xs font-bold truncate">${d.name || d.studentId}</span>
+                                </button>`).join('')}
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="saveReportChanges()" class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ التغييرات</button>
+                        <button onclick="document.getElementById('reportDetailModal').classList.add('hidden')" class="flex-1 liquid-glass interactive py-3.5 rounded-xl font-bold text-gray-500">إإغلاق</button>
+                    </div>
+                </div>`;
+
+            modal.classList.remove('hidden');
+        }
+
+        /* ══════════════════════════════════════
+           TEACHERS
+        ══════════════════════════════════════ */
+        async function renderTeachers() {
+            const table = document.getElementById('teacherTable');
+            UI.showSkeleton(table, 'row', 3);
+            const teachers = await DB.getTeachers();
+
+            if (teachers.length === 0) {
+                table.innerHTML = '<div class="p-8 text-center text-gray-400 text-sm">لا يوجد معلمون. أضف معلماً جديداً.</div>';
+                return;
+            }
+
+            const colors = ['#ffa726', '#42a5f5', '#66bb6a', '#ef5350', '#ab47bc', '#26c6da', '#d4e157', '#ff7043'];
+            table.innerHTML = teachers.map(t => {
+                const initial = t.name ? t.name.trim().charAt(0) : '?';
+                const colorIndex = Math.abs(t.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % colors.length;
+                const solidColor = colors[colorIndex];
+                return `
+                <div class="teacher-row grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 sm:p-5 hover:bg-black/[0.04] transition-all items-center border-b border-black/[0.03] cursor-pointer group" onclick="showEditTeacherModal('${t.id}')">
+                    <div class="flex items-center gap-3 sm:col-span-11">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0" style="background:${solidColor}">${initial}</div>
+                        <div class="min-w-0">
+                            <p class="font-black text-gray-800 text-sm leading-tight mb-1 truncate">${t.name}</p>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${t.role === 'admin' ? 'bg-red-50 text-error border border-red-200' : 'bg-orange-50 text-primary border border-orange-200'}">
+                                    <span class="material-symbols-outlined text-[12px]">${t.role === 'admin' ? 'security' : 'person_book'}</span>
+                                    ${t.role === 'admin' ? 'مدير النظام' : 'معلم'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hidden sm:flex sm:col-span-1 justify-end">
+                        <span class="material-symbols-outlined text-gray-300 group-hover:text-primary transition-all translate-x-0 group-hover:-translate-x-1">chevron_left</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        /* ══════════════════════════════════════
+           CLASSES & STUDENTS HIERARCHY
+        ══════════════════════════════════════ */
+        let studentTabState = {
+            view: 'classes', // 'classes', 'sections', 'students'
+            selectedClassName: '',
+            selectedClassId: ''
+        };
+
+        function setStudentView(view, name = '', id = '') {
+            studentTabState.view = view;
+            studentTabState.selectedClassName = name;
+            studentTabState.selectedClassId = id;
+            renderClasses();
+        }
+
+        async function renderClasses() {
+            const grid = document.getElementById('classGrid');
+            UI.showSkeleton(grid, 'card', 2);
+            const classes = await DB.getClasses();
+
+            if (studentTabState.view === 'classes') {
+                renderClassNamesView(grid, classes);
+            } else if (studentTabState.view === 'sections') {
+                renderSectionsView(grid, classes);
+            } else if (studentTabState.view === 'students') {
+                await renderStudentsView(grid, classes);
+            }
+        }
+
+        function renderClassNamesView(grid, classes) {
+            const uniqueNames = [...new Set(classes.map(c => c.name))];
+
+            grid.innerHTML = uniqueNames.map(name => {
+                const count = classes.filter(c => c.name === name).length;
+                const sections = classes.filter(c => c.name === name).map(c => c.section).join('، ');
+                return `
+                <div class="liquid-glass liquid-glass-prominent p-6 rounded-[2rem] cursor-pointer hover:border-primary/50 transition-all" 
+                     onclick="setStudentView('sections', '${name}')">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="text-xl font-black text-gray-800">${name}</h4>
+                            <p class="text-primary text-xs font-bold mt-1">${count} شعبة (${sections})</p>
+                        </div>
+                        <span class="material-symbols-outlined text-primary">arrow_forward_ios</span>
+                    </div>
+                </div>`;
+            }).join('') + `
+            <button onclick="showAddClassModal()" class="border-2 border-dashed border-black/10 rounded-[2rem] flex flex-col items-center justify-center p-12 text-gray-400 hover:border-primary/50 hover:text-primary transition-all liquid-glass" style="min-height:160px">
+                <span class="material-symbols-outlined text-4xl mb-3">add</span>
+                <span class="font-black text-xs uppercase tracking-widest">إضافة فصل دراسي جديد</span>
+            </button>`;
+        }
+
+        function renderSectionsView(grid, classes) {
+            const sections = classes.filter(c => c.name === studentTabState.selectedClassName);
+
+            grid.innerHTML = `
+            <div class="col-span-full mb-2">
+                <button onclick="setStudentView('classes')" class="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-primary transition-all">
+                    <span class="material-symbols-outlined text-sm">arrow_back</span>
+                    العودة لجميع الصفوف
+                </button>
+                <h3 class="text-lg font-black text-gray-800 mt-2">${studentTabState.selectedClassName}</h3>
+            </div>
+            ` + sections.map(c => `
+                <div class="liquid-glass liquid-glass-prominent p-6 rounded-[2rem] cursor-pointer hover:border-primary/50 transition-all" 
+                     onclick="setStudentView('students', '${c.name}', '${c.id}')">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="text-xl font-black text-gray-800">شعبة: ${c.section}</h4>
+                            <p class="text-primary text-xs font-bold mt-1">عرض طلاب هذه الشعبة</p>
+                        </div>
+                        <span class="material-symbols-outlined text-primary">group</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function renderStudentsView(grid, classes) {
+            const classInfo = classes.find(c => c.id === studentTabState.selectedClassId);
+            if (!classInfo) { setStudentView('classes'); return; }
+
+            const students = await DB.getStudents(classInfo.id);
+
+            grid.innerHTML = `
+            <div class="col-span-full mb-2">
+                <button onclick="setStudentView('sections', '${classInfo.name}')" class="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-primary transition-all">
+                    <span class="material-symbols-outlined text-sm">arrow_back</span>
+                    العودة للشعب (${classInfo.name})
+                </button>
+            </div>
+            <div class="liquid-glass liquid-glass-prominent p-6 rounded-[2rem] relative">
+                <div class="flex justify-between items-start mb-5">
+                    <div>
+                        <h4 class="text-xl font-black text-gray-800">${classInfo.name}</h4>
+                        <p class="text-primary text-xs font-bold uppercase tracking-wider mt-1">شعبة: <span class="text-gray-700">${classInfo.section}</span> • <span class="text-gray-700">${students.length}</span> طلاب</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="showEditClassModal('${classInfo.id}')" class="liquid-glass-icon interactive w-9 h-9 rounded-xl text-primary">
+                            <span class="material-symbols-outlined" style="font-size:16px">edit</span>
+                        </button>
+                        <button onclick="deleteClass('${classInfo.id}', this)" class="liquid-glass-icon interactive icon-error w-9 h-9 rounded-xl text-error">
+                            <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-3 mt-4">
+                    ${students.length === 0 ? '<div class="p-6 text-center text-gray-400 text-xs font-bold liquid-glass rounded-2xl">لا يوجد طلاب في هذا الفصل</div>' : ''}
+                    ${students.map(s => `
+                        <div class="liquid-glass rounded-xl p-3 flex items-center justify-between group/stud">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0" 
+                                     style="background: ${UI.getAvatarColor(s.id)}">
+                                    ${s.name ? s.name.trim().charAt(0) : '?'}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-gray-800 text-sm">${s.name}</p>
+                                    <p class="text-[10px] text-gray-500 font-mono">ID: ${s.academicId}</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-1 transition-opacity">
+                                <button onclick="showEditStudentModal('${s.id}')" class="p-2 text-primary hover:bg-primary/10 rounded-lg">
+                                    <span class="material-symbols-outlined text-sm">edit</span>
+                                </button>
+                                <button onclick="deleteStudent('${s.id}', this)" class="p-2 text-red-400 hover:bg-red-50 rounded-lg">
+                                    <span class="material-symbols-outlined text-sm">delete</span>
+                                </button>
+                            </div>
+                        </div>`).join('')}
+                </div>
+                <button onclick="showAddStudentModal('${classInfo.id}')" class="w-full mt-4 liquid-glass interactive font-black text-[10px] uppercase tracking-widest text-primary border border-primary/20 rounded-2xl py-3.5">
+                    <span class="flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-sm">person_add</span>
+                        إضافة طالب جديد
+                    </span>
+                </button>
+            </div>`;
+        }
+
+        /* ══════════════════════════════════════
+           NOTIFICATIONS
+        ══════════════════════════════════════ */
+        async function renderNotifications() {
+            const list = document.getElementById('notificationsList');
+            if (!list) return;
+            UI.showSkeleton(list, 'card', 2);
+            const notifications = await DB.getNotifications('all_admin');
+            notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            // Permission check button
+            let enableBtnHtml = '';
+            if (typeof NotificationManager !== 'undefined' && !NotificationManager.isPermissionGranted()) {
+                enableBtnHtml = `
+                    <div class="p-5 rounded-[2rem] bg-primary/5 border border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in mb-4">
+                        <div class="flex items-center gap-4 text-right">
+                            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                <span class="material-symbols-outlined">notifications_active</span>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-gray-800 text-sm">تفعيل التنبيهات الإدارية</h4>
+                                <p class="text-[10px] text-gray-500 font-bold leading-tight">احصل على تنبيهات فورية عند وصول تقارير جديدة أو تحديثات.</p>
+                            </div>
+                        </div>
+                        <button onclick="handleEnableNotifications(this)" class="w-full sm:w-auto px-6 py-3 bg-primary text-white text-[10px] font-black rounded-xl shadow-none shadow-primary/20 active:none transition-all none-primary">تفعيل الآن</button>
+                    </div>
+                `;
+            }
+
+            if (notifications.length === 0) {
+                list.innerHTML = enableBtnHtml + '<div class="liquid-glass p-12 text-center text-gray-400 rounded-[2rem] text-sm font-bold">لا توجد إشعارات مرسلة</div>';
+                return;
+            }
+
+            list.innerHTML = enableBtnHtml + notifications.map(n => `
+                <div class="liquid-glass liquid-glass-prominent p-5 rounded-[2rem] border border-black/5 flex flex-col sm:flex-row gap-5 items-start">
+                    ${n.image ? `
+                    <div class="w-full sm:w-32 h-32 rounded-2xl overflow-hidden shrink-0 border border-black/10">
+                        <img src="${UI.formatImgUrl(n.image)}" class="w-full h-full object-cover cursor-pointer interactive" onclick="UI.viewImage(this.src)">
+                    </div>` : ''}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h4 class="font-black text-gray-800 text-base">${n.title}</h4>
+                                <p class="text-[10px] text-primary font-black uppercase tracking-widest mt-0.5">
+                                    ${n.targetType === 'all' ? 'الجميع' : n.targetType === 'class' ? `الصف: ${n.targetId}` : `الطالب: ${n.targetId}`}
+                                </p>
+                            </div>
+                            <p class="text-[10px] font-bold text-gray-400">${new Date(n.timestamp).toLocaleDateString('ar-SA')} ${new Date(n.timestamp).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                        <p class="text-sm text-gray-600 leading-relaxed mb-4">${n.message}</p>
+                        <div class="flex gap-2 justify-end">
+                            <button onclick="showEditNotificationModal('${n.id}')" class="w-9 h-9 rounded-xl flex items-center justify-center bg-orange-50 text-primary border border-orange-200 hover:bg-primary hover:text-white transition-all">
+                                <span class="material-symbols-outlined" style="font-size:16px">edit</span>
+                            </button>
+                            <button onclick="handleDeleteNotification('${n.id}')" class="w-9 h-9 rounded-xl flex items-center justify-center bg-red-50 text-error border border-red-200 hover:bg-error hover:text-white transition-all">
+                                <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function handleEnableNotifications(btn) {
+            const granted = await NotificationManager.requestPermissionManually();
+            if (granted) {
+                const container = btn.closest('div');
+                container.style.opacity = '0';
+                setTimeout(() => container.remove(), 400);
+            }
+        }
+
+        /* ══════════════════════════════════════
+           MODAL CONTROLS
+        ══════════════════════════════════════ */
+        function openModal(id) {
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            document.querySelectorAll('.liquid-glass-modal').forEach(m => m.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+            document.querySelectorAll('.liquid-glass-modal').forEach(el => {
+                el.classList.add('hidden');
+            });
+        }
+        function showAddTeacherModal() {
+            document.getElementById('teacherModalTitle').innerText = 'إضافة معلم جديد';
+            document.getElementById('tEditId').value = '';
+            document.getElementById('tDeleteBtn').classList.add('hidden');
+            document.getElementById('teacherModal').querySelector('form').reset();
+            openModal('teacherModal');
+        }
+        async function showEditTeacherModal(id) {
+            const teachers = await DB.getTeachers();
+            const t = teachers.find(x => x.id === id);
+            if (!t) return;
+            document.getElementById('teacherModalTitle').innerText = 'تعديل بيانات المعلم';
+            document.getElementById('tEditId').value = id;
+            document.getElementById('tName').value = t.name;
+            document.getElementById('tMinistryId').value = t.ministryId;
+            document.getElementById('tPassword').value = t.password || '';
+            document.getElementById('tRole').value = t.role || 'teacher';
+            document.getElementById('tNotes').value = t.notes || '';
+            document.getElementById('tDeleteBtn').classList.remove('hidden');
+            openModal('teacherModal');
+        }
+        async function handleDeleteTeacherFromModal() {
+            const id = document.getElementById('tEditId').value;
+            if (!id) return;
+            if (await UI.confirm('حذف المعلم', 'هل أنت متأكد من حذف هذا المعلم؟ سيتم مسح كافة بياناته نهائياً.')) {
+                await DB.deleteTeacher(id);
+                UI.toast('تم حذف المعلم بنجاح');
+                updateStat('statTeachers', -1);
+                closeModal();
+                renderTeachers();
+            }
+        }
+        function showAddClassModal() {
+            document.getElementById('classModalTitle').innerText = 'إضافة فصل جديد';
+            document.getElementById('cEditId').value = '';
+            document.getElementById('classModal').querySelector('form').reset();
+            openModal('classModal');
+        }
+        async function showEditClassModal(id) {
+            const classes = await DB.getClasses();
+            const c = classes.find(x => x.id === id);
+            if (!c) return;
+            document.getElementById('classModalTitle').innerText = 'تعديل بيانات الفصل';
+            document.getElementById('cEditId').value = id;
+            document.getElementById('cName').value = c.name;
+            document.getElementById('cSection').value = c.section;
+            openModal('classModal');
+        }
+        function showAddStudentModal(classId) {
+            document.getElementById('studentModalTitle').innerText = 'إضافة طالب جديد';
+            document.getElementById('sEditId').value = '';
+            document.getElementById('sClassId').value = classId;
+            document.getElementById('studentModal').querySelector('form').reset();
+            document.getElementById('sImagePreviewContainer').classList.add('hidden');
+            document.getElementById('sImageName').innerText = 'اختر صورة الطالب...';
+            document.getElementById('sFingerprintStatus').classList.add('hidden');
+            document.getElementById('sAppendFingerprintContainer').classList.add('hidden');
+            document.getElementById('sImgRequiredLabel').classList.remove('hidden');
+            openModal('studentModal');
+        }
+        async function showEditStudentModal(id) {
+            const students = await DB.getCollection(DB.KEYS.STUDENTS);
+            const s = students.find(x => x.id === id || x.academicId === id);
+            if (!s) return;
+            document.getElementById('studentModalTitle').innerText = 'تعديل بيانات الطالب';
+            document.getElementById('sEditId').value = s.id;
+            document.getElementById('sClassId').value = s.classId;
+            document.getElementById('sName').value = s.name;
+            document.getElementById('sId').value = s.academicId;
+            document.getElementById('sPhone').value = s.phone || '';
+            document.getElementById('sNotes').value = s.notes || '';
+            document.getElementById('sImgRequiredLabel').classList.add('hidden');
+
+            // Check fingerprints
+            const statusContainer = document.getElementById('sFingerprintStatus');
+            const countText = document.getElementById('sFingerprintCount');
+            const appendContainer = document.getElementById('sAppendFingerprintContainer');
+
+            let descriptors = [];
+            if (s.descriptors) descriptors = typeof s.descriptors === 'string' ? JSON.parse(s.descriptors) : s.descriptors;
+            else if (s.descriptor) descriptors = [s.descriptor];
+
+            if (descriptors.length > 0) {
+                statusContainer.classList.remove('hidden');
+                countText.innerText = `مخزن: ${descriptors.length} بصمات`;
+                appendContainer.classList.remove('hidden');
+                document.getElementById('sAppendFingerprint').checked = true;
+            } else {
+                statusContainer.classList.add('hidden');
+                appendContainer.classList.add('hidden');
+                document.getElementById('sImgRequiredLabel').classList.remove('hidden');
+            }
+
+            document.getElementById('sImagePreviewContainer').classList.add('hidden');
+            openModal('studentModal');
+        }
+
+        async function clearStudentFingerprints() {
+            if (await UI.confirm('مسح البصمات', 'سيتم مسح كافة البصمات الرقمية لهذا الطالب. لن يتمكن النظام من التعرف عليه حتى ترفع صورة جديدة.')) {
+                const id = document.getElementById('sEditId').value;
+                if (id) {
+                    await DB.updateStudent(id, { descriptors: [], descriptor: null });
+                    UI.toast('تم مسح البصمات');
+                    showEditStudentModal(id);
+                }
+            }
+        }
+        function previewStudentImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('sImageName').innerText = file.name;
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('sImagePreview').src = e.target.result;
+                document.getElementById('sImagePreviewContainer').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Notification Modal Controls
+        async function showAddNotificationModal() {
+            document.getElementById('notificationModalTitle').innerText = 'إرسال إشعار جديد';
+            document.getElementById('nEditId').value = '';
+            document.getElementById('notificationModal').querySelector('form').reset();
+            document.getElementById('nTargetClassContainer').classList.add('hidden');
+            document.getElementById('nTargetStudentContainer').classList.add('hidden');
+            document.getElementById('nImagePreviewContainer').classList.add('hidden');
+            document.getElementById('nImageName').innerText = 'اختر صورة...';
+            document.getElementById('nSubmitBtn').innerText = 'إرسال';
+
+            // Populate classes dropdown
+            const classes = await DB.getClasses();
+            const classSelect = document.getElementById('nTargetClass');
+            classSelect.innerHTML = classes.map(c => `<option value="${c.id}">${c.name} - ${c.section}</option>`).join('');
+
+            openModal('notificationModal');
+        }
+
+        async function showEditNotificationModal(id) {
+            const notifications = await DB.getNotifications('all_admin');
+            const n = notifications.find(x => x.id === id);
+            if (!n) return;
+
+            document.getElementById('notificationModalTitle').innerText = 'تعديل الإشعار';
+            document.getElementById('nEditId').value = id;
+            document.getElementById('nTargetType').value = n.targetType;
+            document.getElementById('nTitle').value = n.title;
+            document.getElementById('nMessage').value = n.message;
+            document.getElementById('nSubmitBtn').innerText = 'تحديث';
+
+            toggleNotificationTargetFields();
+            if (n.targetType === 'class') {
+                const classes = await DB.getClasses();
+                const classSelect = document.getElementById('nTargetClass');
+                classSelect.innerHTML = classes.map(c => `<option value="${c.id}">${c.name} - ${c.section}</option>`).join('');
+                document.getElementById('nTargetClass').value = n.targetId;
+            } else if (n.targetType === 'student') {
+                document.getElementById('nTargetStudent').value = n.targetId;
+            }
+
+            const preview = document.getElementById('nImagePreview');
+            const container = document.getElementById('nImagePreviewContainer');
+            if (n.image) {
+                preview.src = n.image;
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+
+            openModal('notificationModal');
+        }
+
+        function toggleNotificationTargetFields() {
+            const type = document.getElementById('nTargetType').value;
+            document.getElementById('nTargetClassContainer').classList.toggle('hidden', type !== 'class');
+            document.getElementById('nTargetStudentContainer').classList.toggle('hidden', type !== 'student' && type !== 'parent');
+        }
+
+        async function previewNotificationImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('nImageName').innerText = file.name;
+            // Use 720px max dimension and low quality (0.3) for max compression
+            const compressed = await UI.compressImage(file, 720, 0.3);
+            document.getElementById('nImagePreview').src = compressed;
+            document.getElementById('nImagePreviewContainer').classList.remove('hidden');
+        }
+
+        function clearNotificationImage() {
+            document.getElementById('nImage').value = '';
+            document.getElementById('nImageName').innerText = 'اختر صورة...';
+            document.getElementById('nImagePreview').src = '';
+            document.getElementById('nImagePreviewContainer').classList.add('hidden');
+        }
+
+        document.getElementById('modalOverlay').addEventListener('click', function (e) {
+            if (e.target === this) closeModal();
+        });
+
+        /* ══════════════════════════════════════
+           FORM HANDLERS
+        ══════════════════════════════════════ */
+        async function handleAddTeacher(e) {
+            e.preventDefault();
+            const editId = document.getElementById('tEditId').value;
+            const data = {
+                name: document.getElementById('tName').value,
+                ministryId: document.getElementById('tMinistryId').value,
+                password: document.getElementById('tPassword').value,
+                role: document.getElementById('tRole').value,
+                notes: document.getElementById('tNotes').value.trim()
+            };
+            if (editId) {
+                await DB.updateTeacher(editId, data);
+                UI.toast('تم تحديث بيانات المعلم');
+            } else {
+                await DB.addTeacher(data);
+                UI.toast('تم إضافة المعلم');
+                updateStat('statTeachers', 1);
+            }
+            closeModal();
+            renderTeachers();
+            e.target.reset();
+        }
+
+        async function handleAddClass(e) {
+            e.preventDefault();
+            const editId = document.getElementById('cEditId').value;
+            const data = {
+                name: document.getElementById('cName').value.trim(),
+                section: document.getElementById('cSection').value.trim()
+            };
+
+            // Validation: Unique Class Name + Section
+            const allClasses = await DB.getClasses();
+            const isDuplicate = allClasses.some(c =>
+                c.id !== editId &&
+                c.name.trim() === data.name &&
+                c.section.trim() === data.section
+            );
+
+            if (isDuplicate) {
+                UI.toast('هذا الفصل والشعبة موجودان بالفعل', 'error');
+                return;
+            }
+
+            if (editId) {
+                await DB.updateClass(editId, data);
+                UI.toast('تم تحديث بيانات الفصل');
+            } else {
+                await DB.addClass(data);
+                UI.toast('تم إضافة الفصل');
+                updateStat('statClasses', 1);
+            }
+            closeModal();
+            renderClasses();
+            e.target.reset();
+        }
+
+        async function handleAddStudent(e) {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const editId = document.getElementById('sEditId').value;
+            const fileInput = document.getElementById('sImage');
+            const appendMode = document.getElementById('sAppendFingerprint').checked;
+
+            const studentData = {
+                name: document.getElementById('sName').value.trim(),
+                academicId: document.getElementById('sId').value.trim(),
+                phone: document.getElementById('sPhone').value.trim(),
+                classId: document.getElementById('sClassId').value,
+                notes: document.getElementById('sNotes').value.trim()
+            };
+
+            // Validate phone number format (Jordanian mobile)
+            const phoneRegex = /^07[789][0-9]{7}$/;
+            if (!phoneRegex.test(studentData.phone)) {
+                UI.toast('يرجى إدخال رقم هاتف ولي أمر صالح (مثال: 0788888888)', 'error');
+                return;
+            }
+
+            if (!editId && (!fileInput.files || !fileInput.files[0])) {
+                UI.toast('يرجى اختيار صورة للطالب لاستخراج البصمة الرقمية', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            const origText = submitBtn.innerHTML;
+            submitBtn.innerHTML = `<span class="material-symbols-outlined animate-spin text-sm">refresh</span> جاري المعالجة...`;
+
+            try {
+                // If a new image is selected, compute the descriptor
+                if (fileInput.files && fileInput.files[0]) {
+                    const img = await new Promise((resolve) => {
+                        const i = new Image();
+                        i.onload = () => resolve(i);
+                        i.src = URL.createObjectURL(fileInput.files[0]);
+                    });
+
+                    const descriptor = await FaceDetection.getDescriptorFromImage(img);
+
+                    if (!descriptor) {
+                        UI.toast('لم يتم العثور على وجه واضح في الصورة. يرجى محاولة صورة أخرى.', 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = origText;
+                        return;
+                    }
+
+                    if (editId && appendMode) {
+                        // Append to existing descriptors
+                        const students = await DB.getCollection(DB.KEYS.STUDENTS);
+                        const s = students.find(x => x.id === editId);
+                        let descriptors = [];
+                        if (s.descriptors) descriptors = typeof s.descriptors === 'string' ? JSON.parse(s.descriptors) : s.descriptors;
+                        else if (s.descriptor) descriptors = [typeof s.descriptor === 'string' ? JSON.parse(s.descriptor) : s.descriptor];
+
+                        descriptors.push(descriptor);
+                        studentData.descriptors = JSON.stringify(descriptors);
+                        studentData.descriptor = null; // Clean legacy field
+                    } else {
+                        // Start fresh or replace
+                        studentData.descriptors = JSON.stringify([descriptor]);
+                        studentData.descriptor = null;
+                    }
+                }
+
+                if (editId) {
+                    await DB.updateStudent(editId, studentData);
+                    UI.toast('تم تحديث بيانات الطالب والبصمة');
+                } else {
+                    await DB.addStudent(studentData);
+                    UI.toast('تم إضافة الطالب وحفظ البصمة الرقمية');
+                    updateStat('statStudents', 1);
+                }
+
+                closeModal();
+                renderClasses();
+                form.reset();
+            } catch (err) {
+                UI.toast('حدث خطأ أثناء المعالجة', 'error');
+                console.error(err);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origText;
+            }
+        }
+
+        /* ══════════════════════════════════════
+           ACTION HANDLERS
+        ══════════════════════════════════════ */
+        async function deleteTeacher(id, el) {
+            if (await UI.confirm('حذف المعلم', 'هل أنت متأكد من حذف هذا المعلم؟')) {
+                const row = el.closest('.teacher-row');
+                await UI.optimistic(row, DB.deleteTeacher(id), 'فشل حذف المعلم');
+                updateStat('statTeachers', -1);
+            }
+        }
+        async function deleteClass(id, el) {
+            if (await UI.confirm('حذف الفصل', 'هل أنت متأكد من حذف هذا الفصل بجميع طلابه؟')) {
+                const card = el.closest('.liquid-glass');
+                const action = async () => {
+                    const students = await DB.getStudents(id);
+                    for (let s of students) await DB.deleteStudent(s.id);
+                    await DB.deleteClass(id);
+                    setStudentView('classes'); // Reset to class names list
+                };
+                await UI.optimistic(card, action(), 'فشل حذف الفصل');
+                updateStat('statClasses', -1);
+            }
+        }
+
+        async function handleSendNotification(e) {
+            e.preventDefault();
+            const editId = document.getElementById('nEditId').value;
+            const targetType = document.getElementById('nTargetType').value;
+            let targetId = 'all';
+
+            if (targetType === 'class') targetId = document.getElementById('nTargetClass').value;
+            else if (targetType === 'student') targetId = document.getElementById('nTargetStudent').value;
+
+            const data = {
+                title: document.getElementById('nTitle').value,
+                message: document.getElementById('nMessage').value,
+                image: document.getElementById('nImagePreviewContainer').classList.contains('hidden') ? null : document.getElementById('nImagePreview').src,
+                targetType,
+                targetId,
+                timestamp: new Date().toISOString()
+            };
+
+            UI.setLoading(true);
+            try {
+                if (editId) {
+                    await DB.updateNotification(editId, data);
+                    UI.toast('تم تحديث الإشعار بنجاح');
+                } else {
+                    await DB.addNotification(data);
+                    UI.toast('تم حفظ الإشعار بالنظام');
+
+                    // Integrations logic can be added here in the future
+                    console.log('Notification saved. Integrations are currently design-only.');
+                }
+                closeModal();
+                renderNotifications();
+            } catch (err) {
+                console.error(err);
+                UI.toast('فشل في معالجة الإشعار', 'error');
+            } finally {
+                UI.setLoading(false);
+            }
+        }
+
+        async function handleDeleteNotification(id) {
+            if (await UI.confirm('حذف الإشعار', 'هل أنت متأكد من حذف هذا الإشعار؟ لن يراه الطلاب بعد الآن.')) {
+                UI.setLoading(true);
+                try {
+                    await DB.deleteNotification(id);
+                    UI.toast('تم حذف الإشعار');
+                    renderNotifications();
+                } catch (err) {
+                    UI.toast('فشل حذف الإشعار', 'error');
+                } finally {
+                    UI.setLoading(false);
+                }
+            }
+        }
+        async function deleteStudent(id, el) {
+            if (await UI.confirm('حذف الطالب', 'هل أنت متأكد من حذف هذا الطالب؟')) {
+                const studentRow = el.closest('.group\\/stud');
+                if (!studentRow) return;
+                await UI.optimistic(studentRow, DB.deleteStudent(id), 'فشل حذف الطالب');
+                updateStat('statStudents', -1);
+            }
+        }
+        function updateStat(id, delta) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = Math.max(0, (parseInt(el.innerText) || 0) + delta);
+        }
+
+        /* ══════════════════════════════════════
+           AI AGENT – OVERRIDE renderToggle
+           (no FAB button, use embedded UI)
+        ══════════════════════════════════════ */
+        Agent.renderToggle = function () {
+            const input = document.getElementById('agent-input');
+            const micBtn = document.getElementById('agent-mic-btn');
+
+            if (micBtn) {
+                micBtn.classList.remove('active-send');
+            }
+
+            // Auto-resize textarea logic & Send button state
+            if (input) {
+
+                input.addEventListener('keypress', e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!Agent.isStreaming && input.value.trim().length > 0) {
+                            Agent.sendMessage();
+                        }
+                    }
+                });
+            }
+
+            document.getElementById('agent-clear-btn')?.addEventListener('click', () => this.clearChat());
+
+            // Wire up initial card suggestions
+            const messages = document.getElementById('agent-messages');
+            if (messages) {
+                messages.querySelectorAll('.autopilot-suggestion-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const prompt = card.getAttribute('data-prompt');
+                        if (input && prompt) {
+                            input.value = prompt;
+                            input.style.height = 'auto';
+                            input.dispatchEvent(new Event('input'));
+                            this.sendMessage();
+                        }
+                    });
+                });
+            }
+
+            this._injectStyles();
+        };
+
+        // Disable the floating toggle (not needed with tab nav)
+        Agent.toggleChat = function () { };
+
+        /* Override clearChat for AutoPilot */
+        Agent.clearChat = function () {
+            const messages = document.getElementById('agent-messages');
+            messages.innerHTML = `
+                <!-- Welcome Container (Blank State) -->
+                <div class="assistant-blank-state" id="assistant-blank-state">
+                    <div class="assistant-planet-logo-container">
+                        <img src="assets/AI-logo.png" class="assistant-planet-logo" alt="Logo" />
+                    </div>
+                    <h2 class="assistant-greeting-text" id="assistant-greeting-text">كيف الأجواء، مدير؟</h2>
+                </div>
+            `;
+            this.chatHistory = [];
+
+            // Also reset the textarea
+            const input = document.getElementById('agent-input');
+            if (input) {
+                input.value = '';
+                if (typeof window.handleInputTyping === 'function') {
+                    window.handleInputTyping(input);
+                }
+            }
+        };
+
+        // Override addMessage to match AutoPilot design with full Markdown support
+        Agent.addMessage = function (text, role) {
+            const messages = document.getElementById('agent-messages');
+            const isUser = role === 'user';
+
+            // If welcome container or blank state is present, remove it
+            const welcome = messages.querySelector('.assistant-blank-state, .autopilot-welcome-container');
+            if (welcome) {
+                welcome.remove();
+            }
+
+            // Flatten background and fade glow orbs via CSS transition class
+            const tabAi = document.getElementById('tab-ai');
+            if (tabAi) tabAi.classList.add('has-messages');
+
+            const div = document.createElement('div');
+            const displayText = text.split('|||COMMAND|||')[0].trim();
+
+            let formattedContent;
+            if (!isUser && typeof marked !== 'undefined') {
+                marked.setOptions({ breaks: true, gfm: true, pedantic: false });
+                formattedContent = marked.parse(displayText || '&nbsp;');
+            } else {
+                formattedContent = displayText
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>') || '&nbsp;';
+            }
+
+            if (isUser) {
+                div.className = `flex flex-col items-end mb-4 mx-2 animate-fade-in`;
+                div.innerHTML = `
+                    <div class="agent-msg-user">
+                        ${formattedContent}
+                    </div>`;
+            } else {
+                div.className = `agent-msg-ai-row animate-fade-in mx-2`;
+                div.innerHTML = `
+                    <div class="agent-msg-ai-avatar">
+                        <img src="assets/AI-logo.png" alt="حضوري" style="width: 36px; height: 36px; object-fit: contain;" />
+                    </div>
+                    <div class="agent-msg-ai-body agent-markdown">
+                        ${formattedContent}
+                    </div>`;
+            }
+
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+        };
+
+        // Override addMessagePlain to render plain verification status text without duplicating the avatar bubble
+        Agent.addMessagePlain = function (text) {
+            const messages = document.getElementById('agent-messages');
+            const div = document.createElement('div');
+            const displayText = text.split('|||COMMAND|||')[0].trim();
+
+            let formattedContent;
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({ breaks: true, gfm: true, pedantic: false });
+                formattedContent = marked.parse(displayText || '&nbsp;');
+            } else {
+                formattedContent = displayText
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>') || '&nbsp;';
+            }
+
+            div.className = `agent-msg-ai-row animate-fade-in mx-2`;
+            div.innerHTML = `
+                <div class="agent-msg-ai-avatar" style="display: none !important;">
+                    <img src="assets/AI-logo.png" alt="حضوري" />
+                </div>
+                <div class="agent-msg-ai-body agent-markdown">
+                    ${formattedContent}
+                </div>`;
+
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+        };
+
+
+        Agent.addLoadingIndicator = function () {
+            const messages = document.getElementById('agent-messages');
+            const div = document.createElement('div');
+            div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center justify-start';
+            div.style.padding = '4px 8px';
+            div.innerHTML = `
+                <svg class="pencil-loader" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width: 32px; height: 32px;">
+                    <defs>
+                        <clipPath id="pencil-eraser">
+                            <rect rx="5" ry="5" width="30" height="30"></rect>
+                        </clipPath>
+                    </defs>
+                    <circle class="pencil__stroke" r="70" fill="none" stroke="transparent" stroke-width="2" stroke-dasharray="439.82 439.82" stroke-dashoffset="439.82" stroke-linecap="round" transform="rotate(-113,100,100)" />
+                    <g class="pencil__rotate" transform="translate(100,100)">
+                        <g fill="none">
+                            <circle class="pencil__body1" r="64" stroke="hsl(33,90%,50%)" stroke-width="30" stroke-dasharray="402.12 402.12" stroke-dashoffset="402" transform="rotate(-90)" />
+                            <circle class="pencil__body2" r="74" stroke="hsl(33,90%,60%)" stroke-width="10" stroke-dasharray="464.96 464.96" stroke-dashoffset="465" transform="rotate(-90)" />
+                            <circle class="pencil__body3" r="54" stroke="hsl(33,90%,40%)" stroke-width="10" stroke-dasharray="339.29 339.29" stroke-dashoffset="339" transform="rotate(-90)" />
+                        </g>
+                        <g class="pencil__eraser" transform="rotate(-90) translate(49,0)">
+                            <g class="pencil__eraser-skew">
+                                <rect fill="hsl(343,90%,70%)" rx="5" ry="5" width="30" height="30" />
+                                <rect fill="hsl(343,90%,60%)" width="5" height="30" clip-path="url(#pencil-eraser)" />
+                                <rect fill="hsl(223,10%,90%)" width="30" height="20" />
+                                <rect fill="hsl(223,10%,70%)" width="15" height="20" />
+                                <rect fill="hsl(223,10%,80%)" width="5" height="20" />
+                                <rect fill="hsla(223,10%,10%,0.2)" y="6" width="30" height="2" />
+                                <rect fill="hsla(223,10%,10%,0.2)" y="13" width="30" height="2" />
+                            </g>
+                        </g>
+                        <g class="pencil__point" transform="rotate(-90) translate(49,-30)">
+                            <polygon fill="hsl(33,90%,70%)" points="15 0,30 30,0 30" />
+                            <polygon fill="hsl(33,90%,50%)" points="15 0,6 30,0 30" />
+                            <polygon fill="hsl(223,10%,10%)" points="15 0,20 10,10 10" />
+                        </g>
+                    </g>
+                </svg>`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div;
+        };
+
+        /* Override setStatus */
+        Agent.setStatus = function (text, active = false) {
+            const status = document.getElementById('agent-status');
+            if (status) {
+                status.textContent = text;
+                status.style.color = active ? '#ffa726' : '#9ca3af';
+                status.style.fontWeight = active ? '700' : '500';
+            }
+        };
+
+        // Override clearChat to restore the blank state welcome container and background glows
+        Agent.clearChat = function () {
+            const messages = document.getElementById('agent-messages');
+
+            // Restore bottom glow gradient background and fade glow orbs back in via CSS transition class
+            const tabAi = document.getElementById('tab-ai');
+            if (tabAi) tabAi.classList.remove('has-messages');
+
+            // Clear history
+            this.chatHistory = [];
+            this.getSystemContext().then(ctx => {
+                this.chatHistory = [{ role: 'system', content: ctx }];
+            });
+
+            // Re-render the blank state welcome container with dynamic greetings
+            const greetings = [
+                "كيف الأجواء، مدير؟",
+                "أهلاً بك! أنا جاهز لمساعدتك.",
+                "مرحباً! كيف يمكنني إعانتك اليوم؟",
+                "يوم سعيد! ما هي خطتك اليوم؟",
+                "مرحباً بك في نظام حضور.",
+                "نظام حضور الذكي في خدمتك.",
+                "يسعدني مساعدتك في أي وقت.",
+                "دعنا ننجز بعض المهام اليوم!",
+                "تحت أمرك، كيف أساعدك؟",
+                "أهلاً! كيف تسير الأمور اليوم؟"
+            ];
+            const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+
+            messages.innerHTML = `
+                <div class="assistant-blank-state" id="assistant-blank-state">
+                    <div class="assistant-planet-logo-container">
+                        <img src="assets/AI-logo.png" class="assistant-planet-logo" alt="Logo" />
+                    </div>
+                    <h2 class="assistant-greeting-text" id="assistant-greeting-text">${randomGreeting}</h2>
+                </div>`;
+
+            const suggestions = document.getElementById('agent-suggestions');
+            if (suggestions) suggestions.style.display = 'flex';
+        };
+
+        // Wrap sendMessage to ensure Send button disables correctly after send
+        const originalSendMessage = Agent.sendMessage;
+        Agent.sendMessage = async function () {
+            if (this.isStreaming) return;
+            const input = document.getElementById('agent-input');
+            const text = input ? input.value.trim() : '';
+            if (!text) return;
+
+            // Glow hide is handled smoothly via CSS transitions when has-messages class is added in addMessage
+
+            const micBtn = document.getElementById('agent-mic-btn');
+            const sendBtn = document.getElementById('agent-send-btn');
+
+            if (micBtn) {
+                micBtn.disabled = true;
+                micBtn.classList.remove('active-send');
+            }
+            if (sendBtn) {
+                sendBtn.disabled = true;
+            }
+
+            await originalSendMessage.call(Agent);
+
+            if (micBtn) {
+                micBtn.disabled = false;
+            }
+            if (sendBtn) {
+                sendBtn.disabled = false;
+            }
+            if (input) {
+                input.value = '';
+                input.style.height = 'auto';
+                window.handleInputTyping(input);
+            }
+        };
+
+        /* ══════════════════════════════════════
+           INIT
+        ══════════════════════════════════════ */
+        async function init() {
+            try {
+                // Show Splash
+                const splash = document.getElementById('splashScreen');
+                const progress = document.getElementById('splashProgress');
+                const status = document.getElementById('splashStatus');
+
+                const user = Auth.checkAuth('admin');
+                if (!user) return;
+
+                // 1. Connect DB
+                status.innerText = "جاري الاتصال بقاعدة البيانات...";
+                progress.style.width = "40%";
+                await DB.init();
+
+                // 2. Load Data
+                status.innerText = "جاري تحميل البيانات والمساعد الذكي...";
+                progress.style.width = "80%";
+
+                // Fetch and display school name
+                if (user.schoolId) {
+                    const school = await DB.getSchool(user.schoolId);
+                    if (school) {
+                        const displayEl = document.getElementById('school-name-display');
+                        if (displayEl) displayEl.innerText = school.name;
+                    }
+                }
+
+                await Agent.init();
+                await FaceDetection.init();
+
+                await Promise.all([
+                    renderDailyInfo(),
+                    populateFilters(),
+                    renderReports(),
+                    renderTeachers(),
+                    renderClasses(),
+                    renderNotifications(),
+                    syncDirectoryToggles()
+                ]);
+
+                progress.style.width = "100%";
+                status.innerText = "جاهز!";
+
+                // Hide Splash
+                setTimeout(() => {
+                    if (splash) {
+                        splash.style.opacity = '0';
+                        splash.style.pointerEvents = 'none';
+                        setTimeout(() => splash.remove(), 700);
+                    }
+                }, 500);
+
+                // Init nav indicator after layout settles
+                setTimeout(() => {
+                    initNavIndicator();
+                }, 150);
+                window.addEventListener('resize', () => moveNavIndicator(currentTabIdx));
+
+            } catch (e) {
+                console.error('Init error:', e);
+                UI.toast('خطأ في تحميل البيانات', 'error');
+                if (document.getElementById('splashStatus')) {
+                    document.getElementById('splashStatus').innerText = `فشل التحميل: ${e.message || 'خطأ غير معروف'}. يرجى التحديث.`;
+                }
+            }
+        }
+
+        init();
+
+        // PWA SW
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => console.log('SW Registered'))
+                    .catch(err => console.log('SW failed', err));
+            });
+        }
+        /* ══════════════════════════════════════
+           DIRECTORY & CUSTOMIZATION SYSTEM
+        ══════════════════════════════════════ */
+        window.showDirectoryModal = function () {
+            const modal = document.getElementById('directoryModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                const content = modal.querySelector('.modal-animate-in');
+                if (content) {
+                    content.style.opacity = '0';
+                    content.style.transform = 'scale(0.8) translateY(20px)';
+                    setTimeout(() => {
+                        content.style.transition = 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                        content.style.opacity = '1';
+                        content.style.transform = 'scale(1) translateY(0)';
+                    }, 50);
+                }
+                syncDirectoryToggles();
+            }
+        };
+
+        window.hideDirectoryModal = function () {
+            const modal = document.getElementById('directoryModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+        };
+
+        window.switchDirectoryTab = function (tab) {
+            document.querySelectorAll('.directory-tab').forEach(btn => {
+                const isActive = btn.id === `tab-${tab}-btn`;
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('bg-white', isActive);
+                btn.classList.toggle('text-primary', isActive);
+                btn.classList.toggle('text-gray-500', !isActive);
+            });
+
+            document.querySelectorAll('.directory-section').forEach(sec => {
+                sec.classList.toggle('hidden', sec.id !== `dir-${tab}`);
+            });
+        };
+
+        window.toggleCustomItem = async function (itemId) {
+            const checkbox = document.getElementById(`check-${itemId}`);
+            let newState = true;
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                newState = checkbox.checked;
+            } else {
+                const settings = (await DB.getSettings()) || {};
+                const customization = settings.customization || {};
+                newState = !customization[itemId];
+            }
+
+            const settings = (await DB.getSettings()) || {};
+            settings.customization = settings.customization || {};
+            settings.customization[itemId] = newState;
+            await DB.saveSettings(settings);
+
+            await syncDirectoryToggles();
+            UI.toast(newState ? 'تم التفعيل بنجاح' : 'تم الإيقاف');
+        };
+
+        async function syncDirectoryToggles() {
+            const settings = (await DB.getSettings()) || {};
+            const customization = settings.customization || {};
+
+            const items = ['skill-reports', 'conn-gmail', 'plugin-absence'];
+            items.forEach(id => {
+                const checked = !!customization[id];
+                
+                // 1. Sync Directory Modal
+                const checkbox = document.getElementById(`check-${id}`);
+                if (checkbox) {
+                    const card = checkbox.closest('.custom-card');
+                    checkbox.checked = checked;
+                    if (card) card.classList.toggle('active', checked);
+                }
+
+                // 2. Sync AI Customization Dropdown
+                const customCheckbox = document.getElementById(`check-${id}-custom`);
+                if (customCheckbox) {
+                    customCheckbox.checked = checked;
+                    const customCard = customCheckbox.closest('.customizer-card');
+                    if (customCard) customCard.classList.toggle('active', checked);
+                    
+                    // Switch styling animation
+                    const suffix = id === 'plugin-absence' ? 'absence' : 'reports';
+                    const bg = document.getElementById(`switch-bg-${suffix}`);
+                    const dot = document.getElementById(`switch-dot-${suffix}`);
+                    if (bg && dot) {
+                        if (checked) {
+                            bg.style.backgroundColor = 'var(--color-primary)';
+                            dot.style.right = 'calc(100% - 18px)';
+                        } else {
+                            bg.style.backgroundColor = '';
+                            dot.style.right = '2px';
+                        }
+                    }
+                }
+
+                // Gmail specifically can also have a visual icon shift (link vs link_off)
+                if (id === 'conn-gmail') {
+                    const linkIcon = document.getElementById('gmail-custom-link-icon');
+                    const customCard = document.querySelector('[onclick="window.toggleCustomItem(\'conn-gmail\')"]');
+                    if (customCard) {
+                        customCard.classList.toggle('active', checked);
+                    }
+                    if (linkIcon) {
+                        linkIcon.textContent = checked ? 'link_off' : 'link';
+                    }
+                }
+
+                applyCustomization(id, checked);
+            });
+        }
+
+        function applyCustomization(id, enabled) {
+            if (id === 'plugin-absence') {
+                const btn = document.getElementById('absence-alarm-btn');
+                if (btn) btn.classList.toggle('hidden', !enabled);
+            }
+            if (id === 'conn-gmail') {
+                const gmailSettings = document.getElementById('gmail-auth-settings');
+                if (gmailSettings) gmailSettings.classList.toggle('hidden', !enabled);
+            }
+            if (id === 'skill-reports' || id === 'conn-gmail') {
+                if (window.Agent && Agent.getSystemContext) {
+                    Agent.getSystemContext(); // Refresh context
+                }
+            }
+        }
+
+        // Gmail Authentication UI Helpers
+        window.handleGmailLogin = function () {
+            GmailManager.login();
+        };
+
+        window.handleGmailLogout = function () {
+            GmailManager.logout();
+            syncGmailStatus();
+        };
+
+        function syncGmailStatus() {
+            const btn = document.getElementById('gmail-auth-btn');
+            const statusText = document.getElementById('gmail-status-text');
+            const statusIndicator = document.getElementById('gmail-status-indicator');
+
+            if (GmailManager.isConnected()) {
+                if (btn) {
+                    btn.innerHTML = '<span class="material-symbols-outlined text-sm">link_off</span> فصل الحساب';
+                    btn.className = 'px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-[10px] font-black hover:bg-red-100 transition-all';
+                    btn.onclick = (e) => { e.stopPropagation(); window.handleGmailLogout(); };
+                }
+                if (statusText) statusText.textContent = 'متصل بنجاح ✓';
+                if (statusIndicator) statusIndicator.className = 'w-2 h-2 rounded-full bg-green-500';
+            } else {
+                if (btn) {
+                    btn.innerHTML = '<span class="material-symbols-outlined text-sm">link</span> ربط الحساب';
+                    btn.className = 'px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all';
+                    btn.onclick = (e) => { e.stopPropagation(); window.handleGmailLogin(); };
+                }
+                if (statusText) statusText.textContent = 'غير متصل';
+                if (statusIndicator) statusIndicator.className = 'w-2 h-2 rounded-full bg-gray-300';
+            }
+        }
+
+        window.addEventListener('gmail_connected', syncGmailStatus);
+
+        // Call initial sync when modal opens
+        const originalShowDirectoryModal = window.showDirectoryModal;
+        window.showDirectoryModal = function () {
+            originalShowDirectoryModal();
+            syncGmailStatus();
+        };
+
+        /* ══════════════════════════════════════
+           ABSENCE ALARM PLUGIN LOGIC
+        ══════════════════════════════════════ */
+        let selectedAlarmDays = [];
+        let selectedAlarmClasses = [];
+
+        window.showAbsenceAlarmModal = async function () {
+            document.getElementById('absenceAlarmModal').classList.remove('hidden');
+            document.getElementById('absenceAlarmModal').style.display = 'flex';
+            UI.showSkeleton(document.getElementById('alarm-classes-list'), 'chip', 3);
+
+            const settings = (await DB.getSettings()) || {};
+            document.getElementById('alarmTime').value = settings.absenceAlarmTime || '08:00';
+
+            selectedAlarmDays = settings.absenceAlarmDays || [0, 1, 2, 3, 4];
+            document.querySelectorAll('.day-chip').forEach((btn, idx) => {
+                const active = selectedAlarmDays.includes(idx);
+                btn.classList.toggle('bg-primary', active);
+                btn.classList.toggle('text-white', active);
+                btn.classList.toggle('border-primary', active);
+            });
+
+            selectedAlarmClasses = settings.absenceAlarmClasses || [];
+            await renderAlarmClasses();
+        }
+
+        async function renderAlarmClasses() {
+            const container = document.getElementById('alarm-classes-list');
+            const classes = await DB.getClasses();
+
+            if (classes.length === 0) {
+                container.innerHTML = '<p class="text-[10px] text-gray-400 text-center py-2">لا توجد فصول مضافة</p>';
+                return;
+            }
+
+            container.innerHTML = classes.map(c => {
+                const active = selectedAlarmClasses.includes(c.id);
+                return `
+                    <div onclick="window.toggleAlarmClassSelection('${c.id}', this)" class="flex items-center justify-between p-3 rounded-2xl border ${active ? 'bg-primary/5 border-primary/30' : 'bg-white border-gray-100'} cursor-pointer transition-all hover:bg-gray-50">
+                        <span class="text-xs font-bold text-gray-700">${c.name} - ${c.section}</span>
+                        <span class="material-symbols-outlined text-sm ${active ? 'text-primary' : 'text-gray-200'}">${active ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.toggleDaySelection = function (idx, el) {
+            if (selectedAlarmDays.includes(idx)) {
+                selectedAlarmDays = selectedAlarmDays.filter(d => d !== idx);
+            } else {
+                selectedAlarmDays.push(idx);
+            }
+            el.classList.toggle('bg-primary');
+            el.classList.toggle('text-white');
+            el.classList.toggle('border-primary');
+        };
+
+        window.toggleAlarmClassSelection = function (id, el) {
+            if (selectedAlarmClasses.includes(id)) {
+                selectedAlarmClasses = selectedAlarmClasses.filter(c => c !== id);
+            } else {
+                selectedAlarmClasses.push(id);
+            }
+            renderAlarmClasses();
+        };
+
+        window.toggleAllClassesSelection = async function () {
+            const classes = await DB.getClasses();
+            if (selectedAlarmClasses.length === classes.length) {
+                selectedAlarmClasses = [];
+            } else {
+                selectedAlarmClasses = classes.map(c => c.id);
+            }
+            renderAlarmClasses();
+        };
+
+        window.closeAbsenceAlarmModal = function () {
+            const modal = document.getElementById('absenceAlarmModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+        };
+
+        window.saveAbsenceAlarmSettings = async function () {
+            const time = document.getElementById('alarmTime').value;
+            const settings = (await DB.getSettings()) || {};
+            settings.absenceAlarmTime = time;
+            settings.absenceAlarmDays = selectedAlarmDays;
+            settings.absenceAlarmClasses = selectedAlarmClasses;
+            await DB.saveSettings(settings);
+            UI.toast('تم حفظ إعدادات الجدولة بنجاح');
+            window.closeAbsenceAlarmModal();
+        };
+
+        window.triggerAbsenceNotificationsNow = async function (isAuto = false) {
+            const settings = (await DB.getSettings()) || {};
+            const classesToNotify = isAuto ? (settings.absenceAlarmClasses || []) : selectedAlarmClasses;
+
+            if (classesToNotify.length === 0) {
+                if (!isAuto) UI.toast('يرجى تحديد فصل واحد على الأقل', 'error');
+                return;
+            }
+
+            if (isAuto || await UI.confirm('تأكيد الإرسال الفوري', `هل تريد إرسال إشعارات غياب داخلية لـ ${classesToNotify.length} فصول؟`)) {
+                if (!isAuto) UI.setLoading(true);
+                try {
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+                    const records = await DB.getCollection(DB.KEYS.RECORDS);
+                    const todayRecords = records.filter(r => r.date === todayStr && classesToNotify.includes(r.classId));
+
+                    let absentCount = 0;
+                    for (const r of todayRecords) {
+                        const absentees = r.details.filter(d => d.status === 'absent');
+                        if (absentees.length === 0) continue;
+
+                        const classStudents = await DB.getStudents(r.classId);
+
+                        for (const item of absentees) {
+                            const student = classStudents.find(s => s.id === item.studentId || s.academicId === item.studentId);
+                            const studentName = student ? student.name : 'الطالب';
+
+                            await DB.addNotification({
+                                title: 'تنبيه غياب',
+                                message: `نحيطكم علماً بأن الطالب ${studentName} غائب اليوم الموافق ${todayStr}. يرجى متابعة حالة الطالب من خلال البوابة.`,
+                                targetType: 'parent',
+                                targetId: student ? (student.academicId || student.id) : item.studentId,
+                                type: 'absence_alert'
+                            });
+                            absentCount++;
+                        }
+                    }
+
+                    if (absentCount === 0) {
+                        if (!isAuto) UI.toast('لا يوجد طلاب غائبين في الفصول المختارة اليوم', 'info');
+                    } else {
+                        UI.toast(isAuto ? `تنبيه تلقائي: تم إرسال ${absentCount} إشعار غياب` : `تم بنجاح! تم إرسال ${absentCount} إشعاراً داخلياً لأولياء الأمور.`);
+
+                        if (isAuto) {
+                            settings.lastAlarmSentDate = todayStr;
+                            await DB.saveSettings(settings);
+                        }
+                    }
+                    if (!isAuto) window.closeAbsenceAlarmModal();
+                } catch (err) {
+                    console.error('Alarm Error:', err);
+                    if (!isAuto) UI.toast('فشل في إرسال الإشعارات', 'error');
+                } finally {
+                    if (!isAuto) UI.setLoading(false);
+                }
+            }
+        };
+
+        // Background Scheduler (Checks every minute)
+        setInterval(async () => {
+            const settings = (await DB.getSettings()) || {};
+            if (!settings.customization?.['plugin-absence']) return;
+
+            const now = new Date();
+            const currentDay = now.getDay(); // 0 is Sunday, etc.
+            const pad = n => String(n).padStart(2, '0');
+            const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+            const scheduledTime = settings.absenceAlarmTime || '08:00';
+            const scheduledDays = settings.absenceAlarmDays || [0, 1, 2, 3, 4];
+
+            if (currentTime === scheduledTime &&
+                scheduledDays.includes(currentDay) &&
+                settings.lastAlarmSentDate !== todayStr) {
+
+                console.log('Automated Absence Alarm Triggered');
+                triggerAbsenceNotificationsNow(true);
+            }
+        }, 60000);
+
+
+    </script>
+    <!-- Customization Modal (New Card-based UI) -->
+    <div id="directoryModal" class="fixed inset-0 z-[120] hidden flex items-center justify-center p-0 sm:p-4">
+        <div class="absolute inset-0 bg-black/10 backdrop-blur-sm" onclick="window.hideDirectoryModal()"></div>
+        <div
+            class="bg-white w-full h-full sm:h-[600px] sm:max-w-4xl sm:rounded-[2.5rem] relative overflow-hidden flex flex-col sm:flex-row modal-animate-in">
+            <!-- Close Button (X) -->
+            <button onclick="window.hideDirectoryModal()"
+                class="absolute top-6 left-6 z-50 w-10 h-10 rounded-xl bg-white/80 backdrop-blur-md shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all sm:hidden">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <button onclick="window.hideDirectoryModal()"
+                class="hidden sm:flex absolute top-8 left-8 z-50 w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <!-- Sidebar -->
+            <div
+                class="w-full sm:w-64 bg-[#f9f8f6] border-b sm:border-b-0 sm:border-l border-gray-100 p-6 sm:p-8 flex flex-col shrink-0">
+                <div class="flex items-center gap-3 mb-10">
+                    <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1">grid_view</span>
+                    </div>
+                    <h2 class="text-xl font-black text-gray-800">التخصيص</h2>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <button id="tab-skills-btn" onclick="window.switchDirectoryTab('skills')"
+                        class="directory-tab active group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-black transition-all bg-white text-primary">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-xl">psychology</span>
+                            <span>المهارات</span>
+                        </div>
+                    </button>
+                    <button id="tab-connectors-btn" onclick="window.switchDirectoryTab('connectors')"
+                        class="directory-tab group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-black transition-all text-gray-500 hover:bg-white/50">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-xl">hub</span>
+                            <span>الربط</span>
+                        </div>
+                    </button>
+                    <button id="tab-plugins-btn" onclick="window.switchDirectoryTab('plugins')"
+                        class="directory-tab group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-black transition-all text-gray-500 hover:bg-white/50">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-xl">extension</span>
+                            <span>الإضافات</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6 sm:p-10 hide-scrollbar">
+                <div id="dir-skills" class="directory-section animate-fade-in">
+                    <h3 class="text-2xl font-black text-gray-800 mb-2">مهارات الذكاء الاصطناعي</h3>
+                    <p class="text-sm text-gray-400 font-bold mb-6">تعليمات متقدمة لتحسين أداء المساعد الذكي</p>
+                    <div class="custom-card group p-6 rounded-3xl border-2 border-gray-50 hover:border-primary/20 transition-all bg-gray-50/30 cursor-pointer"
+                        onclick="window.toggleCustomItem('skill-reports')">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-primary">
+                                <span class="material-symbols-outlined text-2xl">analytics</span>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="check-skill-reports" class="hidden">
+                                <div class="switch-bg w-12 h-6 bg-gray-200 rounded-full relative transition-all">
+                                    <div
+                                        class="switch-dot w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h4 class="font-black text-gray-800 mb-1">تحليل التقارير الذكي</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed font-medium">تمكين الذكاء الاصطناعي من فهم أنماط
+                            الغياب وتقديم توصيات دقيقة.</p>
+                    </div>
+                </div>
+                <div id="dir-connectors" class="directory-section hidden animate-fade-in">
+                    <h3 class="text-2xl font-black text-gray-800 mb-2">ربط التطبيقات</h3>
+                    <p class="text-sm text-gray-400 font-bold mb-6">توصيل النظام بالخدمات الخارجية</p>
+                    <div class="custom-card group p-6 rounded-3xl border-2 border-gray-50 hover:border-primary/20 transition-all bg-gray-50/30 cursor-pointer"
+                        onclick="window.toggleCustomItem('conn-gmail')">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-red-500">
+                                <span class="material-symbols-outlined text-2xl">mail</span>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="check-conn-gmail" class="hidden">
+                                <div class="switch-bg w-12 h-6 bg-gray-200 rounded-full relative transition-all">
+                                    <div
+                                        class="switch-dot w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h4 class="font-black text-gray-800 mb-1">Gmail Connector</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed font-medium mb-4">إرسال البريد الإلكتروني مباشرة
+                            عبر المساعد الذكي.</p>
+
+                        <!-- Gmail Auth Sub-panel -->
+                        <div id="gmail-auth-settings"
+                            class="hidden mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div id="gmail-status-indicator" class="w-2 h-2 rounded-full bg-gray-300"></div>
+                                <span id="gmail-status-text" class="text-[10px] font-bold text-gray-400">غير متصل</span>
+                            </div>
+                            <button id="gmail-auth-btn"
+                                class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all">
+                                <span class="material-symbols-outlined text-sm">link</span>
+                                <span>ربط الحساب</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="dir-plugins" class="directory-section hidden animate-fade-in">
+                    <h3 class="text-2xl font-black text-gray-800 mb-2">إضافات النظام</h3>
+                    <p class="text-sm text-gray-400 font-bold mb-6">أدوات إضافية لتعزيز تجربة الإدارة</p>
+                    <div class="custom-card group p-6 rounded-3xl border-2 border-gray-50 hover:border-primary/20 transition-all bg-gray-50/30 cursor-pointer"
+                        onclick="window.toggleCustomItem('plugin-absence')">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-red-500">
+                                <span class="material-symbols-outlined text-2xl">alarm</span>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="check-plugin-absence" class="hidden">
+                                <div class="switch-bg w-12 h-6 bg-gray-200 rounded-full relative transition-all">
+                                    <div
+                                        class="switch-dot w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h4 class="font-black text-gray-800 mb-1">منبه الغياب الآلي</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed font-medium">إرسال إشعارات داخلية تلقائية
+                            لأولياء الأمور عند تسجيل غياب الطالب.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Absence Alarm Modal (Plugin UI) -->
+    <div id="absenceAlarmModal" class="fixed inset-0 z-[130] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/10 backdrop-blur-sm" onclick="window.closeAbsenceAlarmModal()"></div>
+        <div
+            class="bg-white w-full max-w-lg rounded-[2.5rem] relative p-8 flex flex-col gap-6 modal-animate-in max-h-[90vh] overflow-y-auto hide-scrollbar">
+            <!-- Close Button (X) -->
+            <button onclick="window.closeAbsenceAlarmModal()"
+                class="absolute top-8 left-8 w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-500">
+                    <span class="material-symbols-outlined text-3xl"
+                        style="font-variation-settings: 'FILL' 1">alarm</span>
+                </div>
+                <div>
+                    <h2 class="text-xl font-black text-gray-800">إعدادات منبه الغياب</h2>
+                    <p class="text-xs text-gray-400 font-bold">جدولة إرسال الإشعارات التلقائية</p>
+                </div>
+            </div>
+            <div class="space-y-6">
+                <div class="bg-gray-50 p-6 rounded-3xl">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">وقت
+                        الإرسال</label>
+                    <input type="time" id="alarmTime"
+                        class="w-full bg-white border border-gray-100 p-4 rounded-2xl text-lg font-black text-center outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">أيام
+                        التفعيل</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="window.toggleDaySelection(0, this)"
+                            class="day-chip px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black">الأحد</button>
+                        <button onclick="window.toggleDaySelection(1, this)"
+                            class="day-chip px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black">الاثنين</button>
+                        <button onclick="window.toggleDaySelection(2, this)"
+                            class="day-chip px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black">الثلاثاء</button>
+                        <button onclick="window.toggleDaySelection(3, this)"
+                            class="day-chip px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black">الأربعاء</button>
+                        <button onclick="window.toggleDaySelection(4, this)"
+                            class="day-chip px-4 py-2 rounded-xl border border-gray-100 text-[10px] font-black">الخميس</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">الفصول
+                            المشمولة</label>
+                        <button onclick="window.toggleAllClassesSelection()"
+                            class="text-[10px] font-black text-primary hover:underline">تحديد الكل</button>
+                    </div>
+                    <div id="alarm-classes-list" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="window.saveAbsenceAlarmSettings()"
+                    class="flex-1 py-4 bg-gray-800 text-white rounded-[1.5rem] text-xs font-black">حفظ
+                    الإعدادات</button>
+                <button onclick="window.triggerAbsenceNotificationsNow()"
+                    class="px-6 py-4 bg-red-50 text-red-500 border border-red-100 rounded-[1.5rem] text-xs font-black flex items-center gap-2">
+                    إرسال الآن
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assistant Drawer Overlay & Sidebar (Globalized & Core Nav Activated) -->
+    <div class="assistant-drawer-overlay" id="assistant-drawer-overlay"
+        onclick="window.toggleAssistantDrawer(event)"></div>
+    <div class="assistant-sidebar-drawer" id="assistant-sidebar-drawer">
+        <div class="assistant-drawer-header">
+            <h3 class="assistant-drawer-title flex items-center gap-2">
+                <img src="assets/AI-logo.png" alt="حضوري"
+                    style="width: 32px; height: 32px; object-fit: contain;" />
+                <span>حضوري</span>
+            </h3>
+            <button class="assistant-drawer-close-btn" onclick="window.toggleAssistantDrawer(event)">
+                <img src="assets/icons/close.svg" alt="إغلاق" />
+            </button>
+        </div>
+        <div class="assistant-drawer-content">
+            <div class="assistant-drawer-item" id="drawer-item-daily" onclick="switchTab('daily', 0); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">dashboard</span>
+                <span>الداش بورد</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-teachers" onclick="switchTab('teachers', 3); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">group</span>
+                <span>المعلمون</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-classes" onclick="switchTab('classes', 4); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">school</span>
+                <span>قائمة الطلاب</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-notifications" onclick="switchTab('notifications', 5); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">notifications</span>
+                <span>الإشعارات</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-reports" onclick="switchTab('reports', 1); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">description</span>
+                <span>التقارير</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-ai" onclick="switchTab('ai', 2); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">smart_toy</span>
+                <span>المساعد الذكي</span>
+            </div>
+            <div class="assistant-drawer-item text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" id="drawer-item-logout" onclick="Auth.logout(); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined text-red-500">logout</span>
+                <span>تسجيل الخروج</span>
+            </div>
+        </div>
+        <!-- Manager Profile & Settings Button Footer -->
+        <div class="assistant-drawer-profile relative">
+            <div class="flex items-center gap-3">
+                <img id="manager-avatar-img" src="assets/manager_avatar.png" alt="المدير" class="w-10 h-10 rounded-full border border-primary/20 object-cover shadow-sm" />
+                <div class="flex flex-col">
+                    <span id="manager-name-display" class="font-black text-sm text-gray-800 dark:text-white" style="font-family: 'Tajawal', sans-serif;">جاري التحميل...</span>
+                    <span class="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider" style="font-family: 'Tajawal', sans-serif;">مدير النظام</span>
+                </div>
+            </div>
+            <!-- Settings Button -->
+            <button id="drawer-settings-btn" class="w-8 h-8 rounded-xl bg-gray-50 dark:bg-neutral-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary border border-gray-100 dark:border-neutral-700/50 transition-all cursor-pointer relative" onclick="window.toggleDrawerSettings(event)">
+                <span class="material-symbols-outlined text-[18px]">settings</span>
+            </button>
+            
+            <!-- Floating Theme Switcher Popover -->
+            <div id="drawer-theme-popover" class="drawer-theme-popover absolute bottom-16 left-4 z-50 p-4 w-44 rounded-2xl shadow-xl border border-gray-100/50 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md flex flex-col gap-2">
+                <div class="popover-title">المظهر</div>
+                <button class="popover-item active" onclick="window.setAssistantTheme('light', null, event)">
+                    <span class="material-symbols-outlined text-[16px] text-yellow-500">wb_sunny</span>
+                    <span>فاتح دافئ</span>
+                </button>
+                <button class="popover-item" onclick="window.setAssistantTheme('dark', null, event)">
+                    <span class="material-symbols-outlined text-[16px] text-orange-500">dark_mode</span>
+                    <span>داكن برتقالي</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
