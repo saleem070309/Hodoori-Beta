@@ -510,7 +510,7 @@ const Agent = {
                     liveContext, 
                     correctionPrompt, 
                     [], // ذاكرة نظيفة تماماً لتفادي الهلوسة البرمجية
-                    Gemini.MODEL_PRO, // استخدام نموذج Gemini 3.1 Pro القوي
+                    'xiaomi/mimo-v2.5-pro',
                     true // تفعيل ذاكرة نظيفة
                 );
 
@@ -1172,7 +1172,7 @@ const Agent = {
                 url: "https://api.inworld.ai/v1/chat/completions",
                 key: Gemini.getInworldKey(),
                 headers: {},
-                body: { model: modelOverride || "deepinfra/deepseek-v4-pro" }
+                body: { model: modelOverride || "xiaomi/mimo-v2.5-pro" }
             },
             openrouter: {
                 url: "https://openrouter.ai/api/v1/chat/completions",
@@ -1182,8 +1182,7 @@ const Agent = {
                     "X-Title": "Attendance AI Agent"
                 },
                 body: {
-                    model: modelOverride || "deepseek/deepseek-v4-pro",
-                    provider: { order: ["DeepSeek", "DeepInfra"], allow_fallbacks: true }
+                    model: modelOverride || "xiaomi/mimo-v2.5-pro"
                 }
             }
         };

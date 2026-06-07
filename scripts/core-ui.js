@@ -34,43 +34,86 @@ const UI = {
     },
 
     toast(message, type = 'success') {
-        let container = document.getElementById('iphone-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'iphone-toast-container';
-            document.body.appendChild(container);
-        }
+        // Remove any existing toast
+        const existing = document.getElementById('ui-toast-island');
+        if (existing) existing.remove();
 
         const toast = document.createElement('div');
-        const icon = type === 'success' ? 'check_circle' : (type === 'error' ? 'cancel' : 'info');
+        toast.id = 'ui-toast-island';
 
-        toast.className = 'iphone-toast';
-        toast.innerHTML = `
-            <div class="iphone-toast-icon ${type}">
-                <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1">${icon}</span>
-            </div>
-            <div class="iphone-toast-message">${message}</div>
+        const icons = {
+            success: 'check_circle',
+            error: 'cancel',
+            info: 'info',
+            warning: 'warning'
+        };
+        const icon = icons[type] || 'info';
+
+        // Icon color only — background adapts via dark mode CSS vars
+        const iconColors = {
+            success: '#22c55e',
+            error: '#ef4444',
+            info: '#3b82f6',
+            warning: '#f59e0b'
+        };
+        const iconColor = iconColors[type] || iconColors.info;
+
+        toast.style.cssText = `
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-60px) scale(0.85);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            z-index: 99999;
+            opacity: 0;
+            transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.28s ease;
+            max-width: 90vw;
+            white-space: nowrap;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+            cursor: default;
+            user-select: none;
         `;
-        container.appendChild(toast);
 
-        // Animate in
+        // Detect dark mode
+        const isDark = document.documentElement.classList.contains('dark') ||
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (isDark) {
+            toast.style.background = 'rgba(30, 30, 32, 0.92)';
+            toast.style.border = '1px solid rgba(255,255,255,0.10)';
+            toast.style.color = '#f5f5f7';
+        } else {
+            toast.style.background = 'rgba(255, 255, 255, 0.92)';
+            toast.style.border = '1px solid rgba(0,0,0,0.08)';
+            toast.style.color = '#1c1c1e';
+        }
+
+        toast.innerHTML = `
+            <span class="material-symbols-outlined" style="font-size:20px;color:${iconColor};flex-shrink:0;">${icon}</span>
+            <span style="font-size:14px;font-weight:600;letter-spacing:-0.01em;">${message}</span>
+        `;
+
+        document.body.appendChild(toast);
+
+        // Animate in — slide down + scale up (Dynamic Island feel)
         requestAnimationFrame(() => {
-            setTimeout(() => {
-                toast.classList.add('active');
-            }, 10);
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+            });
         });
 
-        // Auto remove
+        // Auto remove — slide up + scale down
         setTimeout(() => {
-            toast.classList.remove('active');
-            toast.classList.add('removing');
-            setTimeout(() => {
-                toast.remove();
-                if (container.childNodes.length === 0) {
-                    container.remove();
-                }
-            }, 450);
-        }, 3500);
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(-40px) scale(0.88)';
+            toast.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 1, 1), opacity 0.25s ease';
+            setTimeout(() => toast.remove(), 350);
+        }, 3000);
     },
 
     /**

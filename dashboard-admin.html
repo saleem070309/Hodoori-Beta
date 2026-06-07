@@ -97,7 +97,6 @@
             padding: 16px 16px 8px;
             -webkit-overflow-scrolling: touch;
             display: none;
-            will-change: transform;
         }
 
         .tab-panel.active {
@@ -799,6 +798,74 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Teacher Page Feature Controls -->
+                            <div class="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-700/50">
+                                <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5 px-0.5">تحكم في أزرار صفحة المعلم</p>
+                                <div class="customizer-card cursor-pointer" onclick="window.toggleTeacherFeature('face')">
+                                    <div class="customizer-card-icon text-primary">
+                                        <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">face_retouching_natural</span>
+                                    </div>
+                                    <div class="customizer-card-details">
+                                        <span class="customizer-card-title">زر التحضير بالوجه</span>
+                                        <span class="customizer-card-desc">إظهار أو إخفاء زر الذكاء الاصطناعي</span>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <div class="switch-bg w-10 h-5 bg-primary rounded-full relative transition-all" id="switch-bg-teacher-face">
+                                            <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 left-0.5 transition-all" id="switch-dot-teacher-face"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="customizer-card cursor-pointer" onclick="window.toggleTeacherFeature('qr')">
+                                    <div class="customizer-card-icon text-primary">
+                                        <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">qr_code_scanner</span>
+                                    </div>
+                                    <div class="customizer-card-details">
+                                        <span class="customizer-card-title">زر التحضير بـ QR</span>
+                                        <span class="customizer-card-desc">إظهار أو إخفاء زر مسح الكود</span>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <div class="switch-bg w-10 h-5 bg-primary rounded-full relative transition-all" id="switch-bg-teacher-qr">
+                                            <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 left-0.5 transition-all" id="switch-dot-teacher-qr"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="customizer-card cursor-pointer" onclick="window.toggleTeacherFeature('studentList')">
+                                    <div class="customizer-card-icon text-primary">
+                                        <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">format_list_bulleted</span>
+                                    </div>
+                                    <div class="customizer-card-details">
+                                        <span class="customizer-card-title">قائمة الطلاب</span>
+                                        <span class="customizer-card-desc">إظهار أو إخفاء قائمة التحضير اليدوي</span>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <div class="switch-bg w-10 h-5 bg-primary rounded-full relative transition-all" id="switch-bg-teacher-studentList">
+                                            <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 left-0.5 transition-all" id="switch-dot-teacher-studentList"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Attendance Period Settings -->
+                            <div class="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-700/50">
+                                <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5 px-0.5">حصص أخذ الحضور</p>
+                                <div class="customizer-card gap-2">
+                                    <div class="customizer-card-icon text-orange-500 shrink-0">
+                                        <span class="material-symbols-outlined text-xl">schedule</span>
+                                    </div>
+                                    <div class="customizer-card-details flex-1">
+                                        <span class="customizer-card-title">عدد الحصص اليومية</span>
+                                    </div>
+                                    <input type="number" id="periodsPerDayInput" min="1" max="12" value="6"
+                                        class="w-14 liquid-glass-input rounded-lg p-1.5 text-xs text-center font-black"
+                                        onchange="window.onPeriodsCountChange()">
+                                </div>
+                                <div class="px-0.5 mt-1.5">
+                                    <p class="text-[9px] font-bold text-gray-400 mb-1.5">حصص يُؤخذ فيها الحضور (اختر من الأزرار):</p>
+                                    <div id="attendancePeriodsSelector" class="flex flex-wrap gap-1.5 mb-2"></div>
+                                    <button onclick="window.saveAttendancePeriodSettings()" class="w-full py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black hover:bg-primary/20 transition-all">حفظ إعدادات الحصص</button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tab Content: التطبيقات (Apps) -->
@@ -976,6 +1043,27 @@
                     إرسال إشعار</button>
             </div>
             <div id="notificationsList" class="grid grid-cols-1 gap-4"></div>
+        </div>
+
+        <!-- ═══ TAB 6: جدول الحصص ═══ -->
+        <div id="tab-schedule" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-black text-gray-800 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary" style="font-size:20px;font-variation-settings:'FILL' 1">calendar_month</span>
+                    جدول الحصص
+                </h3>
+                <button onclick="window.showAddScheduleModal()" class="liquid-button liquid-button-prominent text-white px-4 py-2.5 rounded-xl text-xs font-black">+ إضافة حصة</button>
+            </div>
+            <!-- Day filter chips -->
+            <div class="flex gap-2 overflow-x-auto pb-2 mb-4 no-scrollbar">
+                <button onclick="window.filterScheduleDay('')" id="sched-filter-all" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border bg-primary/10 text-primary border-primary/20">الكل</button>
+                <button onclick="window.filterScheduleDay('الأحد')" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border border-gray-100 text-gray-500">الأحد</button>
+                <button onclick="window.filterScheduleDay('الاثنين')" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border border-gray-100 text-gray-500">الاثنين</button>
+                <button onclick="window.filterScheduleDay('الثلاثاء')" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border border-gray-100 text-gray-500">الثلاثاء</button>
+                <button onclick="window.filterScheduleDay('الأربعاء')" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border border-gray-100 text-gray-500">الأربعاء</button>
+                <button onclick="window.filterScheduleDay('الخميس')" class="sched-day-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border border-gray-100 text-gray-500">الخميس</button>
+            </div>
+            <div id="scheduleGrid" class="space-y-3"></div>
         </div>
 
     </div><!-- /tabs-wrapper -->
@@ -1200,6 +1288,63 @@
                 <div class="flex gap-3 pt-4">
                     <button type="submit" id="nSubmitBtn"
                         class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">إرسال</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Add/Edit Schedule Modal -->
+        <div id="scheduleModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative overflow-y-auto max-h-[90vh]">
+            <button onclick="closeModal()" class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <h2 id="scheduleModalTitle" class="text-xl font-black text-gray-800 mb-6">إضافة حصة جديدة</h2>
+            <form onsubmit="window.handleSaveSchedule(event)" class="space-y-4 text-right">
+                <input type="hidden" id="schEditId">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اليوم</label>
+                        <select id="schDay" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                            <option value="الأحد">الأحد</option>
+                            <option value="الاثنين">الاثنين</option>
+                            <option value="الثلاثاء">الثلاثاء</option>
+                            <option value="الأربعاء">الأربعاء</option>
+                            <option value="الخميس">الخميس</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">رقم الحصة</label>
+                        <input type="number" id="schPeriod" min="1" max="12" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm" placeholder="1">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">من</label>
+                        <input type="time" id="schStart" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">إلى</label>
+                        <input type="time" id="schEnd" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">المادة</label>
+                    <input type="text" id="schSubject" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm" placeholder="مثال: رياضيات">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">المعلم</label>
+                    <select id="schTeacher" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                        <option value="">-- اختر معلماً --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الفصل</label>
+                    <select id="schClass" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                        <option value="">-- اختر فصلاً --</option>
+                    </select>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
+                    <button type="button" id="schDeleteBtn" onclick="window.handleDeleteSchedule()" class="hidden flex-1 bg-red-50 text-error border border-red-200 font-black py-3.5 rounded-xl transition-all hover:bg-error hover:text-white">حذف</button>
                 </div>
             </form>
         </div>
@@ -1681,7 +1826,7 @@
         /* ══════════════════════════════════════
            TAB NAVIGATION SYSTEM (Fully Responsive & Premium)
          ══════════════════════════════════════ */
-        const TAB_IDS = ['daily', 'reports', 'ai', 'teachers', 'classes', 'notifications'];
+        const TAB_IDS = ['daily', 'reports', 'ai', 'teachers', 'classes', 'notifications', 'schedule'];
         const TAB_TITLES = ['اليوم', 'التقارير', 'المساعد الذكي', 'المعلمون', 'الطلاب', 'الإشعارات'];
         let currentTabIdx = 2; // Default to AI Assistant tab
 
@@ -1785,7 +1930,8 @@
                 renderReports(),
                 renderTeachers(),
                 renderClasses(),
-                renderNotifications()
+                renderNotifications(),
+                renderSchedule()
             ]);
         };
 
@@ -1963,7 +2109,7 @@
                             <span class="material-symbols-outlined">assignment_turned_in</span>
                         </div>
                         <div class="absolute bottom-4 right-4 text-right">
-                            <h4 class="font-black text-base text-gray-800">${cls.name}</h4>
+                            <h4 class="font-black text-base text-gray-800">${cls.name}${r.periodNumber ? ` <span class="text-xs text-gray-500 font-bold">· الحصة ${r.periodNumber}</span>` : ''}</h4>
                             <p class="text-xs font-bold text-primary">${teacher.name} • ${r.date}</p>
                         </div>
                     </div>
@@ -3276,7 +3422,99 @@
 
                 applyCustomization(id, checked);
             });
+
+            // Sync teacher feature toggles
+            const features = settings.teacherFeatures || { face: true, qr: true, studentList: true };
+            syncTeacherFeatureTogglesUI(features);
+
+            // Sync attendance period settings
+            const periodsPerDay = settings.periodsPerDay || 6;
+            const trackingPeriods = settings.trackingPeriods || [1];
+            const pdInput = document.getElementById('periodsPerDayInput');
+            if (pdInput) pdInput.value = periodsPerDay;
+            renderAttendancePeriodsSelector(periodsPerDay, trackingPeriods);
         }
+
+        function syncTeacherFeatureTogglesUI(features) {
+            ['face', 'qr', 'studentList'].forEach(f => {
+                const enabled = features[f] !== false;
+                const bg = document.getElementById(`switch-bg-teacher-${f}`);
+                const dot = document.getElementById(`switch-dot-teacher-${f}`);
+                if (bg) bg.style.background = enabled ? 'var(--color-primary, #ffab31)' : '#e5e7eb';
+                if (dot) {
+                    dot.style.right = enabled ? '2px' : 'calc(100% - 16px)';
+                    dot.style.left = '';
+                }
+            });
+        }
+
+        window.toggleTeacherFeature = async function(feature) {
+            const settings = await DB.getSettings();
+            const features = settings.teacherFeatures || { face: true, qr: true, studentList: true };
+
+            const methodFeatures = ['face', 'qr'];
+            if (methodFeatures.includes(feature)) {
+                const enabledMethods = methodFeatures.filter(f => features[f] !== false);
+                if (features[feature] !== false && enabledMethods.length <= 1) {
+                    UI.toast('يجب أن يبقى زر واحد على الأقل نشطاً', 'warning');
+                    return;
+                }
+            } else if (feature === 'studentList') {
+                const enabledMethods = methodFeatures.filter(f => features[f] !== false);
+                if (features[feature] !== false && enabledMethods.length === 0) {
+                    UI.toast('لا يمكن إخفاء القائمة عندما تكون جميع الأزرار مخفية', 'warning');
+                    return;
+                }
+            }
+
+            features[feature] = features[feature] === false ? true : false;
+            await DB.saveSettings({ teacherFeatures: features });
+            syncTeacherFeatureTogglesUI(features);
+            UI.toast('تم حفظ الإعداد بنجاح', 'success');
+        };
+
+        function renderAttendancePeriodsSelector(count, selected) {
+            const container = document.getElementById('attendancePeriodsSelector');
+            if (!container) return;
+            container.innerHTML = Array.from({ length: count }, (_, i) => {
+                const n = i + 1;
+                const isSel = selected.includes(n);
+                return `<button type="button" onclick="window.toggleAdminPeriodChip(${n}, this)"
+                    class="admin-period-chip px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all ${isSel ? 'bg-primary/15 text-primary border-primary/20' : 'bg-gray-50 text-gray-400 border-gray-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-500'}">
+                    ح${n}
+                </button>`;
+            }).join('');
+        }
+
+        window.onPeriodsCountChange = function() {
+            const count = parseInt(document.getElementById('periodsPerDayInput')?.value) || 6;
+            renderAttendancePeriodsSelector(count, []);
+        };
+
+        window.toggleAdminPeriodChip = function(n, btn) {
+            const isActive = btn.classList.contains('bg-primary/15');
+            btn.className = btn.className.replace(/bg-primary\/15|text-primary|border-primary\/20|bg-gray-50|text-gray-400|border-gray-100|dark:bg-neutral-800|dark:border-neutral-700|dark:text-gray-500/g, '').trim();
+            if (isActive) {
+                btn.className += ' bg-gray-50 text-gray-400 border-gray-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-gray-500';
+            } else {
+                btn.className += ' bg-primary/15 text-primary border-primary/20';
+            }
+        };
+
+        function getSelectedAdminPeriods() {
+            return Array.from(document.querySelectorAll('.admin-period-chip.text-primary')).map(b => parseInt(b.textContent.replace('ح', '')));
+        }
+
+        window.saveAttendancePeriodSettings = async function() {
+            const periodsPerDay = parseInt(document.getElementById('periodsPerDayInput')?.value) || 6;
+            const trackingPeriods = getSelectedAdminPeriods();
+            if (trackingPeriods.length === 0) {
+                UI.toast('اختر حصة واحدة على الأقل', 'warning');
+                return;
+            }
+            await DB.saveSettings({ periodsPerDay, trackingPeriods });
+            UI.toast('تم حفظ إعدادات الحصص', 'success');
+        };
 
         function applyCustomization(id, enabled) {
             if (id === 'plugin-absence') {
@@ -3516,6 +3754,172 @@
             }
         }, 60000);
 
+
+        /* ══════════════════════════════════════
+           SCHEDULE MANAGEMENT
+        ══════════════════════════════════════ */
+        let allScheduleData = [];
+        let scheduleFilterDay = '';
+
+        window.filterScheduleDay = function(day) {
+            scheduleFilterDay = day;
+            document.querySelectorAll('.sched-day-btn').forEach(btn => {
+                const isAll = btn.id === 'sched-filter-all';
+                const match = isAll ? day === '' : btn.textContent.trim() === day;
+                if (match) {
+                    btn.classList.add('bg-primary/10', 'text-primary', 'border-primary/20');
+                    btn.classList.remove('text-gray-500', 'border-gray-100');
+                } else {
+                    btn.classList.remove('bg-primary/10', 'text-primary', 'border-primary/20');
+                    btn.classList.add('text-gray-500', 'border-gray-100');
+                }
+            });
+            renderSchedule();
+        };
+
+        async function renderSchedule() {
+            const grid = document.getElementById('scheduleGrid');
+            if (!grid) return;
+            grid.innerHTML = `<p class="text-center text-gray-400 text-sm py-4">جاري التحميل...</p>`;
+
+            const [data, teachers, classes] = await Promise.all([
+                DB.getSchedule(),
+                DB.getTeachers(),
+                DB.getClasses()
+            ]);
+            allScheduleData = data;
+
+            const filtered = scheduleFilterDay ? data.filter(e => e.day === scheduleFilterDay) : data;
+            const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+            const sorted = [...filtered].sort((a, b) => {
+                const da = days.indexOf(a.day), db = days.indexOf(b.day);
+                if (da !== db) return da - db;
+                return (a.periodNumber || 0) - (b.periodNumber || 0);
+            });
+
+            if (sorted.length === 0) {
+                grid.innerHTML = `<div class="text-center py-10 text-gray-400">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">calendar_month</span>
+                    <p class="text-sm font-bold">لا توجد حصص مضافة</p>
+                    <p class="text-xs mt-1">اضغط "+ إضافة حصة" للبدء</p>
+                </div>`;
+                return;
+            }
+
+            const byDay = {};
+            sorted.forEach(e => { if (!byDay[e.day]) byDay[e.day] = []; byDay[e.day].push(e); });
+
+            grid.innerHTML = Object.entries(byDay).map(([day, entries]) => `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 rounded-full bg-primary shrink-0"></div>
+                        <span class="font-black text-sm text-gray-700 dark:text-white">${day}</span>
+                        <div class="flex-1 h-px bg-gray-100 dark:bg-neutral-700"></div>
+                        <span class="text-[10px] font-bold text-gray-400">${entries.length} حصص</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${entries.map(e => {
+                            const teacher = teachers.find(t => t.id === e.teacherId);
+                            const cls = classes.find(c => c.id === e.classId);
+                            return `
+                            <div onclick="window.showEditScheduleModal('${e.id}')"
+                                class="liquid-glass liquid-glass-prominent rounded-xl p-3.5 flex items-center gap-3 cursor-pointer hover:bg-primary/5 transition-all">
+                                <div class="w-11 h-11 rounded-xl bg-primary/10 flex flex-col items-center justify-center shrink-0">
+                                    <span class="text-primary font-black text-[11px] leading-tight">ح${e.periodNumber}</span>
+                                    <span class="text-primary text-[8px] font-bold leading-tight">${e.startTime || ''}</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-black text-sm text-gray-800 dark:text-white truncate">${e.subject}</h4>
+                                    <p class="text-[10px] text-gray-500 truncate">
+                                        ${teacher ? teacher.name : 'غير محدد'} • ${cls ? cls.name + ' ' + (cls.section || '') : 'غير محدد'}
+                                    </p>
+                                </div>
+                                <div class="text-left shrink-0 opacity-60">
+                                    <p class="text-[9px] font-bold text-gray-500">${e.startTime || '--:--'}</p>
+                                    <p class="text-[9px] font-bold text-gray-500">${e.endTime || '--:--'}</p>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function populateScheduleSelects() {
+            const [teachers, classes] = await Promise.all([DB.getTeachers(), DB.getClasses()]);
+            const tSel = document.getElementById('schTeacher');
+            if (tSel) tSel.innerHTML = '<option value="">-- اختر معلماً --</option>' +
+                teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            const cSel = document.getElementById('schClass');
+            if (cSel) cSel.innerHTML = '<option value="">-- اختر فصلاً --</option>' +
+                classes.map(c => `<option value="${c.id}">${c.name} - ${c.section || ''}</option>`).join('');
+        }
+
+        window.showAddScheduleModal = async function() {
+            document.getElementById('scheduleModalTitle').textContent = 'إضافة حصة جديدة';
+            document.getElementById('schEditId').value = '';
+            document.getElementById('schDeleteBtn').classList.add('hidden');
+            document.getElementById('scheduleModal').querySelector('form').reset();
+            await populateScheduleSelects();
+            openModal('scheduleModal');
+        };
+
+        window.showEditScheduleModal = function(id) {
+            const entry = allScheduleData.find(e => e.id === id);
+            if (!entry) return;
+            document.getElementById('scheduleModalTitle').textContent = 'تعديل الحصة';
+            document.getElementById('schEditId').value = id;
+            document.getElementById('schDay').value = entry.day || 'الأحد';
+            document.getElementById('schPeriod').value = entry.periodNumber || 1;
+            document.getElementById('schStart').value = entry.startTime || '';
+            document.getElementById('schEnd').value = entry.endTime || '';
+            document.getElementById('schSubject').value = entry.subject || '';
+            document.getElementById('schDeleteBtn').classList.remove('hidden');
+            populateScheduleSelects().then(() => {
+                document.getElementById('schTeacher').value = entry.teacherId || '';
+                document.getElementById('schClass').value = entry.classId || '';
+            });
+            openModal('scheduleModal');
+        };
+
+        window.handleSaveSchedule = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('schEditId').value;
+            const entry = {
+                day: document.getElementById('schDay').value,
+                periodNumber: parseInt(document.getElementById('schPeriod').value),
+                startTime: document.getElementById('schStart').value,
+                endTime: document.getElementById('schEnd').value,
+                subject: document.getElementById('schSubject').value.trim(),
+                teacherId: document.getElementById('schTeacher').value,
+                classId: document.getElementById('schClass').value,
+            };
+            try {
+                if (id) {
+                    await DB.updateScheduleEntry(id, entry);
+                    UI.toast('تم تحديث الحصة', 'success');
+                } else {
+                    await DB.saveScheduleEntry(entry);
+                    UI.toast('تمت إضافة الحصة', 'success');
+                }
+                closeModal();
+                await renderSchedule();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء الحفظ', 'error');
+            }
+        };
+
+        window.handleDeleteSchedule = async function() {
+            const id = document.getElementById('schEditId').value;
+            if (!id) return;
+            const confirmed = await UI.confirm('حذف الحصة', 'هل أنت متأكد من حذف هذه الحصة؟', { confirmText: 'حذف', type: 'error' });
+            if (!confirmed) return;
+            await DB.deleteScheduleEntry(id);
+            UI.toast('تم حذف الحصة', 'success');
+            closeModal();
+            await renderSchedule();
+        };
 
     </script>
     <!-- Customization Modal (New Card-based UI) -->
@@ -3759,6 +4163,10 @@
             <div class="assistant-drawer-item" id="drawer-item-ai" onclick="switchTab('ai', 2); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined">smart_toy</span>
                 <span>المساعد الذكي</span>
+            </div>
+            <div class="assistant-drawer-item" id="drawer-item-schedule" onclick="switchTab('schedule', 6); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">calendar_month</span>
+                <span>جدول الحصص</span>
             </div>
             <div class="assistant-drawer-item text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" id="drawer-item-logout" onclick="Auth.logout(); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined text-red-500">logout</span>

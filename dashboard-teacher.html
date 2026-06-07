@@ -48,7 +48,6 @@
         .segmented-control {
             display: flex;
             background: rgba(180, 160, 140, 0.1);
-            backdrop-filter: blur(8px);
             border-radius: 12px;
             padding: 2px;
             position: relative;
@@ -199,7 +198,7 @@
         <!-- Attendance View (Hidden by Default) -->
         <div id="attendanceView" class="hidden space-y-8">
             <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div onclick="openAiModal()"
+                <div id="face-btn-card" onclick="openAiModal()"
                     class="liquid-glass liquid-glass-interactive liquid-glass-tint-primary rounded-xl p-4 sm:p-6 flex flex-row sm:flex-col items-center justify-center sm:justify-center h-full gap-4 sm:gap-0">
                     <div class="liquid-glass-icon icon-primary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:mb-4 shrink-0">
                         <span class="material-symbols-outlined text-primary text-xl sm:text-3xl"
@@ -212,7 +211,7 @@
                     </div>
                 </div>
 
-                <div onclick="openQrModal()"
+                <div id="qr-btn-card" onclick="openQrModal()"
                     class="liquid-glass liquid-glass-interactive liquid-glass-tint-tertiary rounded-xl p-4 sm:p-6 flex flex-row sm:flex-col items-center justify-center sm:justify-center h-full gap-4 sm:gap-0">
                     <div class="liquid-glass-icon icon-primary w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:mb-4 shrink-0">
                         <span class="material-symbols-outlined text-primary text-xl sm:text-3xl"
@@ -258,7 +257,7 @@
             </div>
 
             <!-- Student List -->
-            <section class="space-y-4">
+            <section id="student-list-section" class="space-y-4">
                 <div class="flex justify-between items-center px-2">
                     <h3 class="text-lg font-bold">قائمة الطلاب</h3>
                     <button onclick="markAll('present')"
@@ -271,6 +270,17 @@
                     <!-- Students will be injected here -->
                 </div>
             </section>
+
+            <!-- Period Selector (shown when multiple attendance periods configured) -->
+            <div id="periodSelectorSection" class="hidden">
+                <div class="liquid-glass rounded-xl p-4">
+                    <h4 class="text-sm font-black text-gray-700 mb-3 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary text-base">schedule</span>
+                        حصة التحضير
+                    </h4>
+                    <div id="periodChips" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
 
             <!-- Save button -->
             <div class="pt-8 w-full">
@@ -286,7 +296,7 @@
     <div id="aiModal" class="hidden fixed inset-0 z-50 bg-black text-white overflow-hidden opacity-0 transition-opacity duration-500 flex flex-col">
         <!-- Header Overlay -->
         <header class="absolute top-0 inset-x-0 z-30 p-4 flex justify-between items-center bg-transparent">
-            <button onclick="closeAiModal()" class="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center active:scale-90 transition-all">
+            <button onclick="closeAiModal()" class="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center active:scale-90 transition-all">
                 <span class="material-symbols-outlined text-white">close</span>
             </button>
             <div class="text-center">
@@ -294,7 +304,7 @@
                 <p id="aiCameraText" class="text-[10px] font-bold text-primary animate-pulse">جاري تهيئة الكاميرا...</p>
             </div>
             <div class="w-12 flex justify-end">
-                <span id="aiPresentCounter" class="bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-white whitespace-nowrap">0 / 0</span>
+                <span id="aiPresentCounter" class="bg-white/20 px-2 py-1 rounded-lg text-[10px] font-bold text-white whitespace-nowrap">0 / 0</span>
             </div>
         </header>
 
@@ -319,7 +329,7 @@
 
 
         <!-- Premium Footer Controls -->
-        <footer class="h-32 w-full bg-[#F5F5F7]/90 backdrop-blur-lg shrink-0 flex items-center justify-center px-6 relative z-30" dir="ltr">
+        <footer class="h-32 w-full bg-[#F5F5F7]/90 shrink-0 flex items-center justify-center px-6 relative z-30" dir="ltr">
             <div class="flex items-center justify-between w-full max-w-sm">
                 <!-- Video/Live Mode Button (Left) -->
                 <div class="flex flex-col items-center gap-1.5">
@@ -392,7 +402,7 @@
 
                 <!-- Temp Success Overlay -->
                 <div id="qrSuccessOverlay"
-                    class="absolute inset-0 bg-success/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200 rounded-xl">
+                    class="absolute inset-0 bg-success/90 z-30 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200 rounded-xl">
                     <div class="w-24 h-24 bg-white rounded-full flex items-center justify-between p-4 transition-all transform duration-300"
                         id="qrSuccessIcon">
                         <span class="material-symbols-outlined text-success text-6xl font-bold">check</span>
@@ -411,7 +421,6 @@
     <script src="scripts/utils-gmail.js"></script>
     <script src="scripts/utils-notifications.js"></script>
     <script src="scripts/utils-files.js"></script>
-    <script src="scripts/utils-gemini.js"></script>
     <script src="scripts/module-face-api.js"></script>
 
     <!-- Removed MediaPipe Helper -->
@@ -420,6 +429,8 @@
         let currentClass = null;
         let students = [];
         let attendance = {};
+        let appSettings = {};
+        let selectedPeriod = null;
 
         async function init() {
             const splash = document.getElementById('splashScreen');
@@ -441,6 +452,14 @@
                 logTime("جاري الاتصال بقاعدة البيانات...");
                 progress.style.width = "40%";
                 await DB.init();
+
+                // Load school settings and apply feature toggles
+                try {
+                    appSettings = (await DB.getSettings()) || {};
+                    applyTeacherFeatureSettings(appSettings);
+                } catch (_) {}
+
+
 
                 // Fetch and display school name + teacher name
                 let welcomeText = `أهلاً، ${user.name}`;
@@ -546,10 +565,58 @@
             await renderClassSelector();
         }
 
+        function applyTeacherFeatureSettings(settings) {
+            const features = settings.teacherFeatures || { face: true, qr: true, studentList: true };
+            const faceCard = document.getElementById('face-btn-card');
+            const qrCard = document.getElementById('qr-btn-card');
+            const studentListSection = document.getElementById('student-list-section');
+            if (faceCard) faceCard.classList.toggle('hidden', features.face === false);
+            if (qrCard) qrCard.classList.toggle('hidden', features.qr === false);
+            if (studentListSection) studentListSection.classList.toggle('hidden', features.studentList === false);
+        }
+
+        function renderPeriodChips() {
+            const section = document.getElementById('periodSelectorSection');
+            const container = document.getElementById('periodChips');
+            if (!section || !container) return;
+
+            const periodsPerDay = appSettings.periodsPerDay || 0;
+            const trackingPeriods = appSettings.trackingPeriods || [];
+
+            if (periodsPerDay === 0 || trackingPeriods.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            selectedPeriod = trackingPeriods[0];
+
+            container.innerHTML = trackingPeriods.map(n => `
+                <button type="button" onclick="selectPeriod(${n}, this)"
+                    class="period-chip px-3 py-1.5 rounded-xl text-xs font-black border transition-all
+                    ${n === selectedPeriod ? 'bg-primary/15 text-primary border-primary/20' : 'bg-gray-50 text-gray-400 border-gray-100'}">
+                    الحصة ${n}
+                </button>
+            `).join('');
+        }
+
+        function selectPeriod(n, btn) {
+            selectedPeriod = n;
+            document.querySelectorAll('.period-chip').forEach(b => {
+                b.classList.remove('bg-primary/15', 'text-primary', 'border-primary/20');
+                b.classList.add('bg-gray-50', 'text-gray-400', 'border-gray-100');
+            });
+            if (btn) {
+                btn.classList.add('bg-primary/15', 'text-primary', 'border-primary/20');
+                btn.classList.remove('bg-gray-50', 'text-gray-400', 'border-gray-100');
+            }
+        }
+
         function renderAttendanceView() {
             document.getElementById('classSelector').classList.add('hidden');
             document.getElementById('attendanceView').classList.remove('hidden');
             document.getElementById('classNameDisplay').innerText = `${currentClass.name} - ${currentClass.section}`;
+            renderPeriodChips();
             renderList();
         }
 
@@ -1244,12 +1311,19 @@
 
         async function saveAttendance() {
             const date = new Date().toISOString().split('T')[0];
+            const periodsActive = (appSettings.trackingPeriods || []).length > 0;
+
+            // Determine period for this submission
+            const periodNumber = periodsActive ? (selectedPeriod || 1) : null;
 
             // تحقق إضافي قبل الحفظ للتأكد من عدم التكرار
             const existingRecords = await DB.getRecords(date);
-            if (existingRecords.some(r => r.classId === currentClass.id)) {
-                UI.toast('هذا الصف مقفل، تم إرسال تقريره مسبقاً', 'warning');
-                resetClassSelection();
+            const alreadySaved = periodsActive
+                ? existingRecords.some(r => r.classId === currentClass.id && r.periodNumber === periodNumber)
+                : existingRecords.some(r => r.classId === currentClass.id && !r.periodNumber);
+            if (alreadySaved) {
+                const label = periodsActive ? `الحصة ${periodNumber}` : 'اليوم';
+                UI.toast(`تم إرسال تقرير ${label} مسبقاً لهذا الصف`, 'warning');
                 return;
             }
 
@@ -1257,7 +1331,7 @@
 
             try {
                 UI.toast('جاري حفظ التقرير...', 'info');
-                await DB.saveAttendance(date, currentClass.id, list, user.id, null);
+                await DB.saveAttendance(date, currentClass.id, list, user.id, periodNumber);
 
                 // Send Email if Gmail is connected
                 if (GmailManager.isConnected()) {

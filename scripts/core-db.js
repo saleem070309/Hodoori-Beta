@@ -14,6 +14,7 @@ const DB = {
         NOTIFICATIONS: 'v2_notifications',
         SETTINGS: 'v2_settings',
         SCHOOLS: 'v2_schools',
+        SCHEDULE: 'v2_schedule',
         CURRENT_USER: 'attendance_current_user' // Keep local for session
     },
     dbInstance: null,
@@ -160,20 +161,28 @@ const DB = {
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
 
-    async saveAttendance(date, classId, attendanceList, teacherId, image = null, notes = null) {
+    async saveAttendance(date, classId, attendanceList, teacherId, periodNumber = null, image = null, notes = null) {
         const schoolId = this.getCurrentUserSchoolId();
 
-        const existing = await this.dbInstance.collection(this.KEYS.RECORDS)
+        let query = this.dbInstance.collection(this.KEYS.RECORDS)
             .where('date', '==', date)
             .where('classId', '==', classId)
-            .where('schoolId', '==', schoolId)
-            .get();
+            .where('schoolId', '==', schoolId);
+
+        const existing = await query.get();
 
         let docRef;
-        if (!existing.empty) {
-            docRef = existing.docs[0].ref;
+        if (periodNumber !== null) {
+            // Period-based: find existing doc with same period, or create new
+            const periodDoc = existing.docs.find(d => d.data().periodNumber === periodNumber);
+            docRef = periodDoc ? periodDoc.ref : this.dbInstance.collection(this.KEYS.RECORDS).doc();
         } else {
-            docRef = this.dbInstance.collection(this.KEYS.RECORDS).doc();
+            // Legacy single-record per day
+            if (!existing.empty) {
+                docRef = existing.docs[0].ref;
+            } else {
+                docRef = this.dbInstance.collection(this.KEYS.RECORDS).doc();
+            }
         }
 
         const report = {
@@ -186,6 +195,8 @@ const DB = {
             notes,
             timestamp: new Date().toISOString()
         };
+
+        if (periodNumber !== null) report.periodNumber = periodNumber;
 
         await docRef.set(report);
     },
@@ -410,5 +421,25 @@ const DB = {
     async updateSchool(id, data) {
         await this.init();
         await this.dbInstance.collection(this.KEYS.SCHOOLS).doc(id).update(data);
+    },
+
+    // Schedule Methods
+    async getSchedule() {
+        return await this.getCollection(this.KEYS.SCHEDULE);
+    },
+    async saveScheduleEntry(entry) {
+        await this.init();
+        const id = 'sch_' + Date.now();
+        entry.schoolId = this.getCurrentUserSchoolId();
+        await this.dbInstance.collection(this.KEYS.SCHEDULE).doc(id).set(entry);
+        return id;
+    },
+    async updateScheduleEntry(id, data) {
+        await this.init();
+        await this.dbInstance.collection(this.KEYS.SCHEDULE).doc(id).update(data);
+    },
+    async deleteScheduleEntry(id) {
+        await this.init();
+        await this.dbInstance.collection(this.KEYS.SCHEDULE).doc(id).delete();
     }
 };

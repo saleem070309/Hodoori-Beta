@@ -4,6 +4,13 @@
 
 const Auth = {
     async login(ministryId, password) {
+        // Hardcoded ministry super-account
+        if (ministryId === 'MOE2025' && password === 'ministry@2025') {
+            const ministryUser = { id: 'ministry-root', name: 'وزارة التعليم', role: 'ministry', ministryId: 'MOE2025' };
+            localStorage.setItem(DB.KEYS.CURRENT_USER, JSON.stringify(ministryUser));
+            return { success: true, user: ministryUser };
+        }
+
         // Clear previous session to ensure getTeachers() doesn't filter by old schoolId
         localStorage.removeItem(DB.KEYS.CURRENT_USER);
         
