@@ -1056,6 +1056,17 @@
                     return;
                 }
 
+                // If live analysis is not active, clear canvas and skip detection to save CPU/prevent auto-scanning
+                if (!isAiAnalysisActive) {
+                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    }
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    scheduleNextLoop();
+                    return;
+                }
+
                 const startTime = performance.now();
 
                 if (video.readyState >= 2) {
@@ -1136,60 +1147,30 @@
                         }
                     }
 
-                    // 2. Render UI feedback for all tracked faces
+                    // 2. Render UI feedback for all tracked faces using the upgraded mask/frame
                     nextTrackedFaces.forEach(tf => {
                         const box = tf.box;
-                        const centerX = box.x + box.width / 2;
-                        const centerY = box.y + box.height * 0.45;
-                        const radius = box.width * 0.6;
-
-                        ctx.beginPath();
-                        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                        ctx.lineWidth = 5;
-
+                        
                         let text = "";
+                        let color = "#eab308"; // Yellow default
+                        
                         if (tf.status === 'recognized' && tf.student) {
                             text = tf.student.name;
-                            if (attendance[tf.student.id] === 'present') {
-                                ctx.strokeStyle = '#22c55e'; // Green
-                                ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
-                            } else {
-                                ctx.strokeStyle = '#22c55e'; // Green
-                                ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-                                
-                                // Auto-mark present
-                                if (isAiAnalysisActive) {
-                                    markStudentPresent(tf.student, video, box);
-                                }
+                            color = '#22c55e'; // Green
+                            
+                            // Auto-mark present
+                            if (isAiAnalysisActive && attendance[tf.student.id] !== 'present') {
+                                markStudentPresent(tf.student, video, box);
                             }
                         } else if (tf.status === 'unknown') {
                             text = "غير معروف";
-                            ctx.strokeStyle = '#ef4444'; // Red
-                            ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+                            color = '#ef4444'; // Red
                         } else {
                             text = "جاري التعرف...";
-                            ctx.strokeStyle = '#eab308'; // Yellow
-                            ctx.fillStyle = 'rgba(234, 179, 8, 0.1)';
+                            color = '#eab308'; // Yellow
                         }
                         
-                        ctx.fill();
-                        ctx.stroke();
-
-                        // Render name or status text above circle
-                        ctx.fillStyle = ctx.strokeStyle;
-                        ctx.font = 'bold 16px Tajawal, sans-serif';
-                        ctx.textAlign = 'center';
-
-                        if (aiMirrored) {
-                            // Reverse flip the text so it is readable on mirrored canvases
-                            ctx.save();
-                            ctx.translate(centerX, centerY - radius - 12);
-                            ctx.scale(-1, 1);
-                            ctx.fillText(text, 0, 0);
-                            ctx.restore();
-                        } else {
-                            ctx.fillText(text, centerX, centerY - radius - 12);
-                        }
+                        drawFaceCircle(ctx, box, color, text);
                     });
 
                     // Keep tracked faces that disappeared briefly (for tracking stability)
@@ -1326,14 +1307,14 @@
                     const match = FaceDetection.findBestMatch(det.descriptor, students);
                     if (match) {
                         confirmedStudents.push(match);
-                        drawFaceCircle(ctx, det.detection.box, '#22c55e'); // Green
+                        drawFaceCircle(ctx, det.detection.box, '#22c55e', match.name); // Green
                         
                         if (attendance[match.id] !== 'present') {
                             markStudentPresent(match, video, det.detection.box);
                         }
                     } else {
                         unknownBoxes.push(det.detection.box);
-                        drawFaceCircle(ctx, det.detection.box, '#ef4444'); // Red
+                        drawFaceCircle(ctx, det.detection.box, '#ef4444', 'غير معروف'); // Red
                     }
                 });
 
@@ -1365,27 +1346,85 @@
             }
         }
 
-        function drawFaceCircle(ctx, box, color) {
+        function drawFaceCircle(ctx, box, color, label = null) {
             const { x, y, width, height } = box;
+            
+            // 1. Draw glowing HUD corners
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            const cornerLength = Math.min(width, height) * 0.20;
+            
+            const drawCorner = (startX, startY, dirX, dirY) => {
+                ctx.beginPath();
+                ctx.moveTo(startX, startY + dirY * cornerLength);
+                ctx.lineTo(startX, startY);
+                ctx.lineTo(startX + dirX * cornerLength, startY);
+                ctx.stroke();
+            };
+            
+            // Top-Left
+            drawCorner(x, y, 1, 1);
+            // Top-Right
+            drawCorner(x + width, y, -1, 1);
+            // Bottom-Left
+            drawCorner(x, y + height, 1, -1);
+            // Bottom-Right
+            drawCorner(x + width, y + height, -1, -1);
+
+            // 2. Draw a beautiful semi-transparent oval mask on the face
             const centerX = x + width / 2;
-            const centerY = y + height * 0.45; // Moved up slightly
-            const radius = width * 0.6; // Slightly tighter
+            const centerY = y + height * 0.45;
+            const radX = width * 0.55;
+            const radY = height * 0.65;
 
             ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.lineWidth = 6;
-            ctx.strokeStyle = color;
+            ctx.ellipse(centerX, centerY, radX, radY, 0, 0, 2 * Math.PI);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color + '80'; // 50% opacity
             
             const fillColors = {
-                '#f97316': 'rgba(249, 115, 22, 0.2)', // orange
-                '#22c55e': 'rgba(34, 197, 94, 0.2)', // green
-                '#ef4444': 'rgba(239, 68, 68, 0.2)',  // red
-                '#eab308': 'rgba(234, 179, 8, 0.2)'   // yellow (identifying)
+                '#f97316': 'rgba(249, 115, 22, 0.12)', // orange
+                '#22c55e': 'rgba(34, 197, 94, 0.12)', // green
+                '#ef4444': 'rgba(239, 68, 68, 0.12)',  // red
+                '#eab308': 'rgba(234, 179, 8, 0.12)'   // yellow
             };
             ctx.fillStyle = fillColors[color] || 'rgba(0,0,0,0)';
-            
             ctx.fill();
             ctx.stroke();
+
+            // 3. Draw text label with a semi-transparent black background pill
+            if (label) {
+                ctx.fillStyle = color;
+                ctx.font = 'bold 16px Tajawal, sans-serif';
+                ctx.textAlign = 'center';
+                
+                const textWidth = ctx.measureText(label).width;
+                const pillWidth = textWidth + 20;
+                const pillHeight = 28;
+                const pillX = centerX - pillWidth / 2;
+                const pillY = y - 40;
+                
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 8);
+                } else {
+                    ctx.rect(pillX, pillY, pillWidth, pillHeight);
+                }
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fill();
+                
+                ctx.fillStyle = color;
+                if (aiMirrored) {
+                    ctx.save();
+                    ctx.translate(centerX, pillY + 18);
+                    ctx.scale(-1, 1);
+                    ctx.fillText(label, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.fillText(label, centerX, pillY + 18);
+                }
+            }
         }
 
         function resumeCamera() {
