@@ -1738,8 +1738,31 @@
         let forceStop = false;
         let autoRestartCount = 0;
         const MAX_AUTO_RESTARTS = 50; // Safety limit to prevent infinite loops
-        let accumulatedText = ''; // Tracks all text accumulated across restarts
+        let previousText = ''; // Stores the text before the current speech recognition session
         window.isUpdatingFromSpeech = false;
+
+        function mergeTranscripts(prev, current) {
+            if (!prev) return current;
+            if (!current) return prev;
+            
+            const wordsA = prev.trim().split(/\s+/);
+            const wordsB = current.trim().split(/\s+/);
+            
+            const maxOverlap = Math.min(wordsA.length, wordsB.length);
+            let overlapLength = 0;
+            
+            for (let k = maxOverlap; k > 0; k--) {
+                const sliceA = wordsA.slice(-k).join(' ').toLowerCase();
+                const sliceB = wordsB.slice(0, k).join(' ').toLowerCase();
+                if (sliceA === sliceB) {
+                    overlapLength = k;
+                    break;
+                }
+            }
+            
+            const remainingB = wordsB.slice(overlapLength).join(' ');
+            return remainingB ? (prev.trim() + ' ' + remainingB) : prev.trim();
+        }
 
         window.stopSpeechRecognition = function () {
             forceStop = true;
@@ -1749,7 +1772,7 @@
             isRecording = false;
             isStarting = false;
             autoRestartCount = 0;
-            accumulatedText = '';
+            previousText = '';
             
             // Reset UI
             const micIcon = document.getElementById('capsule-mic-icon');
@@ -1774,7 +1797,7 @@
             isRecording = false;
             isStarting = false;
             autoRestartCount = 0;
-            accumulatedText = '';
+            previousText = '';
             if (micIcon) {
                 micIcon.textContent = "mic";
                 micIcon.style.color = '';
@@ -1787,7 +1810,7 @@
             }
         }
 
-        function _startRecognitionSession(baseText) {
+        function _startRecognitionSession() {
             const micIcon = document.getElementById('capsule-mic-icon');
             const input = document.getElementById('agent-input');
             const micBtn = document.getElementById('agent-mic-btn');
@@ -1827,9 +1850,7 @@
 
                     if (sessionText && sessionText.trim()) {
                         window.isUpdatingFromSpeech = true;
-                        // Combine: original base + accumulated from previous restarts + this session
-                        const fullText = [baseText, accumulatedText, sessionText].filter(t => t && t.trim()).join(' ');
-                        input.value = fullText;
+                        input.value = mergeTranscripts(previousText, sessionText);
                         window.handleInputTyping(input);
                         window.isUpdatingFromSpeech = false;
                     }
@@ -1864,26 +1885,15 @@
 
                 recognition.onend = () => {
                     if (!forceStop && autoRestartCount < MAX_AUTO_RESTARTS) {
-                        // Save what we have so far before restarting
-                        // Get the latest final results from the current session
-                        const currentInput = input.value.trim();
-                        const combinedPrevious = [baseText, accumulatedText].filter(t => t && t.trim()).join(' ').trim();
-                        
-                        // Extract only the new text added during this session
-                        if (currentInput.length > combinedPrevious.length) {
-                            const newPart = currentInput.substring(combinedPrevious.length).trim();
-                            if (newPart) {
-                                accumulatedText = accumulatedText ? (accumulatedText + ' ' + newPart) : newPart;
-                            }
-                        }
-
+                        // Update previousText to the current input value before restarting
+                        previousText = input.value.trim();
                         autoRestartCount++;
                         console.log(`Speech recognition session ended. Auto-restart #${autoRestartCount}...`);
                         
                         // Small delay to let the browser fully release the mic
                         setTimeout(() => {
                             if (!forceStop) {
-                                _startRecognitionSession(baseText);
+                                _startRecognitionSession();
                             }
                         }, 300);
                     } else {
@@ -1942,13 +1952,12 @@
             }
 
             // Save the current text in textarea before starting so we can append to it
-            const baseText = input.value.trim();
-            accumulatedText = '';
+            previousText = input.value.trim();
             autoRestartCount = 0;
             isStarting = true;
             forceStop = false;
 
-            _startRecognitionSession(baseText);
+            _startRecognitionSession();
         };
 
         // Click outside listeners to close custom dropdowns
