@@ -269,6 +269,20 @@
             let allClasses = [];
             let allStudents = [];
 
+            // Auto redirect if already logged in
+            window.addEventListener("DOMContentLoaded", () => {
+                const user = Auth.getCurrentUser();
+                if (user) {
+                    if (user.role === "ministry") {
+                        window.location.href = "dashboard-ministry.html";
+                    } else if (user.role === "admin") {
+                        window.location.href = "dashboard-admin.html";
+                    } else if (user.role === "teacher") {
+                        window.location.href = "dashboard-teacher.html";
+                    }
+                }
+            });
+
             async function switchTab(type) {
                 const tabs = ["teacherTab", "studentTab"];
                 const wrapper = document.getElementById("formsWrapper");

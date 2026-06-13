@@ -24,6 +24,7 @@ const FaceDetection = {
 
     // Performance Mode
     isLowEnd: (navigator.hardwareConcurrency || 4) <= 4,
+    descriptorCache: [], // Cache of recent { descriptor, student } to skip full DB scan
 
     async init(videoElement = null, canvasElement = null) {
         if (videoElement) this.video = videoElement;
@@ -38,16 +39,37 @@ const FaceDetection = {
             throw new Error("مكتبة face-api.js لم يتم تحميلها بشكل صحيح. يرجى التحقق من اتصال الإنترنت.");
         }
 
+        // Optimize TensorFlow.js WebGL backend if available
+        if (faceapi.tf) {
+            try {
+                const tf = faceapi.tf;
+                if (tf.getBackend() !== 'webgl' && tf.findBackend('webgl')) {
+                    await tf.setBackend('webgl');
+                }
+                await tf.ready();
+                
+                if (tf.getBackend() === 'webgl') {
+                    tf.env().set('WEBGL_PACK', true);
+                    tf.env().set('WEBGL_FLUSH_THRESHOLD', -1);
+                    tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                    console.log("Hodoori: WebGL Backend optimized successfully.");
+                }
+                console.log("Hodoori: Active TFJS Backend is", tf.getBackend());
+            } catch (err) {
+                console.warn("Hodoori: WebGL backend optimization failed, using default:", err);
+            }
+        }
+
         try {
-            console.log("Loading Light Face AI models...");
-            // Only load tiny/essential models by default to save memory on i3/low-end CPUs
+            console.log("Loading Face AI models (SSD Mobilenet)...");
             await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(this.MODELS_URL),
+                faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODELS_URL),
                 faceapi.nets.faceLandmark68Net.loadFromUri(this.MODELS_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(this.MODELS_URL)
             ]);
             this.isModelsLoaded = true;
-            console.log("Light Face AI Ready");
+            this.isSSDLoaded = true;
+            console.log("Face AI Ready (SSD Mobilenet)");
         } catch (e) {
             console.error("Face API Init Failed:", e);
             throw e;
@@ -55,18 +77,11 @@ const FaceDetection = {
     },
 
     /**
-     * Lazy load the heavy SSD Mobilenet model only when specifically needed
+     * Lazy load helper - no-op as SSD is loaded in init
      */
     async loadSSDModel() {
-        if (this.isSSDLoaded) return;
-        try {
-            console.log("Loading Heavy SSD Mobilenet model...");
-            await faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODELS_URL);
-            this.isSSDLoaded = true;
-            console.log("SSD Model Ready");
-        } catch (e) {
-            console.error("SSD Model Load Failed:", e);
-        }
+        this.isSSDLoaded = true;
+        return;
     },
 
     /**
@@ -76,19 +91,35 @@ const FaceDetection = {
     async warmUp() {
         if (!this.isModelsLoaded) await this.init();
         
-        console.log("Warming up Face AI engine (Lite)...");
+        console.log("Warming up Face AI engine (SSD Pipeline)...");
         const dummyCanvas = document.createElement('canvas');
         dummyCanvas.width = 160;
-        dummyCanvas.height = 120;
+        dummyCanvas.height = 160;
         const ctx = dummyCanvas.getContext('2d');
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, 160, 120);
+        
+        // Draw a face-like oval shape for more realistic warm up
+        ctx.fillStyle = '#D2B48C';
+        ctx.beginPath();
+        ctx.ellipse(80, 80, 40, 55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Add eye-like dots
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(65, 70, 4, 0, Math.PI * 2);
+        ctx.arc(95, 70, 4, 0, Math.PI * 2);
+        ctx.fill();
 
         try {
-            // ONLY warm up the tiny detector to prevent system freeze on low-end hardware
-            await faceapi.detectSingleFace(dummyCanvas, new faceapi.TinyFaceDetectorOptions());
+            // Warm up the FULL pipeline with SSD
+            await faceapi.detectSingleFace(dummyCanvas, 
+                new faceapi.SsdMobilenetv1Options({ minConfidence: 0.1 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
         } catch (e) {
-            console.warn("Warm up failed, but maybe models are okay:", e);
+            console.warn("SSD warm up failed, trying detection-only:", e);
+            try {
+                await faceapi.detectSingleFace(dummyCanvas, new faceapi.SsdMobilenetv1Options());
+            } catch (_) {}
         }
         console.log("Face AI engine warmed up.");
     },
@@ -99,17 +130,11 @@ const FaceDetection = {
         if (canvas) this.ctx = canvas.getContext('2d');
     },
 
-    async start(useTiny = true, autoLock = true) {
+    async start(useTiny = false, autoLock = true) {
         if (!this.isModelsLoaded) return;
-        
-        // If requesting SSD but not loaded, load it first
-        if (!useTiny && !this.isSSDLoaded) {
-            console.log("SSD model requested, loading now...");
-            await this.loadSSDModel();
-        }
 
         this.isActive = true;
-        this.useTiny = useTiny;
+        this.useTiny = false; // Always enforce SSD Mobilenet V1
         this.autoLock = autoLock;
         this.stableStartTime = null;
         this.predictLoop();
@@ -135,16 +160,8 @@ const FaceDetection = {
                     this.canvas.height = this.video.videoHeight;
                 }
 
-                // Optimization: Use smaller input size for i3 CPU
-                const options = this.useTiny 
-                    ? new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
-                    : new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 });
-
-                // If requesting SSD but not loaded, fallback to Tiny
-                if (!this.useTiny && !this.isSSDLoaded) {
-                    this.useTiny = true;
-                    console.warn("SSD requested but not loaded, falling back to Tiny.");
-                }
+                // Enforce SSD Mobilenet Options at all times
+                const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 });
 
                 const detection = await faceapi.detectSingleFace(this.video, options)
                     .withFaceLandmarks()
@@ -167,8 +184,8 @@ const FaceDetection = {
         }
 
         if (this.isActive) {
-            // Throttling: Wait more (100ms) on low-end devices to give CPU breathing room
-            const throttleTime = this.isLowEnd ? 100 : 40;
+            // Throttling: SSD is computationally heavy on Core i3 CPU, use 180ms minimum throttle to give GPU/CPU breathing room
+            const throttleTime = this.isLowEnd ? 180 : 80;
             setTimeout(() => {
                 if (this.isActive) requestAnimationFrame(() => this.predictLoop());
             }, throttleTime);
@@ -200,8 +217,8 @@ const FaceDetection = {
     async getDescriptorFromImage(imgElement) {
         if (!this.isModelsLoaded) await this.init();
         
-        // 1. Optimization: Downscale image to max 600px to drastically speed up processing on i3
-        const MAX_WIDTH = 600;
+        // 1. Optimization: Downscale image to max 1024px (instead of 600px) to preserve facial details on registration
+        const MAX_WIDTH = 1024;
         let scale = 1;
         let sourceElement = imgElement;
 
@@ -220,16 +237,22 @@ const FaceDetection = {
             sourceElement = tempCanvas;
         }
 
-        // 2. Optimization: Try TinyFaceDetector first (fastest)
-        let detection = await faceapi.detectSingleFace(sourceElement, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-        // 3. Fallback: If Tiny fails to find a face in the static image, try SSD Mobilenet
-        if (!detection) {
-            console.log("TinyFaceDetector failed, loading SSD fallback...");
+        let detection = null;
+        
+        // 2. Primary: Try high-precision SSD Mobilenet for the most accurate registration fingerprint
+        try {
             await this.loadSSDModel();
-            detection = await faceapi.detectSingleFace(sourceElement, new faceapi.SsdMobilenetv1Options())
+            detection = await faceapi.detectSingleFace(sourceElement, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+        } catch (err) {
+            console.warn("Hodoori: SSD registration failed, trying Tiny fallback:", err);
+        }
+
+        // 3. Fallback: If SSD fails or fails to find a face, try TinyFaceDetector
+        if (!detection) {
+            console.log("SSD registration failed/unavailable, using TinyFaceDetector fallback...");
+            detection = await faceapi.detectSingleFace(sourceElement, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor();
         }
@@ -243,8 +266,16 @@ const FaceDetection = {
     findBestMatch(queryDescriptor, students) {
         if (!queryDescriptor) return null;
         
+        // 1. Check Descriptor Cache for highly similar recent descriptors
+        for (const cached of this.descriptorCache) {
+            const distance = faceapi.euclideanDistance(queryDescriptor, cached.descriptor);
+            if (distance < 0.15) { // Very close descriptors must be the same person
+                return cached.student;
+            }
+        }
+        
         let bestMatch = null;
-        let minDistance = 0.45; // Stricter threshold (0.6 was too loose, 0.45 is better for twins/brothers)
+        let minDistance = 0.55; // Balanced threshold (0.6 was too loose, 0.45 was too strict for lighting changes, 0.55 is optimal)
 
         students.forEach(student => {
             // Support both single descriptor and multiple descriptors (array)
@@ -263,6 +294,12 @@ const FaceDetection = {
                 }
             });
         });
+
+        // 2. Save result to cache (keep last 10 entries)
+        this.descriptorCache.unshift({ descriptor: queryDescriptor, student: bestMatch });
+        if (this.descriptorCache.length > 10) {
+            this.descriptorCache.pop();
+        }
 
         return bestMatch;
     }

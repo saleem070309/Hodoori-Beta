@@ -25,14 +25,32 @@ const GmailManager = {
         this.tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: this.CLIENT_ID,
             scope: this.SCOPES,
-            callback: (response) => {
+            callback: async (response) => {
                 if (response.error !== undefined) {
                     throw (response);
                 }
                 this.accessToken = response.access_token;
-                localStorage.setItem(this.getStorageKey('access_token'), this.accessToken);
-                localStorage.setItem(this.getStorageKey('token_expiry'), Date.now() + (response.expires_in * 1000));
                 
+                const expiryTime = Date.now() + (response.expires_in * 1000);
+                localStorage.setItem(this.getStorageKey('access_token'), this.accessToken);
+                localStorage.setItem(this.getStorageKey('token_expiry'), expiryTime);
+                
+                // حفظ التوكن في قاعدة البيانات ليكون متاحاً عبر جميع الأجهزة وبشكل دائم
+                try {
+                    if (typeof DB !== 'undefined') {
+                        const settings = await DB.getSettings();
+                        settings.gmail_session = {
+                            access_token: this.accessToken,
+                            token_expiry: expiryTime,
+                            saved_at: Date.now()
+                        };
+                        await DB.saveSettings(settings);
+                        console.log('Gmail session saved to Firebase');
+                    }
+                } catch (dbErr) {
+                    console.error('Failed to save Gmail session to Firebase:', dbErr);
+                }
+
                 if (typeof UI !== 'undefined') {
                     UI.toast('تم ربط حساب Gmail بنجاح ✨', 'success');
                     // تحديث الواجهة إذا لزم الأمر
@@ -41,10 +59,32 @@ const GmailManager = {
             },
         });
 
-        // استعادة التوكن إذا كان موجوداً ولم ينتهِ
-        const savedToken = localStorage.getItem(this.getStorageKey('access_token'));
-        const expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
-        if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+        // استعادة التوكن من LocalStorage أو من قاعدة البيانات (Firebase)
+        let savedToken = localStorage.getItem(this.getStorageKey('access_token'));
+        let expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
+        
+        if (!savedToken || !expiry || Date.now() >= parseInt(expiry)) {
+            // محاولة جلب الجلسة المحفوظة من Firebase إذا لم تكن موجودة محلياً أو انتهت محلياً
+            try {
+                if (typeof DB !== 'undefined') {
+                    const settings = await DB.getSettings();
+                    if (settings.gmail_session && settings.gmail_session.access_token) {
+                        savedToken = settings.gmail_session.access_token;
+                        expiry = settings.gmail_session.token_expiry;
+                        
+                        // تحديث التخزين المحلي
+                        localStorage.setItem(this.getStorageKey('access_token'), savedToken);
+                        localStorage.setItem(this.getStorageKey('token_expiry'), expiry);
+                        console.log('Gmail session restored from Firebase');
+                    }
+                }
+            } catch (dbErr) {
+                console.error('Failed to restore Gmail session from Firebase:', dbErr);
+            }
+        }
+
+        // ملاحظة: نلغي شرط انتهاء الوقت (expiry check) لنجعل الجلسة دائمة بناء على طلب المستخدم
+        if (savedToken) {
             this.accessToken = savedToken;
             console.log('Gmail session restored');
         } else {
@@ -53,12 +93,12 @@ const GmailManager = {
     },
 
     isConnected() {
-        const expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
         const savedToken = localStorage.getItem(this.getStorageKey('access_token'));
         if (savedToken !== this.accessToken) {
             this.accessToken = savedToken;
         }
-        return !!this.accessToken && expiry && Date.now() < parseInt(expiry);
+        // جعل الاتصال يعتبر متصلاً دائماً طالما يتوفر توكن محفوظ
+        return !!this.accessToken;
     },
 
     login() {
@@ -69,10 +109,23 @@ const GmailManager = {
         }
     },
 
-    logout() {
+    async logout() {
         this.accessToken = null;
         localStorage.removeItem(this.getStorageKey('access_token'));
         localStorage.removeItem(this.getStorageKey('token_expiry'));
+        
+        // حذف الجلسة من قاعدة البيانات أيضاً
+        try {
+            if (typeof DB !== 'undefined') {
+                const settings = await DB.getSettings();
+                delete settings.gmail_session;
+                await DB.saveSettings(settings);
+                console.log('Gmail session deleted from Firebase');
+            }
+        } catch (dbErr) {
+            console.error('Failed to delete Gmail session from Firebase:', dbErr);
+        }
+
         UI.toast('تم فصل حساب Gmail', 'info');
     },
 

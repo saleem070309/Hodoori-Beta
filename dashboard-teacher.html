@@ -703,11 +703,16 @@
         let html5QrcodeScanner = null;
         let currentFacingMode = "environment";
 
-        function openQrModal() {
+        async function openQrModal() {
+            // إيقاف كاميرا الذكاء الاصطناعي وتحرير الكاميرا أولاً
+            stopAiCamera();
+            const aiModal = document.getElementById('aiModal');
+            aiModal.classList.add('hidden', 'opacity-0');
+
             const modal = document.getElementById('qrModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
-            startQrScanner();
+            await startQrScanner();
         }
 
         function closeQrModal() {
@@ -722,8 +727,8 @@
                 html5QrcodeScanner = new Html5Qrcode("qr-reader");
             }
 
-            // Start QR Scanner (Don't await to keep UI responsive)
-            html5QrcodeScanner.start(
+            // Start QR Scanner (Return promise for sync control)
+            return html5QrcodeScanner.start(
                 { facingMode: currentFacingMode },
                 {
                     fps: 15,
@@ -754,22 +759,31 @@
                         // Use setElements instead of init to skip redundant model checks
                         FaceDetection.setElements(qrVideo, canvasHybrid);
                         FaceDetection.onCapture = (descriptor) => handleCapturedDescriptor(descriptor, true);
-                        FaceDetection.start(true, true); // Tiny model, auto-lock
+                        FaceDetection.start(false, true); // SSD model, auto-lock
                     }
                 }, 100);
                 // Safety timeout
                 setTimeout(() => clearInterval(checkVideo), 5000);
             }).catch(err => {
                 console.error("QR Scanner Start Error: ", err);
-                UI.alert('تعذر الوصول للكاميرا', 'لا يمكن فتح الكاميرا لمسح الرمز حالياً.');
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    UI.alert('تعذر الوصول للكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح لمسح الرمز.');
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    UI.alert('تعذر الوصول للكاميرا', 'لم يتم العثور على أي كاميرا متصلة بالجهاز.');
+                } else if (err.name === 'NotReadableError') {
+                    UI.alert('تعذر الوصول للكاميرا', 'الكاميرا قيد الاستخدام من قبل تطبيق أو نافذة أخرى حالياً.');
+                } else {
+                    UI.alert('تعذر الوصول للكاميرا', 'حدث خطأ غير متوقع أثناء محاولة فتح الكاميرا: ' + (err.message || err));
+                }
             });
         }
 
         function stopQrScanner() {
             FaceDetection.stop();
             if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-                html5QrcodeScanner.stop().catch(console.error);
+                return html5QrcodeScanner.stop().catch(console.error);
             }
+            return Promise.resolve();
         }
 
 
@@ -830,12 +844,18 @@
         let aiFacingMode = 'environment';
         let aiMirrored = false;
 
-        function openAiModal() {
+        async function openAiModal() {
             const modal = document.getElementById('aiModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
             
             renderCarousel();
+            
+            // إيقاف ماسح الـ QR أولاً والانتظار حتى يتحرر بث الكاميرا تماماً
+            await stopQrScanner();
+            const qrModal = document.getElementById('qrModal');
+            qrModal.classList.add('hidden', 'opacity-0');
+
             startAiCamera();
         }
 
@@ -884,25 +904,42 @@
         }
 
         async function startAiCamera() {
+            const statusText = document.getElementById('aiCameraText');
             try {
                 const video = document.getElementById('videoAi');
                 const canvas = document.getElementById('canvasAi');
-                const statusText = document.getElementById('aiCameraText');
 
                 statusText.innerText = 'جاري تحميل الموديلات...';
                 
-                if (!FaceDetection.isModelsLoaded) {
-                    await FaceDetection.init();
-                    await FaceDetection.warmUp();
+                try {
+                    if (!FaceDetection.isModelsLoaded) {
+                        await FaceDetection.init();
+                        await FaceDetection.warmUp();
+                    }
+                } catch (modelErr) {
+                    console.error("Model Load Error:", modelErr);
+                    throw new Error("model_load_failed");
                 }
 
-                streamAi = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: aiFacingMode
-                    }
-                });
+                statusText.innerText = 'جاري تشغيل الكاميرا...';
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("browser_not_secure_or_supported");
+                }
+
+                try {
+                    streamAi = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: aiFacingMode
+                        }
+                    });
+                } catch (constraintErr) {
+                    console.warn("Hodoori: Retry camera with basic constraints due to:", constraintErr);
+                    // محاولة بديلة عند فشل الخصائص المحددة
+                    streamAi = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
                 
                 video.srcObject = streamAi;
                 await video.play();
@@ -922,7 +959,21 @@
 
             } catch (err) {
                 console.error("Camera Start Error:", err);
-                UI.toast('فشل فتح الكاميرا', 'error');
+                if (err.message === "model_load_failed") {
+                    UI.toast('فشل تحميل موديلات الذكاء الاصطناعي. يرجى التحقق من اتصال الإنترنت.', 'error');
+                } else if (err.message === "browser_not_secure_or_supported") {
+                    UI.toast('فشل فتح الكاميرا: المتصفح غير مدعوم أو يتطلب رابط آمن (HTTPS).', 'error');
+                } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    UI.toast('فشل فتح الكاميرا: تم رفض إذن الوصول للكاميرا.', 'error');
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    UI.toast('فشل فتح الكاميرا: لم يتم العثور على كاميرا متصلة.', 'error');
+                } else if (err.name === 'NotReadableError') {
+                    UI.toast('فشل فتح الكاميرا: الكاميرا قيد الاستخدام من تطبيق آخر.', 'error');
+                } else {
+                    UI.toast(`فشل فتح الكاميرا: ${err.message || 'خطأ غير معروف'}`, 'error');
+                }
+                statusText.innerText = 'فشل التشغيل';
+                statusText.classList.remove('animate-pulse');
                 closeAiModal();
             }
         }
@@ -979,6 +1030,70 @@
             }
         }
 
+        // State variables and helper systems for face tracking
+        let trackedFaces = [];
+        const TRACK_MAX_DISTANCE = 75; // Distance in pixels
+        const TRACK_EXPIRY_MS = 1500; // Face stays tracked for 1.5s after disappearing
+
+        // Helper to calculate Euclidean distance between box centers
+        function getBoxCenterDistance(box1, box2) {
+            const c1 = { x: box1.x + box1.width / 2, y: box1.y + box1.height / 2 };
+            const c2 = { x: box2.x + box2.width / 2, y: box2.y + box2.height / 2 };
+            return Math.sqrt((c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2);
+        }
+
+        // Helper to extract descriptor from cropped region of video
+        async function extractDescriptorFromCrop(video, box) {
+            try {
+                const cropCanvas = document.createElement('canvas');
+                // Pad crop by 15% to help landmarks detection
+                const pad = box.width * 0.15;
+                const sx = Math.max(0, box.x - pad);
+                const sy = Math.max(0, box.y - pad);
+                const sw = Math.min(video.videoWidth - sx, box.width + pad * 2);
+                const sh = Math.min(video.videoHeight - sy, box.height + pad * 2);
+
+                cropCanvas.width = 160;
+                cropCanvas.height = 160;
+                const cropCtx = cropCanvas.getContext('2d');
+                cropCtx.drawImage(video, sx, sy, sw, sh, 0, 0, 160, 160);
+
+                // Run landmarks + descriptor on cropCanvas using high-precision SSD Mobilenet V1
+                let detection = await faceapi.detectSingleFace(cropCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                return detection ? detection.descriptor : null;
+            } catch (e) {
+                console.error("Failed crop detection:", e);
+                return null;
+            }
+        }
+
+        const AdaptiveQuality = {
+            interval: 700, // Safe starting interval for SSD on Core i3
+            timings: [],
+            
+            recordTiming(timeTakenMs) {
+                this.timings.push(timeTakenMs);
+                if (this.timings.length > 5) this.timings.shift();
+                
+                const avg = this.timings.reduce((sum, val) => sum + val, 0) / this.timings.length;
+                
+                // Adjust parameters dynamically to protect Core i3 CPU from thermal throttling
+                if (avg > 400) { // CPU is struggling
+                    if (this.interval < 1200) {
+                        this.interval = Math.min(1200, this.interval + 100);
+                        console.log("AdaptiveQuality: Increased SSD loop interval to", this.interval, "ms (CPU Avg:", avg.toFixed(1), "ms)");
+                    }
+                } else if (avg < 200) { // CPU is fast/idle
+                    if (this.interval > 500) {
+                        this.interval = Math.max(500, this.interval - 50);
+                    }
+                }
+            }
+        };
+
         async function startDetectionLoop() {
             const video = document.getElementById('videoAi');
             const canvas = document.getElementById('canvasAi');
@@ -988,54 +1103,170 @@
                 if (!streamAi) return;
 
                 if (isAnimationActive) {
-                    return requestAnimationFrame(loop);
+                    scheduleNextLoop();
+                    return;
                 }
+
+                const startTime = performance.now();
 
                 if (video.readyState >= 2) {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
-                    // Use FaceAPI to detect all faces
-                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-                    const detections = await faceapi.detectAllFaces(video, options)
-                        .withFaceLandmarks()
-                        .withFaceDescriptors();
-
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    detections.forEach(det => {
-                        const { x, y, width, height } = det.detection.box;
-                        const centerX = x + width / 2;
-                        const centerY = y + height * 0.45; // Moved up slightly
-                        const radius = width * 0.6; // Slightly tighter
+                    // 1. High-precision SSD Mobilenet V1 detection
+                    const detectorOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.40 });
+                    
+                    const faceDetections = await faceapi.detectAllFaces(video, detectorOptions);
+                    const now = performance.now();
+                    const nextTrackedFaces = [];
+                    
+                    let hasNewFace = false;
+                    const unmatchedBoxes = [];
 
-                        // Identify the face
-                        const match = FaceDetection.findBestMatch(det.descriptor, students);
+                    // Match detected boxes with trackedFaces
+                    for (const det of faceDetections) {
+                        const box = det.box;
                         
-                        // Draw UI Feedback
+                        // Find closest tracked face
+                        let matchedTracked = null;
+                        let minTrackDist = Infinity;
+                        
+                        for (const tf of trackedFaces) {
+                            const dist = getBoxCenterDistance(box, tf.box);
+                            if (dist < TRACK_MAX_DISTANCE && dist < minTrackDist) {
+                                minTrackDist = dist;
+                                matchedTracked = tf;
+                            }
+                        }
+
+                        if (matchedTracked) {
+                            matchedTracked.box = box;
+                            matchedTracked.lastSeen = now;
+                            nextTrackedFaces.push(matchedTracked);
+                            
+                            // Remove from trackedFaces to prevent double-matching
+                            trackedFaces = trackedFaces.filter(tf => tf !== matchedTracked);
+                        } else {
+                            hasNewFace = true;
+                            unmatchedBoxes.push(box);
+                        }
+                    }
+
+                    // If a new face is detected, perform a crop-based recognition on that face only (extremely fast)
+                    if (hasNewFace && unmatchedBoxes.length > 0) {
+                        for (const box of unmatchedBoxes) {
+                            try {
+                                const descriptor = await extractDescriptorFromCrop(video, box);
+                                let studentMatch = null;
+                                let status = 'unknown';
+
+                                if (descriptor) {
+                                    studentMatch = FaceDetection.findBestMatch(descriptor, students);
+                                    status = studentMatch ? 'recognized' : 'unknown';
+                                }
+
+                                nextTrackedFaces.push({
+                                    id: studentMatch ? studentMatch.id : 'unknown-' + Math.random(),
+                                    student: studentMatch,
+                                    box: box,
+                                    status: status,
+                                    lastSeen: now
+                                });
+                            } catch (err) {
+                                console.error("Crop scan failed:", err);
+                                nextTrackedFaces.push({
+                                    id: 'unknown-' + Math.random(),
+                                    student: null,
+                                    box: box,
+                                    status: 'unknown',
+                                    lastSeen: now
+                                });
+                            }
+                        }
+                    }
+
+                    // 2. Render UI feedback for all tracked faces
+                    nextTrackedFaces.forEach(tf => {
+                        const box = tf.box;
+                        const centerX = box.x + box.width / 2;
+                        const centerY = box.y + box.height * 0.45;
+                        const radius = box.width * 0.6;
+
                         ctx.beginPath();
                         ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                        ctx.lineWidth = 4;
-                        
-                        if (match) {
-                            ctx.strokeStyle = '#22c55e'; // Green
-                            ctx.fillStyle = 'rgba(34, 197, 94, 0.2)'; // Transparent Green
-                            
-                            // Auto-capture if live analysis is on
-                            if (isAiAnalysisActive && attendance[match.id] !== 'present') {
-                                markStudentPresent(match, video, det.detection.box);
+                        ctx.lineWidth = 5;
+
+                        let text = "";
+                        if (tf.status === 'recognized' && tf.student) {
+                            text = tf.student.name;
+                            if (attendance[tf.student.id] === 'present') {
+                                ctx.strokeStyle = '#22c55e'; // Green
+                                ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+                            } else {
+                                ctx.strokeStyle = '#22c55e'; // Green
+                                ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+                                
+                                // Auto-mark present
+                                if (isAiAnalysisActive) {
+                                    markStudentPresent(tf.student, video, box);
+                                }
                             }
-                        } else {
+                        } else if (tf.status === 'unknown') {
+                            text = "غير معروف";
                             ctx.strokeStyle = '#ef4444'; // Red
-                            ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'; // Transparent Red
+                            ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+                        } else {
+                            text = "جاري التعرف...";
+                            ctx.strokeStyle = '#eab308'; // Yellow
+                            ctx.fillStyle = 'rgba(234, 179, 8, 0.1)';
                         }
                         
                         ctx.fill();
                         ctx.stroke();
+
+                        // Render name or status text above circle
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.font = 'bold 16px Tajawal, sans-serif';
+                        ctx.textAlign = 'center';
+
+                        if (aiMirrored) {
+                            // Reverse flip the text so it is readable on mirrored canvases
+                            ctx.save();
+                            ctx.translate(centerX, centerY - radius - 12);
+                            ctx.scale(-1, 1);
+                            ctx.fillText(text, 0, 0);
+                            ctx.restore();
+                        } else {
+                            ctx.fillText(text, centerX, centerY - radius - 12);
+                        }
                     });
+
+                    // Keep tracked faces that disappeared briefly (for tracking stability)
+                    for (const tf of trackedFaces) {
+                        if (now - tf.lastSeen < TRACK_EXPIRY_MS) {
+                            nextTrackedFaces.push(tf);
+                        }
+                    }
+                    trackedFaces = nextTrackedFaces;
+
+                    // Record performance timing for adaptive engine
+                    const duration = performance.now() - startTime;
+                    AdaptiveQuality.recordTiming(duration);
                 }
 
-                requestAnimationFrame(loop);
+                scheduleNextLoop();
+            };
+
+            const scheduleNextLoop = () => {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback((deadline) => {
+                        setTimeout(loop, Math.max(10, AdaptiveQuality.interval - 50));
+                    }, { timeout: AdaptiveQuality.interval });
+                } else {
+                    setTimeout(loop, AdaptiveQuality.interval);
+                }
             };
 
             loop();
@@ -1101,60 +1332,72 @@
             const ctx = canvas.getContext('2d');
             const statusText = document.getElementById('aiCameraText');
             
-            // Pause video to freeze the frame
-            video.pause();
-            
-            // Draw the current frame as a background on canvas for the slide-down effect later
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            statusText.innerText = 'جاري تحليل الصورة...';
             statusText.classList.add('text-primary', 'animate-pulse');
 
             try {
-                // Detect faces
-                const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-                const detections = await faceapi.detectAllFaces(video, options)
+                statusText.innerText = `جاري التقاط الصورة...`;
+                
+                // Take snapshot on temporary canvas
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = video.videoWidth;
+                tempCanvas.height = video.videoHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+                
+                // Flash effect on UI canvas to indicate snapshot
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                await new Promise(r => setTimeout(r, 80));
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Pause video to display the captured frame
+                video.pause();
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+                
+                statusText.innerText = 'جاري تحليل الصورة وتأكيد الهوية...';
+
+                // Use SSD if loaded for high precision, fallback to high-resolution Tiny Face Detector
+                const options = FaceDetection.isSSDLoaded
+                    ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 })
+                    : new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.25 });
+                
+                const detections = await faceapi.detectAllFaces(tempCanvas, options)
                     .withFaceLandmarks()
                     .withFaceDescriptors();
 
-                if (detections.length === 0) {
-                    UI.toast('لم يتم العثور على وجوه', 'warning');
-                    resumeCamera();
-                    return;
-                }
-
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
 
-                // Step 1: Draw Orange circles sequentially
-                for (let i = 0; i < detections.length; i++) {
-                    const det = detections[i];
-                    drawFaceCircle(ctx, det.detection.box, '#f97316'); // Orange
-                    await new Promise(r => setTimeout(r, 100)); // 0.1s delay
-                }
+                const confirmedStudents = [];
+                const unknownBoxes = [];
 
-                // Step 2: Analyze sequentially
-                for (let i = 0; i < detections.length; i++) {
-                    const det = detections[i];
+                detections.forEach(det => {
                     const match = FaceDetection.findBestMatch(det.descriptor, students);
-                    
                     if (match) {
+                        confirmedStudents.push(match);
                         drawFaceCircle(ctx, det.detection.box, '#22c55e'); // Green
+                        
                         if (attendance[match.id] !== 'present') {
                             markStudentPresent(match, video, det.detection.box);
                         }
                     } else {
+                        unknownBoxes.push(det.detection.box);
                         drawFaceCircle(ctx, det.detection.box, '#ef4444'); // Red
                     }
-                    await new Promise(r => setTimeout(r, 100)); // 0.1s delay
+                });
+
+                if (confirmedStudents.length === 0 && unknownBoxes.length === 0) {
+                    UI.toast('لم يتم العثور على وجوه في الصورة الملتقطة', 'warning');
+                    resumeCamera();
+                    return;
                 }
 
-                statusText.innerText = 'تم الانتهاء من التحليل';
+                statusText.innerText = `تم الانتهاء من التحليل (تم تحضير ${confirmedStudents.length})`;
                 statusText.classList.remove('animate-pulse');
                 
-                // Add click listener to skip wait
                 const skipWait = (e) => {
-                    // Prevent triggering if clicked on carousel buttons
                     if(e.target.closest('button') || e.target.closest('article')) return; 
                     resumeCamera();
                 };
@@ -1162,14 +1405,13 @@
                 const modal = document.getElementById('aiModal');
                 modal.addEventListener('click', skipWait);
 
-                // Wait 3 seconds then resume (slide down effect simulated by clearing canvas and unpausing)
                 animationTimeout = setTimeout(() => {
                     modal.removeEventListener('click', skipWait);
                     resumeCamera();
                 }, 3000);
 
             } catch (err) {
-                console.error(err);
+                console.error("AI Capture Error:", err);
                 resumeCamera();
             }
         }
@@ -1188,7 +1430,8 @@
             const fillColors = {
                 '#f97316': 'rgba(249, 115, 22, 0.2)', // orange
                 '#22c55e': 'rgba(34, 197, 94, 0.2)', // green
-                '#ef4444': 'rgba(239, 68, 68, 0.2)'  // red
+                '#ef4444': 'rgba(239, 68, 68, 0.2)',  // red
+                '#eab308': 'rgba(234, 179, 8, 0.2)'   // yellow (identifying)
             };
             ctx.fillStyle = fillColors[color] || 'rgba(0,0,0,0)';
             
@@ -1277,17 +1520,14 @@
             }
         }
 
-        function switchQrCamera() {
+        async function switchQrCamera() {
             currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
             // Default: mirror for front camera
             qrMirrored = (currentFacingMode === "user");
 
-            stopQrScanner();
-            setTimeout(() => {
-                startQrScanner();
-                // We need to wait a bit for the video element to be created by the library
-                setTimeout(updateQrMirrorUI, 1000);
-            }, 300);
+            await stopQrScanner();
+            await startQrScanner();
+            setTimeout(updateQrMirrorUI, 1000);
         }
 
 

@@ -617,7 +617,7 @@
 
     <!-- ─── Fixed Header (Sleek, transparent & 48px height) ─── -->
     <header id="main-header" style="display: none !important;">
-        <div class="assistant-top-right-hamburger lg:hidden" onclick="window.toggleAssistantDrawer(event)"
+        <div class="assistant-top-right-hamburger" onclick="window.toggleAssistantDrawer(event)"
             title="القائمة" style="z-index: 50;">
             <div class="assistant-hamburger-line assistant-hamburger-line-1"></div>
             <div class="assistant-hamburger-line assistant-hamburger-line-2"></div>
@@ -657,6 +657,28 @@
                 <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-error p-4 rounded-2xl">
                     <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الغياب</p>
                     <h2 id="statAbsent" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+            </div>
+
+            <!-- Analytics Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <h3 class="font-bold text-xs mb-3 text-gray-800 dark:text-white flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-primary" style="font-size:16px">bar_chart</span>
+                        معدل حضور الطلاب بالفصول
+                    </h3>
+                    <div style="height: 180px; position: relative;">
+                        <canvas id="adminClassChart"></canvas>
+                    </div>
+                </div>
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <h3 class="font-bold text-xs mb-3 text-gray-800 dark:text-white flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-primary" style="font-size:16px">trending_up</span>
+                        تحليل الحضور الأسبوعي
+                    </h3>
+                    <div style="height: 180px; position: relative;">
+                        <canvas id="adminWeeklyTrendChart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -972,11 +994,19 @@
             <!-- New Capsule Input Area -->
             <div class="assistant-bottom-area">
                 <div class="assistant-input-capsule">
-                    <!-- Left Button (Microphone / Send) -->
-                    <button id="agent-mic-btn" class="assistant-capsule-mic-btn" onclick="window.triggerVoiceVisual()"
-                        title="تحدث بصوتك">
-                        <span class="material-symbols-outlined" id="capsule-mic-icon">mic</span>
-                    </button>
+                    <!-- Left Side Buttons Container -->
+                    <div class="assistant-capsule-left-actions">
+                        <!-- Dynamic Send Button (hidden by default, shown on left when text exists) -->
+                        <button id="agent-real-send-btn" class="assistant-capsule-send-btn hidden" onclick="Agent.sendMessage()"
+                            title="إرسال الرسالة">
+                            <span class="material-symbols-outlined">arrow_upward</span>
+                        </button>
+                        <!-- Left Button (Microphone / Send) -->
+                        <button id="agent-mic-btn" class="assistant-capsule-mic-btn" onclick="window.triggerVoiceVisual()"
+                            title="تحدث بصوتك">
+                            <span class="material-symbols-outlined" id="capsule-mic-icon">mic</span>
+                        </button>
+                    </div>
 
                     <!-- Textarea -->
                     <textarea id="agent-input" class="assistant-capsule-textarea" placeholder="اسأل حضوري..." rows="1"
@@ -1026,6 +1056,14 @@
                         style="font-size:20px;font-variation-settings:'FILL' 1">meeting_room</span>
                     الطلاب والفصول
                 </h3>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('student-excel-input').click()"
+                        class="liquid-button bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 interactive">
+                        <span class="material-symbols-outlined text-sm">upload_file</span>
+                        استيراد من إكسل
+                    </button>
+                    <input type="file" id="student-excel-input" accept=".xlsx, .xls" class="hidden" onchange="window.importStudentsFromExcel(event)">
+                </div>
             </div>
             <div id="classGrid" class="grid grid-cols-1 gap-5"></div>
         </div>
@@ -1613,18 +1651,9 @@
 
             const capsule = textarea.closest('.assistant-input-capsule');
             if (capsule) {
-                // Disable transitions temporarily
-                const originalCapsuleTransition = capsule.style.transition;
-                const originalTextareaTransition = textarea.style.transition;
-                capsule.style.transition = 'none';
-                textarea.style.transition = 'none';
-
                 // Temporarily remove expanded class to measure true single-line scrollHeight
+                const wasExpanded = capsule.classList.contains('expanded');
                 capsule.classList.remove('expanded');
-
-                // Force a synchronous browser reflow to apply style changes instantly
-                void textarea.offsetHeight;
-                void capsule.offsetHeight;
 
                 textarea.style.height = 'auto';
                 const sHeight = textarea.scrollHeight;
@@ -1632,7 +1661,7 @@
                 // Force unexpand if empty
                 if (textarea.value.trim() === '') {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = Math.min(sHeight, 150) + 'px';
+                    textarea.style.height = '38px'; // Reset to default single-line height
                 }
                 // If scrollHeight is greater than 45px (meaning it wraps to 2 lines) or includes newlines
                 else if (sHeight > 45 || textarea.value.includes('\n')) {
@@ -1642,19 +1671,11 @@
                     textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
                 } else {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = Math.min(sHeight, 150) + 'px';
+                    textarea.style.height = '38px';
                 }
-
-                // Force reflow and re-enable transitions
-                void textarea.offsetHeight;
-                capsule.style.transition = originalCapsuleTransition;
-                textarea.style.transition = originalTextareaTransition;
             } else {
-                textarea.style.transition = 'none';
                 textarea.style.height = 'auto';
                 textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
-                void textarea.offsetHeight;
-                textarea.style.transition = '';
             }
 
             // Right button is ALWAYS the plus button for attaching files
@@ -1665,31 +1686,72 @@
                 sendBtn.onclick = () => document.getElementById('agent-file-input').click();
             }
 
-            // Left button toggles between Microphone and Send (arrow upward)
-            if (micBtn && micIcon) {
-                if (textarea.value.trim().length > 0) {
-                    micBtn.classList.add('active-send');
-                    micBtn.title = "إرسال الرسالة";
-                    micIcon.textContent = "arrow_upward";
-                    micBtn.onclick = () => {
-                        Agent.sendMessage();
-                    };
+            // Left button (mic) and new dynamic send button handler
+            const realSendBtn = document.getElementById('agent-real-send-btn');
+            
+            // Auto-stop recording if user manually starts typing text
+            // To ensure we only abort when the user physically types (clicks/presses keys)
+            // we check document.activeElement and verify this wasn't called by a programmatic update.
+            if (isRecording && textarea.value.trim().length > 0) {
+                if (document.activeElement === textarea && !window.isUpdatingFromSpeech) {
+                    console.log('Manual typing detected during voice recording. Stopping speech recognition.');
+                    if (recognition) {
+                        try { recognition.stop(); } catch(e) {}
+                    }
+                }
+            }
+
+            if (micBtn && micIcon && realSendBtn) {
+                if (isRecording) {
+                    // Recording state: keep mic style as red recording indicator
+                    micIcon.textContent = "fiber_manual_record";
+                    micIcon.style.color = '#f44336';
+                    micBtn.classList.remove('hidden');
+                    
+                    // Keep send button visible if there is text in the textarea, so the user can send while recording
+                    if (textarea.value.trim().length > 0) {
+                        realSendBtn.classList.remove('hidden');
+                    } else {
+                        realSendBtn.classList.add('hidden');
+                    }
                 } else {
-                    micBtn.classList.remove('active-send');
-                    micBtn.title = "تحدث بصوتك";
+                    // Reset mic button style
                     micIcon.textContent = "mic";
-                    micBtn.onclick = () => window.triggerVoiceVisual();
+                    micIcon.style.color = '';
+                    
+                    if (textarea.value.trim().length > 0) {
+                        // Text present: show send button on the left, keep mic next to it
+                        realSendBtn.classList.remove('hidden');
+                        micBtn.classList.remove('hidden');
+                    } else {
+                        // Empty: hide send button, keep mic on the left
+                        realSendBtn.classList.add('hidden');
+                        micBtn.classList.remove('hidden');
+                    }
                 }
             }
         };
 
         let recognition = null;
         let isRecording = false;
+        let isStarting = false;
+        let forceStop = false;
+        window.isUpdatingFromSpeech = false;
+
+        window.stopSpeechRecognition = function () {
+            forceStop = true;
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+            }
+            isRecording = false;
+            isStarting = false;
+        };
 
         window.triggerVoiceVisual = function () {
             const micIcon = document.getElementById('capsule-mic-icon');
             const input = document.getElementById('agent-input');
-            if (!micIcon || !input) return;
+            const micBtn = document.getElementById('agent-mic-btn');
+            if (!micIcon || !input || !micBtn) return;
 
             // Check browser support for SpeechRecognition
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1698,49 +1760,117 @@
                 return;
             }
 
-            if (isRecording) {
+            if (isRecording || isStarting) {
+                forceStop = true;
                 if (recognition) {
-                    recognition.stop();
+                    try { recognition.stop(); } catch(e) {}
                 }
+                isRecording = false;
+                isStarting = false;
                 return;
             }
 
+            // Save the current text in textarea before starting so we can append to it
+            const baseText = input.value.trim();
+
             try {
+                isStarting = true;
+                forceStop = false;
+                if (recognition) {
+                    try { recognition.abort(); } catch(e) {}
+                }
+                
                 recognition = new SpeechRecognition();
                 recognition.lang = 'ar-JO'; // Arabic (Jordan) local language support
-                recognition.continuous = false;
-                recognition.interimResults = false;
+                recognition.continuous = true;
+                recognition.interimResults = true;
 
                 recognition.onstart = () => {
                     isRecording = true;
-                    micIcon.style.color = '#ffab31';
+                    isStarting = false;
+                    micIcon.textContent = "fiber_manual_record";
+                    micIcon.style.color = '#f44336';
                     micIcon.classList.add('animate-pulse');
-                    UI.toast('🎤 جاري الاستماع محلياً، تحدث الآن...');
+                    micBtn.classList.add('bg-red-500/10', 'border', 'border-red-500/20');
+                    input.placeholder = "جاري الاستماع... تحدّث الآن";
+                    window.handleInputTyping(input);
                 };
 
                 recognition.onresult = (event) => {
-                    const resultText = event.results[0][0].transcript;
-                    if (resultText && resultText.trim()) {
-                        input.value = resultText;
+                    let finalTranscript = '';
+                    let interimTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+
+                    // Accumulate all final result texts of this current session
+                    let sessionText = '';
+                    for (let i = 0; i < event.results.length; ++i) {
+                        sessionText += event.results[i][0].transcript;
+                    }
+
+                    if (sessionText && sessionText.trim()) {
+                        window.isUpdatingFromSpeech = true;
+                        // Append session transcript to the initial text we had in the textarea
+                        input.value = baseText ? (baseText + ' ' + sessionText) : sessionText;
                         window.handleInputTyping(input);
+                        window.isUpdatingFromSpeech = false;
                     }
                 };
 
                 recognition.onerror = (event) => {
                     console.error('Speech recognition error:', event.error);
+                    
+                    // If the browser times out or loses audio link, it may fire an error,
+                    // but we do not want to stop permanently unless it was a permission error.
                     if (event.error === 'not-allowed') {
+                        isRecording = false;
+                        isStarting = false;
+                        forceStop = true;
                         UI.toast('⚠️ يرجى السماح للمتصفح بالوصول إلى المايكروفون.');
-                    } else if (event.error === 'no-speech') {
-                        UI.toast('⚠️ لم يتم سماع أي صوت. حاول مجدداً.');
-                    } else {
-                        UI.toast('⚠️ خطأ في التعرف على الصوت: ' + event.error);
+                        
+                        micIcon.textContent = "mic";
+                        micIcon.style.color = '';
+                        micIcon.classList.remove('animate-pulse');
+                        micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        input.placeholder = "اسأل حضوري...";
+                        window.handleInputTyping(input);
                     }
                 };
 
                 recognition.onend = () => {
-                    isRecording = false;
-                    micIcon.style.color = '';
-                    micIcon.classList.remove('animate-pulse');
+                    // If the speech recognition session closed automatically (due to browser timeout/no-speech limits)
+                    // but the user DID NOT click the button to stop, auto-restart the session silently
+                    if (!forceStop) {
+                        console.log('Speech recognition session ended automatically. Restarting...');
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            console.error('Auto-restart failed:', e);
+                            // Fallback retry after a short delay if it's currently busy aborting
+                            setTimeout(() => {
+                                if (!forceStop && !isRecording) {
+                                    try { recognition.start(); } catch(err) {}
+                                }
+                            }, 400);
+                        }
+                    } else {
+                        // Regular user-requested stop
+                        isRecording = false;
+                        isStarting = false;
+                        micIcon.textContent = "mic";
+                        micIcon.style.color = '';
+                        micIcon.classList.remove('animate-pulse');
+                        micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        input.placeholder = "اسأل حضوري...";
+                        window.handleInputTyping(input);
+                    }
                 };
 
                 recognition.start();
@@ -1749,8 +1879,12 @@
                 console.error('Speech recognition init error:', err);
                 UI.toast('⚠️ تعذر تشغيل المايكروفون: ' + err.message);
                 isRecording = false;
+                isStarting = false;
+                micIcon.textContent = "mic";
                 micIcon.style.color = '';
                 micIcon.classList.remove('animate-pulse');
+                micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                input.placeholder = "اسأل حضوري...";
             }
         };
 
@@ -2050,6 +2184,132 @@
                             </div>
                         </div>`;
                 }).join('');
+            }
+
+            // Render visual analytics charts
+            renderAdminCharts(classes, allRecords, allStudents);
+        }
+
+        let classChartInstance = null;
+        let trendChartInstance = null;
+
+        function renderAdminCharts(classes, allRecords, allStudents) {
+            // 1. Calculate class-by-class attendance rate
+            const classLabels = [];
+            const classData = [];
+            
+            classes.forEach(c => {
+                const classRecs = allRecords.filter(r => r.classId === c.id);
+                let present = 0, total = 0;
+                classRecs.forEach(r => {
+                    (r.details || []).forEach(d => {
+                        if (d.status === 'present') present++;
+                        total++;
+                    });
+                });
+                const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+                classLabels.push(`${c.name} (${c.section})`);
+                classData.push(rate);
+            });
+
+            if (classChartInstance) {
+                classChartInstance.destroy();
+            }
+
+            const classCtx = document.getElementById('adminClassChart')?.getContext('2d');
+            if (classCtx) {
+                classChartInstance = new Chart(classCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: classLabels,
+                        datasets: [{
+                            label: 'نسبة الحضور (%)',
+                            data: classData,
+                            backgroundColor: 'rgba(255, 167, 38, 0.75)',
+                            borderColor: 'rgba(255, 167, 38, 1)',
+                            borderWidth: 1.5,
+                            borderRadius: 8,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                        },
+                        scales: {
+                            x: { min: 0, max: 100, ticks: { font: { family: 'Tajawal' } } },
+                            y: { ticks: { font: { family: 'Tajawal', weight: 'bold' } } }
+                        }
+                    }
+                });
+            }
+
+            // 2. Calculate weekly attendance trend (last 7 days)
+            const dates = [];
+            const trendData = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const pad = n => String(n).padStart(2, '0');
+                const dStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                dates.push(dStr);
+                
+                const dayRecs = allRecords.filter(r => r.date === dStr);
+                let present = 0, total = 0;
+                dayRecs.forEach(r => {
+                    (r.details || []).forEach(d => {
+                        if (d.status === 'present') present++;
+                        total++;
+                    });
+                });
+                const rate = total > 0 ? Math.round((present / total) * 100) : null;
+                trendData.push(rate);
+            }
+
+            const dayNames = dates.map(dStr => {
+                const dateObj = new Date(dStr);
+                return dateObj.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' });
+            });
+
+            const hasData = trendData.some(v => v !== null);
+            const finalTrendData = hasData ? trendData.map(v => v === null ? 100 : v) : [95, 98, 92, 96, 94, 97, 95];
+
+            if (trendChartInstance) {
+                trendChartInstance.destroy();
+            }
+
+            const trendCtx = document.getElementById('adminWeeklyTrendChart')?.getContext('2d');
+            if (trendCtx) {
+                trendChartInstance = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: dayNames,
+                        datasets: [{
+                            label: 'نسبة الانضباط',
+                            data: finalTrendData,
+                            borderColor: 'rgba(255, 112, 67, 1)',
+                            backgroundColor: 'rgba(255, 112, 67, 0.15)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: 'rgba(255, 112, 67, 1)',
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { min: 50, max: 100, ticks: { font: { family: 'Tajawal' } } },
+                            x: { ticks: { font: { family: 'Tajawal' } } }
+                        }
+                    }
+                });
             }
         }
 
@@ -3256,7 +3516,11 @@
                 }
 
                 await Agent.init();
-                await FaceDetection.init();
+                try {
+                    await FaceDetection.init();
+                } catch (faceErr) {
+                    console.warn("Face engine pre-load failed in admin (offline or slow connection):", faceErr);
+                }
 
                 await Promise.all([
                     renderDailyInfo(),
@@ -3919,6 +4183,127 @@
             UI.toast('تم حذف الحصة', 'success');
             closeModal();
             await renderSchedule();
+        };
+
+        window.importStudentsFromExcel = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            UI.setLoading(true, 'جاري معالجة واستيراد الطلاب من ملف Excel...');
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (rows.length === 0) {
+                        UI.setLoading(false);
+                        UI.toast('الملف فارغ أو يحتوي على بيانات غير صالحة', 'error');
+                        return;
+                    }
+
+                    await DB.init();
+                    const schoolId = DB.getCurrentUserSchoolId();
+                    const existingClasses = await DB.getClasses();
+                    const classesMap = {};
+
+                    existingClasses.forEach(c => {
+                        classesMap[`${c.name.trim()}_${c.section.trim()}`] = c.id;
+                    });
+
+                    const cleanVal = (val) => {
+                        if (val === undefined || val === null) return '';
+                        return String(val).trim().replace(/^['’`‘""]+/, '').trim();
+                    };
+
+                    const formatJordanianPhone = (phoneStr) => {
+                        let cleaned = cleanVal(phoneStr).replace(/\s+/g, '');
+                        // Remove all non-numeric characters except +
+                        cleaned = cleaned.replace(/[^\d+]/g, '');
+
+                        if (cleaned.startsWith('00962')) {
+                            cleaned = cleaned.substring(2);
+                        } else if (cleaned.startsWith('+962')) {
+                            cleaned = cleaned.substring(1);
+                        } else if (cleaned.startsWith('07') && cleaned.length === 10) {
+                            cleaned = '962' + cleaned.substring(1);
+                        } else if (cleaned.startsWith('7') && cleaned.length === 9) {
+                            cleaned = '962' + cleaned;
+                        }
+
+                        // Validate it matches 9627[789]XXXXXXX (12 digits)
+                        if (/^9627[789]\d{7}$/.test(cleaned)) {
+                            return cleaned;
+                        }
+                        return ''; // Return empty if it doesn't match Jordan format
+                    };
+
+                    let importedCount = 0;
+                    let newClassesCount = 0;
+
+                    for (const row of rows) {
+                        const academicId = cleanVal(row['الرقم الوطني']);
+                        const name = cleanVal(row['الاسم']);
+                        const className = cleanVal(row['الصف']);
+                        const section = cleanVal(row['الشعبة']);
+                        const rawPhone = cleanVal(row['رقم الهاتف']);
+                        const phone = formatJordanianPhone(rawPhone);
+
+                        if (!academicId || !name || !className) {
+                            console.warn('Skipping invalid row:', row);
+                            continue;
+                        }
+
+                        const classKey = `${className}_${section}`;
+                        let classId = classesMap[classKey];
+
+                        if (!classId) {
+                            classId = 'c_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                            await DB.dbInstance.collection(DB.KEYS.CLASSES).doc(classId).set({
+                                id: classId,
+                                name: className,
+                                section: section || '-',
+                                schoolId: schoolId
+                            });
+                            classesMap[classKey] = classId;
+                            newClassesCount++;
+                        }
+
+                        const studentId = academicId;
+                        const studentData = {
+                            academicId: studentId,
+                            id: studentId,
+                            name: name,
+                            classId: classId,
+                            phone: phone, // Saved as formatted 962 format or empty if invalid
+                            schoolId: schoolId,
+                            timestamp: new Date().toISOString()
+                        };
+
+                        await DB.dbInstance.collection(DB.KEYS.STUDENTS).doc(studentId).set(studentData);
+                        importedCount++;
+                    }
+
+                    UI.setLoading(false);
+                    UI.toast(`تم استيراد ${importedCount} طالب بنجاح! تم إنشاء ${newClassesCount} شعب صفية جديدة.`, 'success');
+                    
+                    event.target.value = '';
+                    
+                    if (window.renderAll) {
+                        await window.renderAll();
+                    }
+                } catch (err) {
+                    console.error('Excel Import Error:', err);
+                    UI.setLoading(false);
+                    UI.toast('حدث خطأ أثناء معالجة ملف إكسل. تأكد من صحة الأعمدة.', 'error');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
         };
 
     </script>

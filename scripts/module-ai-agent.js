@@ -384,6 +384,16 @@ const Agent = {
         const suggestions = document.getElementById('agent-suggestions');
         if (suggestions) suggestions.style.display = 'flex';
 
+        const input = document.getElementById('agent-input');
+        if (input) {
+            input.value = '';
+            if (typeof window.handleInputTyping === 'function') {
+                window.handleInputTyping(input);
+            } else {
+                input.style.height = 'auto';
+            }
+        }
+
         this.getSystemContext().then(ctx => {
             this.chatHistory = [{ role: 'system', content: ctx }];
         });
@@ -403,7 +413,17 @@ const Agent = {
         const text = input.value.trim();
         if (!text) return;
 
+        // Force stop and turn off speech recognition upon sending
+        if (typeof window.stopSpeechRecognition === 'function') {
+            window.stopSpeechRecognition();
+        }
+
         input.value = '';
+        if (typeof window.handleInputTyping === 'function') {
+            window.handleInputTyping(input);
+        } else {
+            input.style.height = 'auto';
+        }
         this.addMessage(text, 'user');
 
         // Hide suggestions after first message
