@@ -1737,45 +1737,28 @@
         let isStarting = false;
         let forceStop = false;
         window.isUpdatingFromSpeech = false;
+        let baseText = '';
 
         window.stopSpeechRecognition = function () {
             forceStop = true;
             if (recognition) {
-                try { recognition.stop(); } catch(e) {}
+                try { recognition.abort(); } catch(e) {}
             }
             isRecording = false;
             isStarting = false;
         };
 
-        window.triggerVoiceVisual = function () {
-            const micIcon = document.getElementById('capsule-mic-icon');
-            const input = document.getElementById('agent-input');
-            const micBtn = document.getElementById('agent-mic-btn');
-            if (!micIcon || !input || !micBtn) return;
-
-            // Check browser support for SpeechRecognition
+        function startRecognition(input) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                UI.toast('⚠️ متصفحك لا يدعم التعرف على الصوت محلياً. يرجى استخدام متصفح Chrome أو Edge.');
-                return;
-            }
+            if (!SpeechRecognition) return;
 
-            if (isRecording || isStarting) {
-                forceStop = true;
-                if (recognition) {
-                    try { recognition.stop(); } catch(e) {}
-                }
-                isRecording = false;
-                isStarting = false;
-                return;
-            }
+            // Capture current text in textarea before starting so we can append to it
+            baseText = input.value.trim();
 
-            // Save the current text in textarea before starting so we can append to it
-            const baseText = input.value.trim();
+            const micIcon = document.getElementById('capsule-mic-icon');
+            const micBtn = document.getElementById('agent-mic-btn');
 
             try {
-                isStarting = true;
-                forceStop = false;
                 if (recognition) {
                     try { recognition.abort(); } catch(e) {}
                 }
@@ -1788,28 +1771,18 @@
                 recognition.onstart = () => {
                     isRecording = true;
                     isStarting = false;
-                    micIcon.textContent = "fiber_manual_record";
-                    micIcon.style.color = '#f44336';
-                    micIcon.classList.add('animate-pulse');
-                    micBtn.classList.add('bg-red-500/10', 'border', 'border-red-500/20');
+                    if (micIcon && micBtn) {
+                        micIcon.textContent = "fiber_manual_record";
+                        micIcon.style.color = '#f44336';
+                        micIcon.classList.add('animate-pulse');
+                        micBtn.classList.add('bg-red-500/10', 'border', 'border-red-500/20');
+                    }
                     input.placeholder = "جاري الاستماع... تحدّث الآن";
                     window.handleInputTyping(input);
                 };
 
                 recognition.onresult = (event) => {
-                    let finalTranscript = '';
-                    let interimTranscript = '';
-
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        const transcript = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
-                            finalTranscript += transcript;
-                        } else {
-                            interimTranscript += transcript;
-                        }
-                    }
-
-                    // Accumulate all final result texts of this current session
+                    // Accumulate all final and interim result transcripts of the current clean session
                     let sessionText = '';
                     for (let i = 0; i < event.results.length; ++i) {
                         sessionText += event.results[i][0].transcript;
@@ -1818,7 +1791,7 @@
                     if (sessionText && sessionText.trim()) {
                         window.isUpdatingFromSpeech = true;
                         // Append session transcript to the initial text we had in the textarea
-                        input.value = baseText ? (baseText + ' ' + sessionText) : sessionText;
+                        input.value = baseText ? (baseText + ' ' + sessionText.trim()) : sessionText.trim();
                         window.handleInputTyping(input);
                         window.isUpdatingFromSpeech = false;
                     }
@@ -1835,10 +1808,12 @@
                         forceStop = true;
                         UI.toast('⚠️ يرجى السماح للمتصفح بالوصول إلى المايكروفون.');
                         
-                        micIcon.textContent = "mic";
-                        micIcon.style.color = '';
-                        micIcon.classList.remove('animate-pulse');
-                        micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        if (micIcon && micBtn) {
+                            micIcon.textContent = "mic";
+                            micIcon.style.color = '';
+                            micIcon.classList.remove('animate-pulse');
+                            micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        }
                         input.placeholder = "اسأل حضوري...";
                         window.handleInputTyping(input);
                     }
@@ -1846,28 +1821,24 @@
 
                 recognition.onend = () => {
                     // If the speech recognition session closed automatically (due to browser timeout/no-speech limits)
-                    // but the user DID NOT click the button to stop, auto-restart the session silently
+                    // but the user DID NOT click the button to stop, auto-restart a fresh session silently
                     if (!forceStop) {
-                        console.log('Speech recognition session ended automatically. Restarting...');
-                        try {
-                            recognition.start();
-                        } catch (e) {
-                            console.error('Auto-restart failed:', e);
-                            // Fallback retry after a short delay if it's currently busy aborting
-                            setTimeout(() => {
-                                if (!forceStop && !isRecording) {
-                                    try { recognition.start(); } catch(err) {}
-                                }
-                            }, 400);
-                        }
+                        console.log('Speech recognition session ended automatically. Restarting fresh instance...');
+                        setTimeout(() => {
+                            if (!forceStop) {
+                                startRecognition(input);
+                            }
+                        }, 200);
                     } else {
                         // Regular user-requested stop
                         isRecording = false;
                         isStarting = false;
-                        micIcon.textContent = "mic";
-                        micIcon.style.color = '';
-                        micIcon.classList.remove('animate-pulse');
-                        micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        if (micIcon && micBtn) {
+                            micIcon.textContent = "mic";
+                            micIcon.style.color = '';
+                            micIcon.classList.remove('animate-pulse');
+                            micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                        }
                         input.placeholder = "اسأل حضوري...";
                         window.handleInputTyping(input);
                     }
@@ -1880,12 +1851,40 @@
                 UI.toast('⚠️ تعذر تشغيل المايكروفون: ' + err.message);
                 isRecording = false;
                 isStarting = false;
-                micIcon.textContent = "mic";
-                micIcon.style.color = '';
-                micIcon.classList.remove('animate-pulse');
-                micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                if (micIcon && micBtn) {
+                    micIcon.textContent = "mic";
+                    micIcon.style.color = '';
+                    micIcon.classList.remove('animate-pulse');
+                    micBtn.classList.remove('bg-red-500/10', 'border', 'border-red-500/20');
+                }
                 input.placeholder = "اسأل حضوري...";
             }
+        }
+
+        window.triggerVoiceVisual = function () {
+            const input = document.getElementById('agent-input');
+            if (!input) return;
+
+            // Check browser support for SpeechRecognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                UI.toast('⚠️ متصفحك لا يدعم التعرف على الصوت محلياً. يرجى استخدام متصفح Chrome أو Edge.');
+                return;
+            }
+
+            if (isRecording || isStarting) {
+                forceStop = true;
+                if (recognition) {
+                    try { recognition.abort(); } catch(e) {}
+                }
+                isRecording = false;
+                isStarting = false;
+                return;
+            }
+
+            isStarting = true;
+            forceStop = false;
+            startRecognition(input);
         };
 
         // Click outside listeners to close custom dropdowns
