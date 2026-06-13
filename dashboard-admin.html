@@ -3516,11 +3516,7 @@
                 }
 
                 await Agent.init();
-                try {
-                    await FaceDetection.init();
-                } catch (faceErr) {
-                    console.warn("Face engine pre-load failed in admin (offline or slow connection):", faceErr);
-                }
+                await FaceDetection.init();
 
                 await Promise.all([
                     renderDailyInfo(),

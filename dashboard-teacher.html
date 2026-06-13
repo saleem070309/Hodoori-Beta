@@ -703,16 +703,11 @@
         let html5QrcodeScanner = null;
         let currentFacingMode = "environment";
 
-        async function openQrModal() {
-            // إيقاف كاميرا الذكاء الاصطناعي وتحرير الكاميرا أولاً
-            stopAiCamera();
-            const aiModal = document.getElementById('aiModal');
-            aiModal.classList.add('hidden', 'opacity-0');
-
+        function openQrModal() {
             const modal = document.getElementById('qrModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
-            await startQrScanner();
+            startQrScanner();
         }
 
         function closeQrModal() {
@@ -727,8 +722,8 @@
                 html5QrcodeScanner = new Html5Qrcode("qr-reader");
             }
 
-            // Start QR Scanner (Return promise for sync control)
-            return html5QrcodeScanner.start(
+            // Start QR Scanner (Don't await to keep UI responsive)
+            html5QrcodeScanner.start(
                 { facingMode: currentFacingMode },
                 {
                     fps: 15,
@@ -766,24 +761,15 @@
                 setTimeout(() => clearInterval(checkVideo), 5000);
             }).catch(err => {
                 console.error("QR Scanner Start Error: ", err);
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    UI.alert('تعذر الوصول للكاميرا', 'يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح لمسح الرمز.');
-                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                    UI.alert('تعذر الوصول للكاميرا', 'لم يتم العثور على أي كاميرا متصلة بالجهاز.');
-                } else if (err.name === 'NotReadableError') {
-                    UI.alert('تعذر الوصول للكاميرا', 'الكاميرا قيد الاستخدام من قبل تطبيق أو نافذة أخرى حالياً.');
-                } else {
-                    UI.alert('تعذر الوصول للكاميرا', 'حدث خطأ غير متوقع أثناء محاولة فتح الكاميرا: ' + (err.message || err));
-                }
+                UI.alert('تعذر الوصول للكاميرا', 'لا يمكن فتح الكاميرا لمسح الرمز حالياً.');
             });
         }
 
         function stopQrScanner() {
             FaceDetection.stop();
             if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-                return html5QrcodeScanner.stop().catch(console.error);
+                html5QrcodeScanner.stop().catch(console.error);
             }
-            return Promise.resolve();
         }
 
 
@@ -844,18 +830,12 @@
         let aiFacingMode = 'environment';
         let aiMirrored = false;
 
-        async function openAiModal() {
+        function openAiModal() {
             const modal = document.getElementById('aiModal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
             
             renderCarousel();
-            
-            // إيقاف ماسح الـ QR أولاً والانتظار حتى يتحرر بث الكاميرا تماماً
-            await stopQrScanner();
-            const qrModal = document.getElementById('qrModal');
-            qrModal.classList.add('hidden', 'opacity-0');
-
             startAiCamera();
         }
 
@@ -904,42 +884,25 @@
         }
 
         async function startAiCamera() {
-            const statusText = document.getElementById('aiCameraText');
             try {
                 const video = document.getElementById('videoAi');
                 const canvas = document.getElementById('canvasAi');
+                const statusText = document.getElementById('aiCameraText');
 
                 statusText.innerText = 'جاري تحميل الموديلات...';
                 
-                try {
-                    if (!FaceDetection.isModelsLoaded) {
-                        await FaceDetection.init();
-                        await FaceDetection.warmUp();
+                if (!FaceDetection.isModelsLoaded) {
+                    await FaceDetection.init();
+                    await FaceDetection.warmUp();
+                }
+
+                streamAi = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: aiFacingMode
                     }
-                } catch (modelErr) {
-                    console.error("Model Load Error:", modelErr);
-                    throw new Error("model_load_failed");
-                }
-
-                statusText.innerText = 'جاري تشغيل الكاميرا...';
-
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("browser_not_secure_or_supported");
-                }
-
-                try {
-                    streamAi = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            width: { ideal: 640 },
-                            height: { ideal: 480 },
-                            facingMode: aiFacingMode
-                        }
-                    });
-                } catch (constraintErr) {
-                    console.warn("Hodoori: Retry camera with basic constraints due to:", constraintErr);
-                    // محاولة بديلة عند فشل الخصائص المحددة
-                    streamAi = await navigator.mediaDevices.getUserMedia({ video: true });
-                }
+                });
                 
                 video.srcObject = streamAi;
                 await video.play();
@@ -959,21 +922,7 @@
 
             } catch (err) {
                 console.error("Camera Start Error:", err);
-                if (err.message === "model_load_failed") {
-                    UI.toast('فشل تحميل موديلات الذكاء الاصطناعي. يرجى التحقق من اتصال الإنترنت.', 'error');
-                } else if (err.message === "browser_not_secure_or_supported") {
-                    UI.toast('فشل فتح الكاميرا: المتصفح غير مدعوم أو يتطلب رابط آمن (HTTPS).', 'error');
-                } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    UI.toast('فشل فتح الكاميرا: تم رفض إذن الوصول للكاميرا.', 'error');
-                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                    UI.toast('فشل فتح الكاميرا: لم يتم العثور على كاميرا متصلة.', 'error');
-                } else if (err.name === 'NotReadableError') {
-                    UI.toast('فشل فتح الكاميرا: الكاميرا قيد الاستخدام من تطبيق آخر.', 'error');
-                } else {
-                    UI.toast(`فشل فتح الكاميرا: ${err.message || 'خطأ غير معروف'}`, 'error');
-                }
-                statusText.innerText = 'فشل التشغيل';
-                statusText.classList.remove('animate-pulse');
+                UI.toast('فشل فتح الكاميرا', 'error');
                 closeAiModal();
             }
         }
@@ -1520,14 +1469,17 @@
             }
         }
 
-        async function switchQrCamera() {
+        function switchQrCamera() {
             currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
             // Default: mirror for front camera
             qrMirrored = (currentFacingMode === "user");
 
-            await stopQrScanner();
-            await startQrScanner();
-            setTimeout(updateQrMirrorUI, 1000);
+            stopQrScanner();
+            setTimeout(() => {
+                startQrScanner();
+                // We need to wait a bit for the video element to be created by the library
+                setTimeout(updateQrMirrorUI, 1000);
+            }, 300);
         }
 
 
