@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#faf7f2">
@@ -28,6 +28,7 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -624,7 +625,7 @@
         </div>
 
         <!-- Left side (Last child in RTL): Brand Text "حضوري" with the AI logo -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 cursor-pointer animate-fade-in" onclick="switchTab('ai', 2)" title="المساعد الذكي">
             <span class="text-sm font-black tracking-wide" style="font-family: 'Tajawal', sans-serif; color: var(--text-primary);">حضوري</span>
             <img src="assets/AI-logo.png" alt="حضوري" style="width: 24px; height: 24px; object-fit: contain;" />
         </div>
@@ -993,6 +994,21 @@
 
             <!-- New Capsule Input Area -->
             <div class="assistant-bottom-area">
+                <!-- File Preview Card (Hidden by default) -->
+                <div id="agent-file-preview-container" class="w-full max-w-[600px] rounded-[1.5rem] p-3 flex items-center justify-between gap-3 hidden border transition-all">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <img id="agent-file-preview-thumbnail" class="w-10 h-10 rounded-xl object-cover border hidden" />
+                        <span id="agent-file-preview-icon" class="material-symbols-outlined text-2xl text-gray-400 shrink-0">description</span>
+                        <div class="flex flex-col min-w-0 flex-1 text-right">
+                            <span id="agent-file-preview-name" class="text-[10px] font-black text-gray-800 dark:text-white truncate" style="direction: ltr; text-align: right;"></span>
+                            <span id="agent-file-preview-status" class="text-[9px] font-bold text-primary"></span>
+                        </div>
+                    </div>
+                    <button onclick="Agent.clearFileAttachment(event)" class="w-8 h-8 rounded-xl bg-gray-50 dark:bg-neutral-800 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all cursor-pointer">
+                        <span class="material-symbols-outlined text-lg">close</span>
+                    </button>
+                </div>
+
                 <div class="assistant-input-capsule">
                     <!-- Left Side Buttons Container -->
                     <div class="assistant-capsule-left-actions">
@@ -1571,6 +1587,8 @@
             if (theme === 'light') {
                 document.body.classList.add('theme-light-warm');
                 document.body.classList.remove('theme-dark-orange');
+                document.documentElement.classList.remove('dark');
+                document.body.classList.remove('dark');
                 if (panel) {
                     panel.classList.add('theme-light-warm');
                     panel.classList.remove('theme-dark-orange');
@@ -1582,6 +1600,8 @@
             } else {
                 document.body.classList.add('theme-dark-orange');
                 document.body.classList.remove('theme-light-warm');
+                document.documentElement.classList.add('dark');
+                document.body.classList.add('dark');
                 if (panel) {
                     panel.classList.add('theme-dark-orange');
                     panel.classList.remove('theme-light-warm');
@@ -3369,9 +3389,24 @@
 
             if (isUser) {
                 div.className = `flex flex-col items-end mb-4 mx-2 animate-fade-in`;
+                let fileContentHtml = '';
+                if (Agent.currentUploadedFile) {
+                    if (Agent.currentUploadedFile.dataUrl) {
+                        fileContentHtml = `<div class="agent-msg-file-attachment mt-2">
+                            <img src="${Agent.currentUploadedFile.dataUrl}" class="max-w-[200px] max-h-[150px] rounded-xl object-cover border border-white/20 shadow-sm" />
+                            <div class="text-[9px] text-gray-400 mt-1 truncate" style="max-width: 200px;">${Agent.currentUploadedFile.name}</div>
+                        </div>`;
+                    } else {
+                        fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/10 max-w-[200px]">
+                            <span class="material-symbols-outlined text-sm text-gray-400">description</span>
+                            <span class="text-[9px] text-gray-400 truncate">${Agent.currentUploadedFile.name}</span>
+                        </div>`;
+                    }
+                }
                 div.innerHTML = `
                     <div class="agent-msg-user">
                         ${formattedContent}
+                        ${fileContentHtml}
                     </div>`;
             } else {
                 div.className = `agent-msg-ai-row animate-fade-in mx-2`;
@@ -3519,7 +3554,7 @@
             if (this.isStreaming) return;
             const input = document.getElementById('agent-input');
             const text = input ? input.value.trim() : '';
-            if (!text) return;
+            if (!text && !Agent.currentUploadedFile) return;
 
             // Glow hide is handled smoothly via CSS transitions when has-messages class is added in addMessage
 
@@ -4586,6 +4621,10 @@
             </button>
         </div>
         <div class="assistant-drawer-content">
+            <div class="assistant-drawer-item" id="drawer-item-ai" onclick="switchTab('ai', 2); window.toggleAssistantDrawer(event);">
+                <span class="icon material-symbols-outlined">smart_toy</span>
+                <span>المساعد الذكي</span>
+            </div>
             <div class="assistant-drawer-item" id="drawer-item-daily" onclick="switchTab('daily', 0); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined">dashboard</span>
                 <span>الداش بورد</span>
@@ -4605,10 +4644,6 @@
             <div class="assistant-drawer-item" id="drawer-item-reports" onclick="switchTab('reports', 1); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined">description</span>
                 <span>التقارير</span>
-            </div>
-            <div class="assistant-drawer-item" id="drawer-item-ai" onclick="switchTab('ai', 2); window.toggleAssistantDrawer(event);">
-                <span class="icon material-symbols-outlined">smart_toy</span>
-                <span>المساعد الذكي</span>
             </div>
             <div class="assistant-drawer-item" id="drawer-item-schedule" onclick="switchTab('schedule', 6); window.toggleAssistantDrawer(event);">
                 <span class="icon material-symbols-outlined">calendar_month</span>

@@ -69,35 +69,45 @@ const GmailManager = {
                 if (typeof DB !== 'undefined') {
                     const settings = await DB.getSettings();
                     if (settings.gmail_session && settings.gmail_session.access_token) {
-                        savedToken = settings.gmail_session.access_token;
-                        expiry = settings.gmail_session.token_expiry;
-                        
-                        // تحديث التخزين المحلي
-                        localStorage.setItem(this.getStorageKey('access_token'), savedToken);
-                        localStorage.setItem(this.getStorageKey('token_expiry'), expiry);
-                        console.log('Gmail session restored from Firebase');
+                        const dbExpiry = settings.gmail_session.token_expiry;
+                        if (dbExpiry && Date.now() < parseInt(dbExpiry)) {
+                            savedToken = settings.gmail_session.access_token;
+                            expiry = dbExpiry;
+                            
+                            // تحديث التخزين المحلي
+                            localStorage.setItem(this.getStorageKey('access_token'), savedToken);
+                            localStorage.setItem(this.getStorageKey('token_expiry'), expiry);
+                            console.log('Gmail session restored from Firebase');
+                        }
                     }
                 }
             } catch (dbErr) {
                 console.error('Failed to restore Gmail session from Firebase:', dbErr);
             }
         }
-
-        // ملاحظة: نلغي شرط انتهاء الوقت (expiry check) لنجعل الجلسة دائمة بناء على طلب المستخدم
-        if (savedToken) {
+ 
+        if (savedToken && expiry && Date.now() < parseInt(expiry)) {
             this.accessToken = savedToken;
             console.log('Gmail session restored');
         } else {
             this.accessToken = null;
+            localStorage.removeItem(this.getStorageKey('access_token'));
+            localStorage.removeItem(this.getStorageKey('token_expiry'));
         }
     },
-
+ 
     isConnected() {
         const savedToken = localStorage.getItem(this.getStorageKey('access_token'));
+        const expiry = localStorage.getItem(this.getStorageKey('token_expiry'));
+        
+        if (!savedToken || !expiry || Date.now() >= parseInt(expiry)) {
+            this.accessToken = null;
+            return false;
+        }
+        
         if (savedToken !== this.accessToken) {
             this.accessToken = savedToken;
         }
-        // جعل الاتصال يعتبر متصلاً دائماً طالما يتوفر توكن محفوظ
         return !!this.accessToken;
     },
 

@@ -813,7 +813,60 @@ body {
   padding: 16px 20px 24px;
   z-index: 20;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+#agent-file-preview-container {
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  border-radius: 20px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+#agent-file-preview-container:not(.hidden) {
+  display: flex;
+}
+
+.theme-light-warm #agent-file-preview-container {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.theme-light-warm #agent-file-preview-container button {
+  background: #f9f9f9;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #888888;
+}
+
+.theme-light-warm #agent-file-preview-container button:hover {
+  color: #f44336;
+  background: #fee2e2;
+}
+
+.theme-dark-orange #agent-file-preview-container {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark-orange #agent-file-preview-container button {
+  background: #222222;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #aaaaaa;
+}
+
+.theme-dark-orange #agent-file-preview-container button:hover {
+  color: #f44336;
+  background: #450a0a;
 }
 
 .assistant-input-capsule {
@@ -1034,6 +1087,8 @@ body {
   align-self: flex-end;
   font-family: 'Tajawal', sans-serif;
   transition: transform 0.3s ease;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
 }
 
 .theme-dark-orange .agent-msg-user {
@@ -2825,4 +2880,23 @@ body {
 .assistant-drawer-content {
   -webkit-overflow-scrolling: touch !important; /* Smooth elastic iOS scrolling */
   scroll-behavior: smooth !important;
+}
+
+/* Premium App-like Feel Style Rules */
+body, button, a, img, .nav-btn, .assistant-drawer-item, .liquid-glass, .customizer-card, .day-chip, .suggestion-btn {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+input, textarea, .agent-msg-user, .agent-msg-ai, .agent-msg-ai-body {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+button:focus, a:focus, input:focus, textarea:focus, select:focus, div:focus {
+  outline: none !important;
 }

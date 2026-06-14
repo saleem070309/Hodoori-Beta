@@ -8,6 +8,7 @@ const Agent = {
     chatHistory: [],
     isOpen: false,
     isStreaming: false,
+    currentMatchedStudent: null,
 
     async init() {
         if (typeof GmailManager !== 'undefined') {
@@ -226,7 +227,18 @@ const Agent = {
 - توجيهات هامة: ${isGmailConnected ? 'يمكنك الآن إرسال رسائل البريد الإلكتروني مباشرة وحرية باستخدام الأمر send_email.' : 'إذا طلب منك المستخدم إرسال إيميل أو تقرير بالبريد الإلكتروني، فيجب عليك إخباره بوضوح ولطف شديد بأنه لم يقم بربط إيميله الشخصي بعد، وتوجيهه خطوة بخطوة بالخطوات التالية تماماً: "لم تقم بربط بريدك الإلكتروني بعد. يرجى الضغط على زر التخصيص الموجود أعلى الشاشة، ثم اختيار قسم التطبيقات (التطبيقات)، والضغط على كرت Gmail، ثم الضغط على زر (ربط الحساب) وعمل تسجيل دخول بالبريد الذي تريده لتفعيل الإرسال الآمن والمجاني."'}`;
 
             if (this.currentUploadedFile && this.currentFingerprint) {
-                finalPrompt += `\n\n### تم كشف صورة مرفوعة تحتوي على بصمة رقمية (وجه) للمستخدم الحالي:
+                if (this.currentMatchedStudent) {
+                    finalPrompt += `\n\n### نتيجة مطابقة البصمة الرقمية للوجه (Face Matching Match):
+- تم مطابقة الوجه في الصورة المرفوعة مع الطالب التالي المسجل في قاعدة البيانات:
+  * الاسم: ${this.currentMatchedStudent.name}
+  * معرف الطالب (ID): ${this.currentMatchedStudent.id}
+  * الرقم الأكاديمي (academicId): ${this.currentMatchedStudent.academicId}
+  * معرف الصف (classId): ${this.currentMatchedStudent.classId}
+  * مسافة التطابق (Confidence Distance): ${this.currentMatchedStudent.distance.toFixed(4)} (كلما كانت أقل من 0.6 كلما كان التطابق دقيقاً)
+- توجيه: أخبر المستخدم بوضوح أنك تعرفت على الطالب "${this.currentMatchedStudent.name}" في الصورة المرفوعة بناءً على البصمة الرقمية للوجه المكتشفة ومقارنتها بقاعدة البيانات.
+`;
+                } else {
+                    finalPrompt += `\n\n### تم كشف صورة مرفوعة تحتوي على بصمة رقمية (وجه) للمستخدم الحالي:
 - البصمة الرقمية الحالية المستخرجة من الصورة "${this.currentUploadedFile.name}" هي: "${JSON.stringify(this.currentFingerprint)}"
 - حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([this.currentFingerprint])}
 - إذا طلب المستخدم تعديل/ربط الصورة بطالب موجود (مثلاً: "Saleem Al-Zoubi" أو أي طالب تحدده بالاسم أو الـ ID)، فاستخدم الأمر database_action مع action: "update" لتحديث حقل "descriptors" لهذا الطالب، مثلاً:
@@ -235,6 +247,7 @@ const Agent = {
   |||COMMAND|||{"type":"database_action","action":"insert","table":"students","data":{"name":"اسم الطالب الجديد","academicId":"Academic_ID_OR_Generate_Unique_Number","classId":"Class_ID","descriptors": ${JSON.stringify([this.currentFingerprint])}}}
 - وبمجرد أن تنفذ الأمر بنجاح، أخبر المستخدم بوضوح أنه تم تحويل الصورة لبصمة رقمية وحفظها بنجاح للطالب.
 `;
+                }
             }
 
             return finalPrompt;
@@ -422,34 +435,37 @@ const Agent = {
     async sendMessage() {
         if (this.isStreaming) return;
         const input = document.getElementById('agent-input');
-        const text = input.value.trim();
-        if (!text) return;
-
+        const text = input ? input.value.trim() : '';
+        if (!text && !this.currentUploadedFile) return;
+ 
         // Force stop and turn off speech recognition upon sending
         if (typeof window.stopSpeechRecognition === 'function') {
             window.stopSpeechRecognition();
         }
-
-        input.value = '';
-        if (typeof window.handleInputTyping === 'function') {
-            window.handleInputTyping(input);
-        } else {
-            input.style.height = 'auto';
+ 
+        if (input) {
+            input.value = '';
+            if (typeof window.handleInputTyping === 'function') {
+                window.handleInputTyping(input);
+            } else {
+                input.style.height = 'auto';
+            }
         }
         this.addMessage(text, 'user');
-
+ 
         // Hide suggestions after first message
         const suggestionsEl = document.getElementById('agent-suggestions');
         if (suggestionsEl) suggestionsEl.style.display = 'none';
-
+ 
         // Loading indicator
         const loadingDiv = this.addLoadingIndicator();
         this.isStreaming = true;
         this.setStatus('يفكر...', true);
         const sendBtn = document.getElementById('agent-send-btn');
         if (sendBtn) sendBtn.disabled = true;
-
+ 
         let liveContext = '';
+        const attempts = [];
         try {
             // Refresh context with latest data
             liveContext = await this.getSystemContext();
@@ -458,17 +474,20 @@ const Agent = {
             } else {
                 this.chatHistory.unshift({ role: 'system', content: liveContext });
             }
-
+ 
+            // Clear file preview details after getSystemContext has processed them
+            this.clearFilePreviewUI();
+ 
             // --- المحاولة الأولى (الوكيل الخفي) ---
             console.log('[AutoPilot] Launching hidden agent (Attempt 1)...');
             const hiddenResponse = await this._callHiddenAgent(liveContext, text, this.chatHistory);
             
             // إزالة مؤشر التحميل لعدم تكرار الواجهة
             loadingDiv.remove();
-
+ 
             const DELIMITER = '|||COMMAND|||';
             const hasCommand = hiddenResponse.includes(DELIMITER);
-
+ 
             if (!hasCommand) {
                 // محادثة طبيعية عادية، لا داعي للتحقق أو الفشل
                 this.chatHistory.push({ role: 'user', content: text });
@@ -476,12 +495,12 @@ const Agent = {
                 this.addMessage(hiddenResponse, 'ai');
                 return;
             }
-
+ 
             // تحليل واستخراج الأوامر
             const parts = hiddenResponse.split(DELIMITER);
             const mainText = parts[0].trim();
             const cmdStr = parts[1]?.trim();
-
+ 
             let parsedCmd = null;
             try {
                 const cleanedJson = this._sanitizeJSON(cmdStr);
@@ -493,20 +512,27 @@ const Agent = {
                     try { parsedCmd = JSON.parse(fallbackJson); } catch (e) {}
                 }
             }
-
+ 
             if (!parsedCmd) {
-                throw new Error('فشل فك تشفير الأمر البرمجي JSON في المحاولة الأولى');
+                const parseErrText = 'فشل فك تشفير الأمر البرمجي JSON في المحاولة الأولى';
+                attempts.push({
+                    title: 'المحاولة الأولى: فك تشفير الأمر البرمجي JSON',
+                    success: false,
+                    error: parseErrText,
+                    action: `رد الوكيل: ${cmdStr || 'فارغ'}`
+                });
+                throw new Error(parseErrText);
             }
-
+ 
             // إظهار النص التمهيدي للتأكيد فوراً (مع دائرة الأفاتار)
             if (mainText) {
                 this.addMessage(mainText, 'ai');
             }
-
+ 
             // تنفيذ مع التحقق
             console.log('[AutoPilot] Executing and verifying command:', parsedCmd);
             const result = await this._executeCommandWithVerification(parsedCmd);
-
+ 
             if (result.success) {
                 // نجحت العملية تماماً!
                 this.chatHistory.push({ role: 'user', content: text });
@@ -516,13 +542,20 @@ const Agent = {
                 this.addMessagePlain(successText);
                 return;
             }
-
+ 
+            attempts.push({
+                title: 'المحاولة الأولى: تنفيذ وقبول التعديل بقاعدة البيانات',
+                success: false,
+                error: result.executionError || (result.verification ? result.verification.reason : 'فشل التحقق من قاعدة البيانات بعد الاستدعاء الأول'),
+                action: `الأمر الموجه: ${JSON.stringify(parsedCmd)}`
+            });
+ 
             // --- المحاولة الثانية (التصحيح الذاتي بنموذج أقوى وذاكرة نظيفة كلياً) ---
             console.warn('[AutoPilot] First attempt failed. Triggering Self-Correction with premium model...');
             
-            const correctionNotice = this.addMessage('⚠️ تم اكتشاف عدم استقرار أو خطأ في المحاولة الأولى. جاري تفعيل نموذج التصحيح الذاتي الأقوى (Gemini Pro) بذاكرة نظيفة كلياً لتجاوز الهلوسة وإتمام المهمة...', 'ai');
+            const correctionNotice = this.addMessage('⚠️ جاري تصحيح وتعديل المعالجة ذاتياً لاستقرار قاعدة البيانات...', 'ai');
             const correctionLoading = this.addLoadingIndicator();
-
+ 
             // تجهيز سياق التصحيح الذاتي المخفي
             const correctionPrompt = `
 لقد طلب المستخدم القيام بالعملية التالية: "${text}"
@@ -530,13 +563,13 @@ const Agent = {
 الأمر البرمجي الذي تم تجسيده: ${JSON.stringify(parsedCmd)}
 الأخطاء الملتقطة في الكونسول: ${JSON.stringify(result.capturedErrors)}
 حالة تحقق قاعدة البيانات: ${result.verification ? result.verification.reason : 'غير معروف'}
-
+ 
 المطلوب منك:
 1. تحليل سبب الفشل بدقة بالغة.
 2. تفادي الخطأ السابق بالكامل وصياغة أمر قاعدة البيانات الصحيح والبديل فوراً.
 3. التزم بإخراج الأمر البرمجي بصيغة |||COMMAND||| يليه مباشرة كود JSON صالح تماماً وخالٍ من الهلوسة البرمجية. لا تشرح خطواتك البرمجية، اكتب الكود فوراً ليتم تنفيذه برمجياً.
 `;
-
+ 
             try {
                 const fallbackResponse = await this._callHiddenAgent(
                     liveContext, 
@@ -545,14 +578,14 @@ const Agent = {
                     'xiaomi/mimo-v2.5-pro',
                     true // تفعيل ذاكرة نظيفة
                 );
-
+ 
                 correctionNotice.remove();
                 correctionLoading.remove();
-
+ 
                 const fallbackParts = fallbackResponse.split(DELIMITER);
                 const fallbackMainText = fallbackParts[0].trim();
                 const fallbackCmdStr = fallbackParts[1]?.trim();
-
+ 
                 let parsedFallbackCmd = null;
                 try {
                     const cleanedFallbackJson = this._sanitizeJSON(fallbackCmdStr);
@@ -563,15 +596,22 @@ const Agent = {
                         try { parsedFallbackCmd = JSON.parse(fallbackJson); } catch (e) {}
                     }
                 }
-
+ 
                 if (!parsedFallbackCmd) {
-                    throw new Error('فشل فك تشفير أمر التصحيح البرمجي JSON في المحاولة الثانية');
+                    const parseErrText = 'فشل فك تشفير أمر التصحيح البرمجي JSON في المحاولة الثانية';
+                    attempts.push({
+                        title: 'التشخيص والتصحيح الذاتي: فك تشفير JSON البديل',
+                        success: false,
+                        error: parseErrText,
+                        action: `رد التصحيح الذاتي: ${fallbackCmdStr || 'فارغ'}`
+                    });
+                    throw new Error(parseErrText);
                 }
-
+ 
                 // تنفيذ مع التحقق من جديد
                 console.log('[AutoPilot] Executing and verifying fallback command:', parsedFallbackCmd);
                 const fallbackResult = await this._executeCommandWithVerification(parsedFallbackCmd);
-
+ 
                 if (fallbackResult.success) {
                     // نجح التصحيح التلقائي!
                     this.chatHistory.push({ role: 'user', content: text });
@@ -580,29 +620,53 @@ const Agent = {
                     if (fallbackMainText) {
                         this.addMessagePlain(fallbackMainText);
                     }
-                    const successText = `🎉 تم تصحيح المشكلة بنجاح تام وإتمام العملية بواسطة نموذج التصحيح الذاتي الأقوى!`;
+                    const successText = `🎉 تم تصحيح المشكلة بنجاح تام وإتمام العملية!`;
                     this.addMessagePlain(successText);
+ 
+                    attempts.push({
+                        title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
+                        success: true,
+                        action: `تم تعديل وتثبيت قاعدة البيانات بنجاح: ${JSON.stringify(parsedFallbackCmd)}`
+                    });
+ 
+                    this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
                     return;
                 }
-
+ 
+                attempts.push({
+                    title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
+                    success: false,
+                    error: fallbackResult.executionError || (fallbackResult.verification ? fallbackResult.verification.reason : 'فشل التحقق بعد التصحيح الذاتي'),
+                    action: `فشل استقرار قاعدة البيانات: ${JSON.stringify(parsedFallbackCmd)}`
+                });
+ 
                 // إذا فشل التصحيح أيضاً
                 throw new Error(`فشل التصحيح الذاتي أيضاً. الخطأ: ${fallbackResult.executionError || (fallbackResult.verification ? fallbackResult.verification.reason : 'غير معروف')}`);
-
+ 
             } catch (fallbackErr) {
                 if (typeof correctionNotice !== 'undefined' && correctionNotice.parentNode) correctionNotice.remove();
                 if (typeof correctionLoading !== 'undefined' && correctionLoading.parentNode) correctionLoading.remove();
                 throw fallbackErr;
             }
-
+ 
         } catch (e) {
             // --- الفشل التام والتسجيل الصامت في قوقل شيت ---
             console.error('[AutoPilot] Ultimate failure in agentic flow:', e);
             
             // إزالة الرسائل التمهيدية المتبقية إن وجدت
             if (typeof loadingDiv !== 'undefined' && loadingDiv.parentNode) loadingDiv.remove();
-
+ 
             this.addMessage(`❌ أعتذر منك بشدة، واجهت المهمة خطأ مستعصياً بعد عدة محاولات ولم تكتمل العملية بنجاح. تم تدوين تقرير التشخيص للإدارة فوراً لتصحيح المشكلة.`, 'ai');
-
+ 
+            if (attempts.length === 0) {
+                attempts.push({
+                    title: 'فشل العملية العام',
+                    success: false,
+                    error: e.message
+                });
+            }
+            this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
+ 
             // تجميع معلومات التشخيص بالكامل بشكل صامت
             const diagnosticData = {
                 userPrompt: text,
@@ -613,7 +677,7 @@ const Agent = {
                 uploadedFile: this.lastUploadedFile || null,
                 systemContext: liveContext
             };
-
+ 
             // تشغيل الإرسال الصامت
             this._silentLogToGoogleSheets(diagnosticData);
         } finally {
@@ -657,10 +721,26 @@ const Agent = {
             ? 'agent-msg-user'
             : 'agent-msg-ai agent-markdown';
 
+        let fileContentHtml = '';
+        if (isUser && Agent.currentUploadedFile) {
+            if (Agent.currentUploadedFile.dataUrl) {
+                fileContentHtml = `<div class="agent-msg-file-attachment mt-2">
+                    <img src="${Agent.currentUploadedFile.dataUrl}" class="max-w-[200px] max-h-[150px] rounded-xl object-cover border border-white/20 shadow-sm" />
+                    <div class="text-[9px] text-gray-400 mt-1 truncate" style="max-width: 200px;">${Agent.currentUploadedFile.name}</div>
+                </div>`;
+            } else {
+                fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/10 max-w-[200px]">
+                    <span class="material-symbols-outlined text-sm text-gray-400">description</span>
+                    <span class="text-[9px] text-gray-400 truncate">${Agent.currentUploadedFile.name}</span>
+                </div>`;
+            }
+        }
+
         div.innerHTML = `
             <span class="text-[9px] font-black ${isUser ? 'text-gray-400' : 'text-primary'} mb-1 px-1 uppercase tracking-tight">${labelText}</span>
             <div class="${bubbleClass} p-3.5 rounded-2xl ${isUser ? 'rounded-tl-sm' : 'rounded-tr-sm'} text-xs font-bold leading-relaxed max-w-[92%] relative">
                 ${formattedContent}
+                ${fileContentHtml}
             </div>`;
 
         messages.appendChild(div);
@@ -1023,6 +1103,27 @@ const Agent = {
             return;
         }
 
+        // توحيد ومعالجة البصمات الرقمية (descriptors) لتفادي خطأ المصفوفات المتداخلة في Firebase
+        if (cmd.table === 'students') {
+            const normalizeStudentData = (data) => {
+                if (data) {
+                    if (data.descriptors && Array.isArray(data.descriptors)) {
+                        data.descriptors = JSON.stringify(data.descriptors);
+                    }
+                    if (data.descriptor && Array.isArray(data.descriptor)) {
+                        data.descriptor = JSON.stringify(data.descriptor);
+                    }
+                }
+            };
+            if (cmd.data) {
+                if (Array.isArray(cmd.data)) {
+                    cmd.data.forEach(normalizeStudentData);
+                } else {
+                    normalizeStudentData(cmd.data);
+                }
+            }
+        }
+
         try {
             let result;
 
@@ -1064,7 +1165,11 @@ const Agent = {
             }
 
             if (typeof window.renderAll === 'function') {
+                const activeTab = localStorage.getItem('admin_active_tab') || 'ai';
                 await window.renderAll();
+                if (typeof window.switchTab === 'function') {
+                    window.switchTab(activeTab);
+                }
             }
         } catch (e) {
             status.textContent = 'فشل ✗';
@@ -1424,11 +1529,42 @@ const Agent = {
         }
     },
 
+    clearFilePreviewUI() {
+        this.currentUploadedFile = null;
+        this.currentFingerprint = null;
+        this.currentMatchedStudent = null;
+        const previewContainer = document.getElementById('agent-file-preview-container');
+        if (previewContainer) {
+            previewContainer.classList.add('hidden');
+        }
+        const fileInput = document.getElementById('agent-file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        const thumbnail = document.getElementById('agent-file-preview-thumbnail');
+        if (thumbnail) {
+            thumbnail.src = '';
+            thumbnail.classList.add('hidden');
+        }
+        const previewIcon = document.getElementById('agent-file-preview-icon');
+        if (previewIcon) {
+            previewIcon.classList.remove('hidden');
+        }
+    },
+
+    clearFileAttachment(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        this.clearFilePreviewUI();
+    },
+
     handleFileUpload(input) {
         const file = input.files[0];
         if (!file) return;
 
-        // تسجيل الملف المرفوع في الجلسة الصامتة لمراقبة الأخطاء
+        // Save metadata for diagnostic logging
         Agent.lastUploadedFile = {
             name: file.name,
             size: file.size,
@@ -1436,7 +1572,24 @@ const Agent = {
             timestamp: new Date().toISOString()
         };
 
-        Agent.addMessage(`تم رفع ملف: ${file.name}`, 'user');
+        // Show preview container
+        const previewContainer = document.getElementById('agent-file-preview-container');
+        const thumbnail = document.getElementById('agent-file-preview-thumbnail');
+        const previewIcon = document.getElementById('agent-file-preview-icon');
+        const nameEl = document.getElementById('agent-file-preview-name');
+        const statusEl = document.getElementById('agent-file-preview-status');
+
+        if (previewContainer) {
+            previewContainer.classList.remove('hidden');
+        }
+        if (nameEl) {
+            nameEl.textContent = file.name;
+        }
+        if (statusEl) {
+            statusEl.textContent = 'جاري المعالجة...';
+            statusEl.style.color = '';
+        }
+
         Agent.setStatus('جاري معالجة الملف...', true);
 
         if (file.type && file.type.startsWith('image/')) {
@@ -1444,12 +1597,26 @@ const Agent = {
             reader.onload = async (e) => {
                 const dataUrl = e.target.result;
                 
+                // Show thumbnail
+                if (thumbnail) {
+                    thumbnail.src = dataUrl;
+                    thumbnail.classList.remove('hidden');
+                }
+                if (previewIcon) {
+                    previewIcon.classList.add('hidden');
+                }
+
                 // Save it to Agent.currentUploadedFile
                 Agent.currentUploadedFile = {
                     name: file.name,
                     type: file.type,
                     dataUrl: dataUrl
                 };
+
+                if (statusEl) {
+                    statusEl.textContent = 'جاري استخراج البصمة الرقمية...';
+                    statusEl.style.color = '#ffa726';
+                }
 
                 // Compute the digital fingerprint
                 try {
@@ -1460,35 +1627,174 @@ const Agent = {
                         if (descriptor) {
                             Agent.currentFingerprint = descriptor;
                             console.log("Hodoori Agent: Extracted digital fingerprint successfully:", descriptor);
-                            Agent.addMessagePlain(`✓ تم استخراج البصمة الرقمية من الصورة بنجاح وتجهيزها للاستخدام! يمكنك الآن أن تطلب مني ربطها بطالب أو إضافة طالب جديد بها.`);
+                            
+                            if (statusEl) {
+                                statusEl.textContent = 'جاري البحث في قاعدة البيانات...';
+                                statusEl.style.color = '#ffa726';
+                            }
+                            
+                            const matchResult = await Agent.searchStudentByFingerprint(descriptor);
+                            if (matchResult && matchResult.success && matchResult.match) {
+                                Agent.currentMatchedStudent = matchResult.match;
+                                console.log("Hodoori Agent: Matched student:", matchResult.match);
+                                if (statusEl) {
+                                    statusEl.textContent = `طالب مطابق: ${matchResult.match.name} ✓`;
+                                    statusEl.style.color = '#4caf50';
+                                }
+                            } else {
+                                Agent.currentMatchedStudent = null;
+                                if (statusEl) {
+                                    statusEl.textContent = 'بصمة رقمية صالحة (غير مسجل) ✓';
+                                    statusEl.style.color = '#4caf50';
+                                }
+                            }
                         } else {
                             Agent.currentFingerprint = null;
-                            Agent.addMessagePlain(`⚠️ لم أتمكن من العثور على وجه واضح في الصورة المرفوعة لاستخراج البصمة الرقمية. يرجى التأكد من أن الصورة تحتوي على وجه واضح ومضاء بشكل جيد.`);
+                            Agent.currentMatchedStudent = null;
+                            if (statusEl) {
+                                statusEl.textContent = '⚠️ لم يتم العثور على وجه';
+                                statusEl.style.color = '#f44336';
+                            }
                         }
                         Agent.setStatus('جاهز للمساعدة', false);
                     };
                 } catch (err) {
                     console.error("Error extracting descriptor from uploaded file:", err);
                     Agent.currentFingerprint = null;
-                    Agent.addMessagePlain(`❌ فشل معالجة الصورة المرفوعة لاستخراج البصمة الرقمية: ${err.message}`);
+                    Agent.currentMatchedStudent = null;
+                    if (statusEl) {
+                        statusEl.textContent = '❌ فشل المعالجة';
+                        statusEl.style.color = '#f44336';
+                    }
                     Agent.setStatus('جاهز للمساعدة', false);
                 }
             };
             reader.readAsDataURL(file);
         } else {
+            if (thumbnail) {
+                thumbnail.classList.add('hidden');
+            }
+            if (previewIcon) {
+                previewIcon.classList.remove('hidden');
+            }
             Agent.currentUploadedFile = {
                 name: file.name,
                 type: file.type
             };
             Agent.currentFingerprint = null;
-            // Placeholder for real processing
-            setTimeout(() => {
-                Agent.addMessage(`لقد استلمت الملف **${file.name}**. كيف تود أن أساعدك به؟ (مثلاً: استيراد البيانات، تحليل الأسماء، إلخ)`, 'ai');
-                Agent.setStatus('جاهز للمساعدة', false);
-            }, 1500);
+            Agent.currentMatchedStudent = null;
+            
+            if (statusEl) {
+                statusEl.textContent = 'ملف جاهز';
+                statusEl.style.color = '#4caf50';
+            }
+            Agent.setStatus('جاهز للمساعدة', false);
+        }
+    },
+
+    async searchStudentByFingerprint(descriptor) {
+        if (!descriptor || !Array.isArray(descriptor)) {
+            return { success: false, error: 'البصمة الرقمية غير صالحة' };
         }
 
-        input.value = ''; // Reset input
+        try {
+            const students = await DB.getStudents();
+            let bestMatch = null;
+            let minDistance = Infinity;
+            const threshold = 0.6; // standard distance threshold
+
+            for (const s of students) {
+                let descriptors = [];
+                if (s.descriptors) {
+                    try {
+                        descriptors = typeof s.descriptors === 'string' ? JSON.parse(s.descriptors) : s.descriptors;
+                    } catch(e) {}
+                } else if (s.descriptor) {
+                    try {
+                        const single = typeof s.descriptor === 'string' ? JSON.parse(s.descriptor) : s.descriptor;
+                        if (single) descriptors = [single];
+                    } catch(e) {}
+                }
+
+                if (!Array.isArray(descriptors)) continue;
+
+                for (const desc of descriptors) {
+                    if (!desc || desc.length !== descriptor.length) continue;
+                    let sum = 0;
+                    for (let i = 0; i < descriptor.length; i++) {
+                        const diff = descriptor[i] - desc[i];
+                        sum += diff * diff;
+                    }
+                    const distance = Math.sqrt(sum);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = s;
+                    }
+                }
+            }
+
+            if (minDistance < threshold && bestMatch) {
+                return {
+                    success: true,
+                    match: {
+                        id: bestMatch.id,
+                        name: bestMatch.name,
+                        academicId: bestMatch.academicId,
+                        classId: bestMatch.classId,
+                        distance: minDistance
+                    }
+                };
+            }
+            return { success: true, match: null, reason: 'لم يتم العثور على طالب مطابق لهذه البصمة في قاعدة البيانات.' };
+        } catch(e) {
+            console.error('Error searching fingerprint:', e);
+            return { success: false, error: e.message };
+        }
+    },
+
+    _renderDiagnosticsCard(messages, data) {
+        const id = `diag-${Date.now()}`;
+        const div = document.createElement('div');
+        div.className = 'animate-fade-in mb-3 mx-2';
+        
+        let stepsHtml = '';
+        if (data.attempts && data.attempts.length > 0) {
+            stepsHtml = data.attempts.map((attempt, index) => {
+                const isSuccess = attempt.success;
+                const statusIcon = isSuccess ? 'check_circle' : 'cancel';
+                const statusColor = isSuccess ? 'text-green-500' : 'text-red-500';
+                
+                return `
+                    <div class="relative pl-6 pb-4 border-l border-dashed ${index === data.attempts.length - 1 ? 'border-transparent' : 'border-white/10'} last:pb-0">
+                        <div class="absolute -left-[8px] top-0.5 w-4 h-4 rounded-full bg-gray-900 flex items-center justify-center border border-white/5">
+                            <span class="material-symbols-outlined text-[12px] ${statusColor}">${statusIcon}</span>
+                        </div>
+                        <div class="text-[11px] font-black text-white/90 leading-tight">${attempt.title}</div>
+                        ${attempt.error ? `<div class="text-[10px] text-red-300/80 font-mono mt-1 p-2 bg-red-950/20 border border-red-950/40 rounded-xl overflow-x-auto select-text">${attempt.error}</div>` : ''}
+                        ${attempt.action ? `<div class="text-[10px] text-gray-400 font-bold mt-1 leading-normal break-all">${attempt.action}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        div.innerHTML = `
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-lg">
+                <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all select-none" onclick="document.getElementById('${id}').classList.toggle('hidden')">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm text-amber-500" style="font-variation-settings:'FILL' 1">construction</span>
+                        <span class="text-[11px] font-black text-amber-500">مخطط سير عملية التشخيص والصيانة الذاتية</span>
+                    </div>
+                    <span class="material-symbols-outlined text-white/40 text-xs">expand_more</span>
+                </div>
+                <div id="${id}" class="hidden p-4 border-t border-white/10 bg-black/10">
+                    <div class="space-y-4 relative pr-2">
+                        ${stepsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
     },
 
     _injectStyles() {
