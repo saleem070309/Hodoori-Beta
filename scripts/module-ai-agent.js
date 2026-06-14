@@ -225,6 +225,18 @@ const Agent = {
 - حالة الربط الحالية: [${isGmailConnected ? 'متصل ومربوط بنجاح' : 'غير متصل وغير مربوط'}].
 - توجيهات هامة: ${isGmailConnected ? 'يمكنك الآن إرسال رسائل البريد الإلكتروني مباشرة وحرية باستخدام الأمر send_email.' : 'إذا طلب منك المستخدم إرسال إيميل أو تقرير بالبريد الإلكتروني، فيجب عليك إخباره بوضوح ولطف شديد بأنه لم يقم بربط إيميله الشخصي بعد، وتوجيهه خطوة بخطوة بالخطوات التالية تماماً: "لم تقم بربط بريدك الإلكتروني بعد. يرجى الضغط على زر التخصيص الموجود أعلى الشاشة، ثم اختيار قسم التطبيقات (التطبيقات)، والضغط على كرت Gmail، ثم الضغط على زر (ربط الحساب) وعمل تسجيل دخول بالبريد الذي تريده لتفعيل الإرسال الآمن والمجاني."'}`;
 
+            if (this.currentUploadedFile && this.currentFingerprint) {
+                finalPrompt += `\n\n### تم كشف صورة مرفوعة تحتوي على بصمة رقمية (وجه) للمستخدم الحالي:
+- البصمة الرقمية الحالية المستخرجة من الصورة "${this.currentUploadedFile.name}" هي: "${JSON.stringify(this.currentFingerprint)}"
+- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([this.currentFingerprint])}
+- إذا طلب المستخدم تعديل/ربط الصورة بطالب موجود (مثلاً: "Saleem Al-Zoubi" أو أي طالب تحدده بالاسم أو الـ ID)، فاستخدم الأمر database_action مع action: "update" لتحديث حقل "descriptors" لهذا الطالب، مثلاً:
+  |||COMMAND|||{"type":"database_action","action":"update","table":"students","id":"STUDENT_ID","data":{"descriptors": ${JSON.stringify([this.currentFingerprint])}}}
+- إذا طلب المستخدم إضافة طالب جديد (مثلاً: أضف طالب جديد اسمه فلان الفلان وهذه صورته)، فاستخدم الأمر database_action مع action: "insert" لتخزين الطالب الجديد مع وضع البصمة الرقمية في حقل "descriptors" كـ JSON stringified array، مثلاً:
+  |||COMMAND|||{"type":"database_action","action":"insert","table":"students","data":{"name":"اسم الطالب الجديد","academicId":"Academic_ID_OR_Generate_Unique_Number","classId":"Class_ID","descriptors": ${JSON.stringify([this.currentFingerprint])}}}
+- وبمجرد أن تنفذ الأمر بنجاح، أخبر المستخدم بوضوح أنه تم تحويل الصورة لبصمة رقمية وحفظها بنجاح للطالب.
+`;
+            }
+
             return finalPrompt;
         } catch (e) {
             console.error('Context error:', e);
@@ -1046,6 +1058,11 @@ const Agent = {
 
 
 
+            if (cmd.table === 'students' && (cmd.action === 'insert' || cmd.action === 'update')) {
+                Agent.currentUploadedFile = null;
+                Agent.currentFingerprint = null;
+            }
+
             if (typeof window.renderAll === 'function') {
                 await window.renderAll();
             }
@@ -1412,21 +1429,64 @@ const Agent = {
         if (!file) return;
 
         // تسجيل الملف المرفوع في الجلسة الصامتة لمراقبة الأخطاء
-        this.lastUploadedFile = {
+        Agent.lastUploadedFile = {
             name: file.name,
             size: file.size,
             type: file.type,
             timestamp: new Date().toISOString()
         };
 
-        this.addMessage(`تم رفع ملف: ${file.name}`, 'user');
-        this.setStatus('جاري معالجة الملف...', true);
+        Agent.addMessage(`تم رفع ملف: ${file.name}`, 'user');
+        Agent.setStatus('جاري معالجة الملف...', true);
 
-        // Placeholder for real processing
-        setTimeout(() => {
-            this.addMessage(`لقد استلمت الملف **${file.name}**. كيف تود أن أساعدك به؟ (مثلاً: استيراد البيانات، تحليل الأسماء، إلخ)`, 'ai');
-            this.setStatus('جاهز للمساعدة', false);
-        }, 1500);
+        if (file.type && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const dataUrl = e.target.result;
+                
+                // Save it to Agent.currentUploadedFile
+                Agent.currentUploadedFile = {
+                    name: file.name,
+                    type: file.type,
+                    dataUrl: dataUrl
+                };
+
+                // Compute the digital fingerprint
+                try {
+                    const img = new Image();
+                    img.src = dataUrl;
+                    img.onload = async () => {
+                        const descriptor = await FaceDetection.getDescriptorFromImage(img);
+                        if (descriptor) {
+                            Agent.currentFingerprint = descriptor;
+                            console.log("Hodoori Agent: Extracted digital fingerprint successfully:", descriptor);
+                            Agent.addMessagePlain(`✓ تم استخراج البصمة الرقمية من الصورة بنجاح وتجهيزها للاستخدام! يمكنك الآن أن تطلب مني ربطها بطالب أو إضافة طالب جديد بها.`);
+                        } else {
+                            Agent.currentFingerprint = null;
+                            Agent.addMessagePlain(`⚠️ لم أتمكن من العثور على وجه واضح في الصورة المرفوعة لاستخراج البصمة الرقمية. يرجى التأكد من أن الصورة تحتوي على وجه واضح ومضاء بشكل جيد.`);
+                        }
+                        Agent.setStatus('جاهز للمساعدة', false);
+                    };
+                } catch (err) {
+                    console.error("Error extracting descriptor from uploaded file:", err);
+                    Agent.currentFingerprint = null;
+                    Agent.addMessagePlain(`❌ فشل معالجة الصورة المرفوعة لاستخراج البصمة الرقمية: ${err.message}`);
+                    Agent.setStatus('جاهز للمساعدة', false);
+                }
+            };
+            reader.readAsDataURL(file);
+        } else {
+            Agent.currentUploadedFile = {
+                name: file.name,
+                type: file.type
+            };
+            Agent.currentFingerprint = null;
+            // Placeholder for real processing
+            setTimeout(() => {
+                Agent.addMessage(`لقد استلمت الملف **${file.name}**. كيف تود أن أساعدك به؟ (مثلاً: استيراد البيانات، تحليل الأسماء، إلخ)`, 'ai');
+                Agent.setStatus('جاهز للمساعدة', false);
+            }, 1500);
+        }
 
         input.value = ''; // Reset input
     },
