@@ -37,14 +37,22 @@ const Agent = {
 • طلاب يتطلبون متابعة (حضور < 75%): {{LOW_ATTENDANCE_COUNT}}
 • طلاب متميزون (حضور 100%): {{PERFECT_ATTENDANCE_COUNT}}
 
-═══ قائمة الطلاب التفصيلية ═══
-{{STUDENTS_LIST}}
-
-═══ الفصول الدراسية ═══
+═══ الفصول الدراسية (IDs للاستخدام) ═══
 {{CLASSES_LIST}}
 
-═══ المعلمون والموظفون ═══
+═══ المعلمون والموظفون (IDs للاستخدام) ═══
 {{TEACHERS_LIST}}
+
+═══ الاستعلام عن تفاصيل الطلاب والبيانات ═══
+لتوفير استهلاك التوكنز، لا يتم تحميل قائمة الطلاب التفصيلية ولا سجلات الحضور التفصيلية في السياق تلقائياً.
+إذا طلب المستخدم تفاصيل عن طالب معين (مثال: "عطني معلومات أحمد" أو "تواصل مع ولي أمر سالم" أو "ما هي نسبة حضور محمد") أو تفاصيل معلم أو سجلات حضور، يجب عليك أولاً إجراء استعلام للبحث في قاعدة البيانات باستخدام الأمر التالي:
+|||COMMAND|||{"type":"database_action","action":"select","table":"students","query":"اسم الطالب أو جزء منه"}
+أو للبحث عن معلم:
+|||COMMAND|||{"type":"database_action","action":"select","table":"teachers","query":"اسم المعلم"}
+أو للبحث عن سجل حضور:
+|||COMMAND|||{"type":"database_action","action":"select","table":"records","query":"التاريخ مثل 2024-04-22 أو معرف الفصل"}
+
+بمجرد إرسال هذا الأمر، سيقوم النظام بالبحث تلقائياً وإعادة تزويدك بالنتائج المفصلة في رسالة مخفية لتتمكن من صياغة الرد النهائي للمستخدم.
 
 ═══ قدراتك (أنواع الأوامر) ═══
 
@@ -180,9 +188,9 @@ const Agent = {
                 }).join('\n');
 
             // تجهيز القوائم مع إرفاق الملاحظات إن وجدت
-            const studentsList = studentStats.map(s => `• ${s.name || 'مسمى مفقود'} | ID (الرقم الأكاديمي): ${s.academicId || 'بدون رقم'} | هاتف ولي الأمر: ${s.phone || 'غير مسجل'} | الفصل: ${s.classId || 'غير محدد'} | النسبة: ${s.attendanceRate}%${s.notes ? ` | ملاحظات: ${s.notes}` : ''}`).join('\n');
-            const classesList = classes.map(c => `• ${c.name || 'مسمى غير محدد'} (${c.section || '-'}) | ID: ${c.id}${c.notes ? ` | ملاحظات: ${c.notes}` : ''}`).join('\n');
-            const teachersList = teachers.map(t => `• ${t.name || 'بدون اسم'} (${t.role || 'موظف'}) | ID: ${t.id}${t.notes ? ` | ملاحظات: ${t.notes}` : ''}`).join('\n');
+            const studentsList = ""; // تم إفراغها بالكامل لتوفير التوكنز والاعتماد على الاستعلام الديناميكي
+            const classesList = classes.map(c => `• ${c.name || 'غير محدد'} (${c.section || '-'}) | ID: ${c.id}`).join('\n');
+            const teachersList = teachers.map(t => `• ${t.name || 'بدون اسم'} (${t.role || 'موظف'}) | ID: ${t.id}`).join('\n');
 
             // تعويض المتغيرات في القالب
             let finalPrompt = instructionTemplate
@@ -480,10 +488,9 @@ const Agent = {
  
             // --- المحاولة الأولى (الوكيل الخفي) ---
             console.log('[AutoPilot] Launching hidden agent (Attempt 1)...');
-            const hiddenResponse = await this._callHiddenAgent(liveContext, text, this.chatHistory);
-            
-            // إزالة مؤشر التحميل لعدم تكرار الواجهة
             loadingDiv.remove();
+            const msgEl = this.addMessage('', 'ai');
+            const hiddenResponse = await this._streamHiddenAgent(msgEl, liveContext, text, this.chatHistory);
  
             const DELIMITER = '|||COMMAND|||';
             const hasCommand = hiddenResponse.includes(DELIMITER);
@@ -492,7 +499,6 @@ const Agent = {
                 // محادثة طبيعية عادية، لا داعي للتحقق أو الفشل
                 this.chatHistory.push({ role: 'user', content: text });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
-                this.addMessage(hiddenResponse, 'ai');
                 return;
             }
  
@@ -534,9 +540,29 @@ const Agent = {
             const result = await this._executeCommandWithVerification(parsedCmd);
  
             if (result.success) {
-                // نجحت العملية تماماً!
                 this.chatHistory.push({ role: 'user', content: text });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
+
+                if (parsedCmd.type === 'database_action' && parsedCmd.action === 'select') {
+                    const resultsData = this.lastQueryResult?.data || [];
+                    const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedCmd.table} بـ "${parsedCmd.query || parsedCmd.id}"]: \n` + 
+                        (resultsData.length > 0 
+                            ? JSON.stringify(resultsData) 
+                            : "لا توجد نتائج تطابق هذا الاستعلام في قاعدة البيانات.");
+
+                    this.chatHistory.push({ role: 'user', content: resultsText });
+
+                    this.setStatus('جاري صياغة الرد النهائي...', true);
+                    const finalMsgEl = this.addMessage('', 'ai');
+
+                    await this._streamHiddenAgent(
+                        finalMsgEl,
+                        liveContext,
+                        "الرجاء صياغة الرد النهائي للمستخدم بناءً على نتائج الاستعلام السابقة المعروضة أمامك، وتزويد كافة التفاصيل المطلوبة.",
+                        this.chatHistory
+                    );
+                    return;
+                }
                 
                 const successText = `✓ تم تنفيذ العملية بنجاح تام وتم التحقق من استقرار قاعدة البيانات!`;
                 this.addMessagePlain(successText);
@@ -571,7 +597,9 @@ const Agent = {
 `;
  
             try {
-                const fallbackResponse = await this._callHiddenAgent(
+                correctionLoading.remove();
+                const fallbackMsgEl = this.addMessage('', 'ai');
+                const fallbackResponse = await this._streamHiddenAgent(fallbackMsgEl,
                     liveContext, 
                     correctionPrompt, 
                     [], // ذاكرة نظيفة تماماً لتفادي الهلوسة البرمجية
@@ -580,7 +608,7 @@ const Agent = {
                 );
  
                 correctionNotice.remove();
-                correctionLoading.remove();
+
  
                 const fallbackParts = fallbackResponse.split(DELIMITER);
                 const fallbackMainText = fallbackParts[0].trim();
@@ -613,9 +641,36 @@ const Agent = {
                 const fallbackResult = await this._executeCommandWithVerification(parsedFallbackCmd);
  
                 if (fallbackResult.success) {
-                    // نجح التصحيح التلقائي!
                     this.chatHistory.push({ role: 'user', content: text });
                     this.chatHistory.push({ role: 'assistant', content: fallbackResponse });
+
+                    if (parsedFallbackCmd.type === 'database_action' && parsedFallbackCmd.action === 'select') {
+                        const resultsData = this.lastQueryResult?.data || [];
+                        const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedFallbackCmd.table} بـ "${parsedFallbackCmd.query || parsedFallbackCmd.id}"]: \n` + 
+                            (resultsData.length > 0 
+                                ? JSON.stringify(resultsData) 
+                                : "لا توجد نتائج تطابق هذا الاستعلام في قاعدة البيانات.");
+
+                        this.chatHistory.push({ role: 'user', content: resultsText });
+
+                        this.setStatus('جاري صياغة الرد النهائي...', true);
+                        const finalMsgEl = this.addMessage('', 'ai');
+
+                        await this._streamHiddenAgent(
+                            finalMsgEl,
+                            liveContext,
+                            "الرجاء صياغة الرد النهائي للمستخدم بناءً على نتائج الاستعلام السابقة المعروضة أمامك، وتزويد كافة التفاصيل المطلوبة.",
+                            this.chatHistory
+                        );
+
+                        attempts.push({
+                            title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
+                            success: true,
+                            action: `تم الاستعلام من قاعدة البيانات بنجاح: ${JSON.stringify(parsedFallbackCmd)}`
+                        });
+                        this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
+                        return;
+                    }
                     
                     if (fallbackMainText) {
                         this.addMessagePlain(fallbackMainText);
@@ -1127,7 +1182,65 @@ const Agent = {
         try {
             let result;
 
-            if (cmd.action === 'insert') {
+            if (cmd.action === 'select') {
+                status.textContent = 'جاري الاستعلام...';
+                function normalizeArabic(str) {
+                    if (!str) return '';
+                    return str
+                        .replace(/[أإآا]/g, 'a')
+                        .replace(/ة/g, 'h')
+                        .replace(/ى/g, 'y')
+                        .replace(/[\u064B-\u0652]/g, '')
+                        .replace(/[أإآا]/g, 'ا')
+                        .replace(/ة/g, 'ه')
+                        .replace(/ى/g, 'ي')
+                        .toLowerCase()
+                        .trim();
+                }
+                const query = (cmd.query || cmd.id || '').toLowerCase().trim();
+                const normQuery = normalizeArabic(query);
+                let results = [];
+
+                if (cmd.table === 'students') {
+                    const list = await DB.getStudents();
+                    results = list.filter(s => {
+                        const nameMatch = s.name && normalizeArabic(s.name).includes(normQuery);
+                        const idMatch = s.academicId && s.academicId.toLowerCase() === query;
+                        const classIdMatch = s.classId && s.classId.toLowerCase() === query;
+                        return nameMatch || idMatch || classIdMatch;
+                    });
+                } else if (cmd.table === 'teachers') {
+                    const list = await DB.getTeachers();
+                    results = list.filter(t => {
+                        const nameMatch = t.name && normalizeArabic(t.name).includes(normQuery);
+                        const idMatch = t.ministryId && t.ministryId.toLowerCase() === query;
+                        return nameMatch || idMatch;
+                    });
+                } else if (cmd.table === 'classes') {
+                    const list = await DB.getClasses();
+                    results = list.filter(c => {
+                        const nameMatch = c.name && normalizeArabic(c.name).includes(normQuery);
+                        const idMatch = c.id && c.id.toLowerCase() === query;
+                        return nameMatch || idMatch;
+                    });
+                } else if (cmd.table === 'records') {
+                    const list = await DB.getRecords();
+                    results = list.filter(r => 
+                        (r.date && r.date.toLowerCase() === query) || 
+                        (r.classId && r.classId.toLowerCase() === query)
+                    );
+                }
+
+                Agent.lastQueryResult = {
+                    success: true,
+                    query: cmd.query || cmd.id,
+                    table: cmd.table,
+                    data: results
+                };
+
+                status.textContent = `تم العثور على ${results.length} نتائج ✓`;
+                status.className = 'text-green-400';
+            } else if (cmd.action === 'insert') {
                 const dataItems = Array.isArray(cmd.data) ? cmd.data : [cmd.data];
                 status.textContent = `جاري إضافة ${dataItems.length} عنصر...`;
 
@@ -1307,14 +1420,41 @@ const Agent = {
         messages.scrollTop = messages.scrollHeight;
     },
 
-    async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false) {
+    async getModelPricing(modelName) {
+        try {
+            const cached = localStorage.getItem('openrouter_models_pricing');
+            if (cached) {
+                const data = JSON.parse(cached);
+                const found = data.find(m => m.id === modelName);
+                if (found) return found.pricing;
+            }
+            const res = await fetch("https://openrouter.ai/api/v1/models");
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.data) {
+                    localStorage.setItem('openrouter_models_pricing', JSON.stringify(json.data));
+                    const found = json.data.find(m => m.id === modelName);
+                    if (found) return found.pricing;
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch model pricing:", e);
+        }
+        if (modelName === "xiaomi/mimo-v2.5-pro") {
+            return { prompt: "0.00000015", completion: "0.0000006" };
+        }
+        return { prompt: "0", completion: "0" };
+    },
+
+    async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, onChunk = null) {
         const currentProvider = this.provider;
+        const modelName = modelOverride || "xiaomi/mimo-v2.5-pro";
         const providers = {
             inworld: {
                 url: "https://api.inworld.ai/v1/chat/completions",
                 key: Gemini.getInworldKey(),
                 headers: {},
-                body: { model: modelOverride || "xiaomi/mimo-v2.5-pro" }
+                body: { model: modelName }
             },
             openrouter: {
                 url: "https://openrouter.ai/api/v1/chat/completions",
@@ -1324,7 +1464,7 @@ const Agent = {
                     "X-Title": "Attendance AI Agent"
                 },
                 body: {
-                    model: modelOverride || "xiaomi/mimo-v2.5-pro"
+                    model: modelName
                 }
             }
         };
@@ -1345,6 +1485,20 @@ const Agent = {
             ];
         }
 
+        const requestBody = {
+            messages: messages,
+            temperature: 0.1,
+            max_tokens: 4096,
+            ...config.body
+        };
+
+        if (onChunk) {
+            requestBody.stream = true;
+            if (currentProvider === 'openrouter') {
+                requestBody.stream_options = { include_usage: true };
+            }
+        }
+
         const response = await fetch(config.url, {
             method: "POST",
             headers: {
@@ -1352,12 +1506,7 @@ const Agent = {
                 "Content-Type": "application/json",
                 ...config.headers
             },
-            body: JSON.stringify({
-                messages: messages,
-                temperature: 0.1,
-                max_tokens: 4096,
-                ...config.body
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -1365,10 +1514,187 @@ const Agent = {
             throw new Error(err.error?.message || `HTTP ${response.status}`);
         }
 
-        const data = await response.json();
-        const resultText = data.choices?.[0]?.message?.content;
-        if (!resultText) throw new Error('لم يأتِ رد من النموذج');
-        return resultText;
+        if (onChunk) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = '';
+            let fullText = '';
+            let fullReasoningText = '';
+            let usageData = null;
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        const cleaned = line.trim();
+                        if (!cleaned) continue;
+                        if (cleaned.startsWith('data: ')) {
+                            const dataStr = cleaned.slice(6);
+                            if (dataStr === '[DONE]') continue;
+                            try {
+                                const parsed = JSON.parse(dataStr);
+                                const delta = parsed.choices?.[0]?.delta;
+                                if (delta) {
+                                    const content = delta.content || '';
+                                    const reasoning = delta.reasoning_content || delta.reasoning || '';
+                                    
+                                    if (content) fullText += content;
+                                    if (reasoning) fullReasoningText += reasoning;
+
+                                    onChunk({
+                                        content: content,
+                                        reasoning_content: reasoning,
+                                        fullContent: fullText,
+                                        fullReasoning: fullReasoningText,
+                                        usage: parsed.usage || null
+                                    });
+                                }
+                                if (parsed.usage) {
+                                    usageData = parsed.usage;
+                                    onChunk({
+                                        content: '',
+                                        reasoning_content: '',
+                                        fullContent: fullText,
+                                        fullReasoning: fullReasoningText,
+                                        usage: parsed.usage
+                                    });
+                                }
+                            } catch (e) {
+                                // Ignore partial line errors
+                            }
+                        }
+                    }
+                }
+            } catch (streamErr) {
+                console.error("Error reading stream:", streamErr);
+            }
+
+            return fullText;
+        } else {
+            const data = await response.json();
+            const resultText = data.choices?.[0]?.message?.content;
+            if (!resultText) throw new Error('لم يأتِ رد من النموذج');
+            return resultText;
+        }
+    },
+
+    async _streamHiddenAgent(msgEl, systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false) {
+        const bodyEl = msgEl.querySelector('.agent-msg-ai-body') || msgEl.querySelector('.agent-msg-ai') || msgEl;
+        
+        let thinkingDropdown = null;
+        let thinkingContent = null;
+        let contentContainer = null;
+        let isThinkingComplete = false;
+        const modelName = modelOverride || "xiaomi/mimo-v2.5-pro";
+
+        const responseText = await this._callHiddenAgent(
+            systemContext,
+            userMessage,
+            chatHistory,
+            modelName,
+            useFreshMemory,
+            async (chunk) => {
+                if (chunk.reasoning_content) {
+                    if (!thinkingDropdown) {
+                        thinkingDropdown = document.createElement('details');
+                        thinkingDropdown.className = 'agent-thinking-dropdown bg-black/10 border border-white/5 rounded-2xl p-2.5 mb-2.5';
+                        thinkingDropdown.open = true;
+                        
+                        const summary = document.createElement('summary');
+                        summary.className = 'text-xs text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
+                        summary.innerHTML = `
+                            <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
+                            <span class="thinking-label">جاري التفكير...</span>
+                        `;
+                        thinkingDropdown.appendChild(summary);
+
+                        thinkingContent = document.createElement('div');
+                        thinkingContent.className = 'agent-thinking-content text-[11px] text-white/60 pl-3 border-l border-white/10 mt-2 leading-relaxed font-mono whitespace-pre-wrap';
+                        thinkingDropdown.appendChild(thinkingContent);
+
+                        bodyEl.insertBefore(thinkingDropdown, bodyEl.firstChild);
+                    }
+                    thinkingContent.textContent = chunk.fullReasoning;
+                }
+
+                if (chunk.content) {
+                    if (thinkingDropdown && !isThinkingComplete) {
+                        isThinkingComplete = true;
+                        const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
+                        if (spinner) {
+                            spinner.className = 'material-symbols-outlined text-[14px] text-green-500';
+                            spinner.style.animation = 'none';
+                            spinner.textContent = 'check_circle';
+                        }
+                        const label = thinkingDropdown.querySelector('.thinking-label');
+                        if (label) {
+                            label.textContent = 'تم التفكير';
+                        }
+                        thinkingDropdown.open = false;
+                    }
+
+                    if (!contentContainer) {
+                        contentContainer = document.createElement('div');
+                        contentContainer.className = 'agent-actual-content';
+                        bodyEl.appendChild(contentContainer);
+                    }
+
+                    const displaySoFar = chunk.fullContent.split('|||COMMAND|||')[0].trim();
+                    if (typeof marked !== 'undefined') {
+                        contentContainer.innerHTML = marked.parse(displaySoFar || '&nbsp;');
+                    } else {
+                        contentContainer.innerHTML = displaySoFar.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') || '&nbsp;';
+                    }
+                }
+
+                if (chunk.usage) {
+                    const settings = await DB.getSettings();
+                    if (settings?.customization?.['dev-mode']) {
+                        const usage = chunk.usage;
+                        const pricing = await this.getModelPricing(modelName);
+                        const promptCost = (usage.prompt_tokens || 0) * parseFloat(pricing.prompt || 0);
+                        const completionCost = (usage.completion_tokens || 0) * parseFloat(pricing.completion || 0);
+                        const totalCost = promptCost + completionCost;
+
+                        const oldBadge = bodyEl.querySelector('.agent-msg-usage-badge');
+                        if (oldBadge) oldBadge.remove();
+
+                        const usageBadge = document.createElement('div');
+                        usageBadge.className = 'agent-msg-usage-badge mt-2.5 pt-2.5 border-t border-black/10 dark:border-white/10 text-[10px] text-gray-600 dark:text-gray-400 flex items-center justify-between font-mono select-none w-full';
+                        usageBadge.innerHTML = `
+                            <span>المدخلات: ${usage.prompt_tokens} (${(promptCost * 1000).toFixed(4)}¢) | المخرجات: ${usage.completion_tokens} (${(completionCost * 1000).toFixed(4)}¢)</span>
+                            <span class="bg-primary/20 text-primary px-1.5 py-0.5 rounded-md font-bold shrink-0">التكلفة الفعلية: $${totalCost.toFixed(6)}</span>
+                        `;
+                        bodyEl.appendChild(usageBadge);
+                    }
+                }
+
+                const messages = document.getElementById('agent-messages');
+                if (messages) {
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            }
+        );
+
+        if (thinkingDropdown && !isThinkingComplete) {
+            const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
+            if (spinner) {
+                spinner.className = 'material-symbols-outlined text-[14px] text-green-500';
+                spinner.style.animation = 'none';
+                spinner.textContent = 'check_circle';
+            }
+            const label = thinkingDropdown.querySelector('.thinking-label');
+            if (label) label.textContent = 'تم التفكير';
+            thinkingDropdown.open = false;
+        }
+
+        return responseText;
     },
 
     async _verifyDatabaseState(cmd) {
