@@ -802,7 +802,7 @@
                             <button id="customizer-tab-plugins" class="customizer-tab-btn" onclick="window.switchCustomizerTab('plugins', event)">الاضافات</button>
                             <button id="customizer-tab-connectors" class="customizer-tab-btn active" onclick="window.switchCustomizerTab('connectors', event)">التطبيقات</button>
                             <button id="customizer-tab-skills" class="customizer-tab-btn" onclick="window.switchCustomizerTab('skills', event)">المهارات</button>
-                            <button id="customizer-tab-devmode" class="customizer-tab-btn" onclick="window.switchCustomizerTab('devmode', event)">المطور</button>
+
                         </div>
 
                         <!-- Tab Content: الاضافات (Extensions) -->
@@ -972,25 +972,7 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Tab Content: المطور (Developer Mode) -->
-                        <div id="customizer-panel-devmode" class="customizer-tab-panel">
-                            <!-- Dev Mode Toggle Card -->
-                            <div class="customizer-card cursor-pointer" onclick="window.toggleCustomItem('dev-mode')">
-                                <div class="customizer-card-icon text-primary">
-                                    <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">developer_mode</span>
-                                </div>
-                                <div class="customizer-card-details">
-                                    <span class="customizer-card-title">وضع المطورين</span>
-                                    <span class="customizer-card-desc">عرض تفاصيل استهلاك التوكن وتكلفة المحادثة الفعلية</span>
-                                </div>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="check-dev-mode-custom" class="hidden">
-                                    <div class="switch-bg w-10 h-5 bg-gray-200 rounded-full relative transition-all" id="switch-bg-devmode">
-                                        <div class="switch-dot w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 right-0.5 transition-all" id="switch-dot-devmode"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
 
@@ -4474,13 +4456,7 @@
                             <span>الإضافات</span>
                         </div>
                     </button>
-                    <button id="tab-devmode-btn" onclick="window.switchDirectoryTab('devmode')"
-                        class="directory-tab group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-black transition-all text-gray-500 hover:bg-white/50">
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-xl">code</span>
-                            <span>وضع المطورين</span>
-                        </div>
-                    </button>
+
                 </div>
             </div>
             <!-- Content -->
@@ -4568,28 +4544,7 @@
                             لأولياء الأمور عند تسجيل غياب الطالب.</p>
                     </div>
                 </div>
-                <div id="dir-devmode" class="directory-section hidden animate-fade-in">
-                    <h3 class="text-2xl font-black text-gray-800 mb-2">وضع المطورين</h3>
-                    <p class="text-sm text-gray-400 font-bold mb-6">خيارات وإحصائيات متقدمة للمطورين</p>
-                    <div class="custom-card group p-6 rounded-3xl border-2 border-gray-50 hover:border-primary/20 transition-all bg-gray-50/30 cursor-pointer"
-                        onclick="window.toggleCustomItem('dev-mode')">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-primary">
-                                <span class="material-symbols-outlined text-2xl">developer_mode</span>
-                            </div>
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="check-dev-mode" class="hidden">
-                                <div class="switch-bg w-12 h-6 bg-gray-200 rounded-full relative transition-all">
-                                    <div
-                                        class="switch-dot w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-all">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <h4 class="font-black text-gray-800 mb-1">تفعيل وضع المطورين</h4>
-                        <p class="text-xs text-gray-500 leading-relaxed font-medium">عرض تفاصيل استهلاك التوكن للادخال والاخراج، وتكلفة المحادثة الفعلية مع المساعد الذكي.</p>
-                    </div>
-                </div>
+
             </div>
         </div>
     </div>

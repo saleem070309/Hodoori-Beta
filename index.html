@@ -7,6 +7,7 @@
         <meta name="theme-color" content="#faf7f2" />
         <!-- Using var(--color-cream) -->
         <title>دخول | نظام الحضور الذكي</title>
+        <link rel="icon" type="image/png" href="assets/brand-logo.png" />
         <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
         <link
             href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
@@ -107,12 +108,37 @@
                 animation: animate-fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)
                     forwards;
             }
+
+            @keyframes logo-pulse {
+                0% {
+                    transform: scale(0.8);
+                    opacity: 1;
+                }
+                100% {
+                    transform: scale(1.4);
+                    opacity: 0;
+                }
+            }
+
+            .animate-pulse-ring {
+                animation: logo-pulse 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+            }
         </style>
     </head>
 
     <body
         class="min-h-screen flex flex-col items-center justify-center py-6 sm:py-12 px-4 sm:px-6 text-gray-800 font-sans"
     >
+        <!-- Splash Loading Screen -->
+        <div id="indexSplashScreen" class="fixed inset-0 z-[9999] bg-[#faf7f2] flex flex-col items-center justify-center transition-all duration-700">
+            <div class="relative">
+                <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] bg-white flex items-center justify-center overflow-hidden relative z-10 shadow-lg border border-primary/10">
+                    <img src="assets/brand-logo.png" alt="Logo" class="w-full h-full object-contain p-4" />
+                </div>
+                <div class="absolute inset-0 rounded-[2rem] border-[1.5px] border-primary animate-pulse-ring z-0"></div>
+            </div>
+        </div>
+
         <!-- Ambient Background -->
         <div class="liquid-glass-ambient">
             <div class="orb orb-primary"></div>
@@ -275,11 +301,22 @@
                 if (user) {
                     if (user.role === "ministry") {
                         window.location.href = "dashboard-ministry.html";
+                        return;
                     } else if (user.role === "admin") {
                         window.location.href = "dashboard-admin.html";
+                        return;
                     } else if (user.role === "teacher") {
                         window.location.href = "dashboard-teacher.html";
+                        return;
                     }
+                }
+                
+                // Hide preloader if not redirecting
+                const splash = document.getElementById("indexSplashScreen");
+                if (splash) {
+                    splash.style.opacity = '0';
+                    splash.style.pointerEvents = 'none';
+                    setTimeout(() => splash.remove(), 700);
                 }
             });
 

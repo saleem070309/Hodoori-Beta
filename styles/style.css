@@ -698,6 +698,9 @@ body {
   height: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
+  padding: 16px;
+  margin: -16px;
+  box-sizing: content-box;
 }
 
 .assistant-hamburger-line {
@@ -1362,18 +1365,19 @@ body {
 /* Premium Drawer Sidebar overlay */
 .assistant-sidebar-drawer {
   position: fixed;
-  top: 0;
-  bottom: 0;
-  right: 0;
+  top: 16px;
+  bottom: 16px;
+  right: 16px;
   width: 290px;
+  height: calc(100% - 32px);
   z-index: 100;
-  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.12);
-  transform: translateX(100%);
+  box-shadow: -10px 10px 40px rgba(0, 0, 0, 0.12);
+  transform: translateX(calc(100% + 24px));
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   direction: rtl;
   display: flex;
   flex-direction: column;
-  border-radius: 24px 0px 0px 24px;
+  border-radius: 24px;
   background: #ffffff;
 }
 
@@ -1384,13 +1388,13 @@ body {
 .theme-light-warm .assistant-sidebar-drawer,
 .theme-light-warm.assistant-sidebar-drawer {
   background: #ffffff !important;
-  border-left: 1px solid rgba(255, 171, 49, 0.15);
+  border: 1px solid rgba(255, 171, 49, 0.15);
 }
 
 .theme-dark-orange .assistant-sidebar-drawer,
 .theme-dark-orange.assistant-sidebar-drawer {
   background: #0f0f0f !important;
-  border-left: 1px solid rgba(255, 167, 38, 0.15);
+  border: 1px solid rgba(255, 167, 38, 0.15);
 }
 
 .assistant-drawer-overlay {
@@ -2867,7 +2871,7 @@ body {
 
 /* Ensure drawer uses 3D transform acceleration safely without layout breaks */
 .assistant-sidebar-drawer {
-  transform: translate3d(100%, 0, 0) !important;
+  transform: translate3d(calc(100% + 24px), 0, 0) !important;
 }
 
 .assistant-sidebar-drawer.open {

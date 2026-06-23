@@ -4,7 +4,7 @@
  */
 
 const Agent = {
-    provider: 'inworld', // <--- غير القيمة هنا لـ 'openrouter' أو 'inworld' للتبديل بينهما
+    provider: 'openrouter', // <--- غير القيمة هنا لـ 'openrouter' أو 'inworld' للتبديل بينهما
     chatHistory: [],
     isOpen: false,
     isStreaming: false,
@@ -91,6 +91,9 @@ const Agent = {
 
 8) stats — إحصائيات سريعة
 |||COMMAND|||{"type":"stats","data":{"title":"إحصائيات","items":[{"label":"الطلاب","value":"150"}]}}
+
+9) web_search — البحث في الويب (مدمج تلقائياً عبر OpenRouter)
+عندما يسألك المستخدم عن معلومات عامة، حية، أو تاريخية خارج قاعدة البيانات المحلية، سيقوم خادم OpenRouter تلقائياً بتشغيل أداة البحث وإرجاع النتائج لك لتصيغ ردك النهائي بها.
 
 ═══ قواعد صارمة ═══
 1. |||COMMAND||| في سطر مستقل في نهاية ردك — بدون json أو \`\`\`.
@@ -1464,7 +1467,11 @@ const Agent = {
                     "X-Title": "Attendance AI Agent"
                 },
                 body: {
-                    model: modelName
+                    model: modelName,
+                    provider: {
+                        only: ["xiaomi"],
+                        allow_fallbacks: false
+                    }
                 }
             }
         };
@@ -1491,6 +1498,12 @@ const Agent = {
             max_tokens: 4096,
             ...config.body
         };
+
+        if (currentProvider === 'openrouter') {
+            requestBody.tools = [
+                { type: 'openrouter:web_search' }
+            ];
+        }
 
         if (onChunk) {
             requestBody.stream = true;

@@ -8,10 +8,10 @@ const Gemini = {
     },
 
     getOpenRouterKey() {
-        return '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';
+        return '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';
     },
 
     getInworldKey() {
-        return 'cXpIamdtOXpLa1F0dDFuNVVyeVg0MVdoUVZHUUhyNGc6bEptVnpuc0R5aEtSTXpnOVF2a3dRbDd6QnNIYXliazdmMmJLUlNOem5Tc2dPYjRDQkRuRzNTWFQ2dWo1enpUdQ==';
+        return '';
     }
 };
