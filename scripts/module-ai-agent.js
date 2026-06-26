@@ -6,8 +6,8 @@
 const Agent = {
     // ════════════════ CONFIGURATION ════════════════
     provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
-    defaultModel: 'sakana/fugu-ultra', // Default model to use (e.g. sakana/fugu-ultra)
-    
+    defaultModel: 'qwen/qwen3.7-plus', // Default model to use (e.g. sakana/fugu-ultra)
+
     // API Keys - can be set directly here or fall back to Gemini/localStorage settings
     apiKeys: {
         openrouter: '', // If empty, will fallback to Gemini.getOpenRouterKey()
@@ -510,12 +510,12 @@ const Agent = {
         const input = document.getElementById('agent-input');
         const text = input ? input.value.trim() : '';
         if (!text && !this.currentUploadedFile) return;
- 
+
         // Force stop and turn off speech recognition upon sending
         if (typeof window.stopSpeechRecognition === 'function') {
             window.stopSpeechRecognition();
         }
- 
+
         if (input) {
             input.value = '';
             if (typeof window.handleInputTyping === 'function') {
@@ -525,18 +525,18 @@ const Agent = {
             }
         }
         this.addMessage(text, 'user');
- 
+
         // Hide suggestions after first message
         const suggestionsEl = document.getElementById('agent-suggestions');
         if (suggestionsEl) suggestionsEl.style.display = 'none';
- 
+
         // Loading indicator
         const loadingDiv = this.addLoadingIndicator();
         this.isStreaming = true;
         this.setStatus('يفكر...', true);
         const sendBtn = document.getElementById('agent-send-btn');
         if (sendBtn) sendBtn.disabled = true;
- 
+
         let liveContext = '';
         const attempts = [];
         try {
@@ -547,11 +547,11 @@ const Agent = {
             } else {
                 this.chatHistory.unshift({ role: 'system', content: liveContext });
             }
- 
+
             // Capture uploaded file reference before clearing preview UI
             const uploadedFile = this.currentUploadedFile;
             this.clearFilePreviewUI();
- 
+
             // --- المحاولة الأولى (الوكيل الخفي) ---
             console.log('[AutoPilot] Launching hidden agent (Attempt 1)...');
             const msgEl = this.addMessage('', 'ai');
@@ -571,22 +571,22 @@ const Agent = {
                 ];
             }
             const hiddenResponse = await this._streamHiddenAgent(msgEl, liveContext, finalUserContent, this.chatHistory, null, false, loadingDiv);
- 
+
             const DELIMITER = '|||COMMAND|||';
             const hasCommand = hiddenResponse.includes(DELIMITER);
- 
+
             if (!hasCommand) {
                 // محادثة طبيعية عادية، لا داعي للتحقق أو الفشل
                 this.chatHistory.push({ role: 'user', content: finalUserContent });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
                 return;
             }
- 
+
             // تحليل واستخراج الأوامر
             const parts = hiddenResponse.split(DELIMITER);
             const mainText = parts[0].trim();
             const cmdStr = parts[1]?.trim();
- 
+
             let parsedCmd = null;
             try {
                 const cleanedJson = this._sanitizeJSON(cmdStr);
@@ -595,10 +595,10 @@ const Agent = {
                 console.warn('[AutoPilot] Failed to parse JSON command:', jsonErr);
                 const fallbackJson = this._extractJSONFallback(cmdStr);
                 if (fallbackJson) {
-                    try { parsedCmd = JSON.parse(fallbackJson); } catch (e) {}
+                    try { parsedCmd = JSON.parse(fallbackJson); } catch (e) { }
                 }
             }
- 
+
             if (!parsedCmd) {
                 const parseErrText = 'فشل فك تشفير الأمر البرمجي JSON في المحاولة الأولى';
                 attempts.push({
@@ -638,7 +638,7 @@ const Agent = {
                     spinner.style.animation = 'spin 1.2s linear infinite';
                 }
             }
- 
+
             // تنفيذ مع التحقق
             console.log('[AutoPilot] Executing and verifying command:', parsedCmd);
             const result = await this._executeCommandWithVerification(parsedCmd);
@@ -655,7 +655,7 @@ const Agent = {
                     spinner.textContent = result.success ? 'check_circle' : 'error';
                 }
             }
- 
+
             if (result.success) {
                 this.chatHistory.push({ role: 'user', content: finalUserContent });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
@@ -670,15 +670,15 @@ const Agent = {
                     } else {
                         resultsText = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف وجه واستخراج البصمة بنجاح.\n` +
                             `- البصمة الرقمية للوجه (descriptor): "${JSON.stringify(idRes.fingerprint)}"\n` +
-                            (idRes.match 
+                            (idRes.match
                                 ? `- تم مطابقة الوجه مع الطالب التالي في قاعدة البيانات:\n` +
-                                  `  * الاسم: ${idRes.match.name}\n` +
-                                  `  * معرف الطالب (ID): ${idRes.match.id}\n` +
-                                  `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
-                                  `  * معرف الصف (classId): ${idRes.match.classId}\n` +
-                                  `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
+                                `  * الاسم: ${idRes.match.name}\n` +
+                                `  * معرف الطالب (ID): ${idRes.match.id}\n` +
+                                `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
+                                `  * معرف الصف (classId): ${idRes.match.classId}\n` +
+                                `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
                                 : `- لم يتم مطابقة الوجه مع أي طالب مسجل حالياً في قاعدة البيانات.\n` +
-                                  `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
+                                `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
                     }
 
                     this.chatHistory.push({ role: 'user', content: resultsText });
@@ -697,9 +697,9 @@ const Agent = {
 
                 if (parsedCmd.type === 'database_action' && parsedCmd.action === 'select') {
                     const resultsData = this.lastQueryResult?.data || [];
-                    const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedCmd.table} بـ "${parsedCmd.query || parsedCmd.id}"]: \n` + 
-                        (resultsData.length > 0 
-                            ? JSON.stringify(resultsData) 
+                    const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedCmd.table} بـ "${parsedCmd.query || parsedCmd.id}"]: \n` +
+                        (resultsData.length > 0
+                            ? JSON.stringify(resultsData)
                             : "لا توجد نتائج تطابق هذا الاستعلام في قاعدة البيانات.");
 
                     this.chatHistory.push({ role: 'user', content: resultsText });
@@ -715,25 +715,25 @@ const Agent = {
                     );
                     return;
                 }
-                
+
                 const successText = `✓ تم تنفيذ العملية بنجاح تام وتم التحقق من استقرار قاعدة البيانات!`;
                 this.addMessagePlain(successText);
                 return;
             }
- 
+
             attempts.push({
                 title: 'المحاولة الأولى: تنفيذ وقبول التعديل بقاعدة البيانات',
                 success: false,
                 error: result.executionError || (result.verification ? result.verification.reason : 'فشل التحقق من قاعدة البيانات بعد الاستدعاء الأول'),
                 action: `الأمر الموجه: ${JSON.stringify(parsedCmd)}`
             });
- 
+
             // --- المحاولة الثانية (التصحيح الذاتي بنموذج أقوى وذاكرة نظيفة كلياً) ---
             console.warn('[AutoPilot] First attempt failed. Triggering Self-Correction with premium model...');
-            
+
             const correctionNotice = this.addMessage('⚠️ جاري تصحيح وتعديل المعالجة ذاتياً لاستقرار قاعدة البيانات...', 'ai');
             const correctionLoading = this.addLoadingIndicator();
- 
+
             // تجهيز سياق التصحيح الذاتي المخفي
             const correctionPrompt = `
 لقد طلب المستخدم القيام بالعملية التالية: "${text}"
@@ -747,25 +747,25 @@ const Agent = {
 2. تفادي الخطأ السابق بالكامل وصياغة أمر قاعدة البيانات الصحيح والبديل فوراً.
 3. التزم بإخراج الأمر البرمجي بصيغة |||COMMAND||| يليه مباشرة كود JSON صالح تماماً وخالٍ من الهلوسة البرمجية. لا تشرح خطواتك البرمجية، اكتب الكود فوراً ليتم تنفيذه برمجياً.
 `;
- 
+
             try {
                 const fallbackMsgEl = this.addMessage('', 'ai');
                 const fallbackResponse = await this._streamHiddenAgent(fallbackMsgEl,
-                    liveContext, 
-                    correctionPrompt, 
+                    liveContext,
+                    correctionPrompt,
                     [], // ذاكرة نظيفة تماماً لتفادي الهلوسة البرمجية
                     this.defaultModel,
                     true, // تفعيل ذاكرة نظيفة
                     correctionLoading
                 );
- 
+
                 correctionNotice.remove();
 
- 
+
                 const fallbackParts = fallbackResponse.split(DELIMITER);
                 const fallbackMainText = fallbackParts[0].trim();
                 const fallbackCmdStr = fallbackParts[1]?.trim();
- 
+
                 let parsedFallbackCmd = null;
                 try {
                     const cleanedFallbackJson = this._sanitizeJSON(fallbackCmdStr);
@@ -773,10 +773,10 @@ const Agent = {
                 } catch (jsonErr) {
                     const fallbackJson = this._extractJSONFallback(fallbackCmdStr);
                     if (fallbackJson) {
-                        try { parsedFallbackCmd = JSON.parse(fallbackJson); } catch (e) {}
+                        try { parsedFallbackCmd = JSON.parse(fallbackJson); } catch (e) { }
                     }
                 }
- 
+
                 if (!parsedFallbackCmd) {
                     const parseErrText = 'فشل فك تشفير أمر التصحيح البرمجي JSON في المحاولة الثانية';
                     attempts.push({
@@ -787,7 +787,7 @@ const Agent = {
                     });
                     throw new Error(parseErrText);
                 }
- 
+
                 // تحديث حالة التفكير لتوضيح الأداة المستدعاة للمحاولة الثانية
                 const fallbackThinkingDropdown = fallbackMsgEl.querySelector('.agent-thinking-dropdown');
                 if (fallbackThinkingDropdown) {
@@ -833,7 +833,7 @@ const Agent = {
                         spinner.textContent = fallbackResult.success ? 'check_circle' : 'error';
                     }
                 }
- 
+
                 if (fallbackResult.success) {
                     this.chatHistory.push({ role: 'user', content: finalUserContent });
                     this.chatHistory.push({ role: 'assistant', content: fallbackResponse });
@@ -848,15 +848,15 @@ const Agent = {
                         } else {
                             resultsText = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف وجه واستخراج البصمة بنجاح.\n` +
                                 `- البصمة الرقمية للوجه (descriptor): "${JSON.stringify(idRes.fingerprint)}"\n` +
-                                (idRes.match 
+                                (idRes.match
                                     ? `- تم مطابقة الوجه مع الطالب التالي في قاعدة البيانات:\n` +
-                                      `  * الاسم: ${idRes.match.name}\n` +
-                                      `  * معرف الطالب (ID): ${idRes.match.id}\n` +
-                                      `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
-                                      `  * معرف الصف (classId): ${idRes.match.classId}\n` +
-                                      `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
+                                    `  * الاسم: ${idRes.match.name}\n` +
+                                    `  * معرف الطالب (ID): ${idRes.match.id}\n` +
+                                    `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
+                                    `  * معرف الصف (classId): ${idRes.match.classId}\n` +
+                                    `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
                                     : `- لم يتم مطابقة الوجه مع أي طالب مسجل حالياً في قاعدة البيانات.\n` +
-                                      `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
+                                    `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
                         }
 
                         this.chatHistory.push({ role: 'user', content: resultsText });
@@ -882,9 +882,9 @@ const Agent = {
 
                     if (parsedFallbackCmd.type === 'database_action' && parsedFallbackCmd.action === 'select') {
                         const resultsData = this.lastQueryResult?.data || [];
-                        const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedFallbackCmd.table} بـ "${parsedFallbackCmd.query || parsedFallbackCmd.id}"]: \n` + 
-                            (resultsData.length > 0 
-                                ? JSON.stringify(resultsData) 
+                        const resultsText = `[نتائج الاستعلام التلقائي من قاعدة البيانات للجدول ${parsedFallbackCmd.table} بـ "${parsedFallbackCmd.query || parsedFallbackCmd.id}"]: \n` +
+                            (resultsData.length > 0
+                                ? JSON.stringify(resultsData)
                                 : "لا توجد نتائج تطابق هذا الاستعلام في قاعدة البيانات.");
 
                         this.chatHistory.push({ role: 'user', content: resultsText });
@@ -907,45 +907,45 @@ const Agent = {
                         this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
                         return;
                     }
-                    
+
                     const successText = `🎉 تم تصحيح المشكلة بنجاح تام وإتمام العملية!`;
                     this.addMessagePlain(successText);
- 
+
                     attempts.push({
                         title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
                         success: true,
                         action: `تم تعديل وتثبيت قاعدة البيانات بنجاح: ${JSON.stringify(parsedFallbackCmd)}`
                     });
- 
+
                     this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
                     return;
                 }
- 
+
                 attempts.push({
                     title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
                     success: false,
                     error: fallbackResult.executionError || (fallbackResult.verification ? fallbackResult.verification.reason : 'فشل التحقق بعد التصحيح الذاتي'),
                     action: `فشل استقرار قاعدة البيانات: ${JSON.stringify(parsedFallbackCmd)}`
                 });
- 
+
                 // إذا فشل التصحيح أيضاً
                 throw new Error(`فشل التصحيح الذاتي أيضاً. الخطأ: ${fallbackResult.executionError || (fallbackResult.verification ? fallbackResult.verification.reason : 'غير معروف')}`);
- 
+
             } catch (fallbackErr) {
                 if (typeof correctionNotice !== 'undefined' && correctionNotice.parentNode) correctionNotice.remove();
                 if (typeof correctionLoading !== 'undefined' && correctionLoading.parentNode) correctionLoading.remove();
                 throw fallbackErr;
             }
- 
+
         } catch (e) {
             // --- الفشل التام والتسجيل الصامت في قوقل شيت ---
             console.error('[AutoPilot] Ultimate failure in agentic flow:', e);
-            
+
             // إزالة الرسائل التمهيدية المتبقية إن وجدت
             if (typeof loadingDiv !== 'undefined' && loadingDiv.parentNode) loadingDiv.remove();
- 
+
             this.addMessage(`❌ أعتذر منك بشدة، واجهت المهمة خطأ مستعصياً بعد عدة محاولات ولم تكتمل العملية بنجاح. تم تدوين تقرير التشخيص للإدارة فوراً لتصحيح المشكلة.`, 'ai');
- 
+
             if (attempts.length === 0) {
                 attempts.push({
                     title: 'فشل العملية العام',
@@ -954,7 +954,7 @@ const Agent = {
                 });
             }
             this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
- 
+
             // تجميع معلومات التشخيص بالكامل بشكل صامت
             const diagnosticData = {
                 userPrompt: text,
@@ -965,7 +965,7 @@ const Agent = {
                 uploadedFile: this.lastUploadedFile || null,
                 systemContext: liveContext
             };
- 
+
             // تشغيل الإرسال الصامت
             this._silentLogToGoogleSheets(diagnosticData);
         } finally {
@@ -1076,7 +1076,7 @@ const Agent = {
         div.style.padding = '10px 14px';
         div.style.alignSelf = 'flex-start';
         div.style.marginBottom = '12px';
-        
+
         div.innerHTML = `
             <div class="flex items-center gap-1 shrink-0" style="direction: ltr;">
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.1s; display: inline-block;"></span>
@@ -1085,7 +1085,7 @@ const Agent = {
             </div>
             <div class="loading-text text-xs text-neutral-600 dark:text-white/70 font-semibold">جاري تحضير الرد...</div>
         `;
-        
+
         const textEl = div.querySelector('.loading-text');
         const phrases = [
             "جاري تحضير الرد...",
@@ -1104,11 +1104,11 @@ const Agent = {
                 clearInterval(intervalId);
             }
         }, 2500);
-        
+
         div.dataset.intervalId = intervalId;
-        
+
         const originalRemove = div.remove;
-        div.remove = function() {
+        div.remove = function () {
             if (this.dataset.intervalId) {
                 clearInterval(parseInt(this.dataset.intervalId));
             }
@@ -1291,7 +1291,7 @@ const Agent = {
 
             status.textContent = 'مطابقة البصمة...';
             const matchResult = await this.searchStudentByFingerprint(descriptor);
-            
+
             this.lastIdentifyResult = {
                 success: true,
                 faceDetected: true,
@@ -1369,7 +1369,7 @@ const Agent = {
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(studentsData), "الطلاب");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(teachersData), "المعلمون");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendanceData), "سجل الحضور");
-                
+
                 XLSX.writeFile(wb, `تقرير_النظام_الشامل_${Date.now()}.xlsx`);
             }
         });
@@ -1538,8 +1538,8 @@ const Agent = {
                     });
                 } else if (cmd.table === 'records') {
                     const list = await DB.getRecords();
-                    results = list.filter(r => 
-                        (r.date && r.date.toLowerCase() === query) || 
+                    results = list.filter(r =>
+                        (r.date && r.date.toLowerCase() === query) ||
                         (r.classId && r.classId.toLowerCase() === query)
                     );
                 }
@@ -1826,7 +1826,7 @@ const Agent = {
         };
 
         const config = providers[currentProvider];
-        
+
         let messages = [];
         if (useFreshMemory) {
             messages = [
@@ -1888,7 +1888,7 @@ const Agent = {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop();
@@ -1905,7 +1905,7 @@ const Agent = {
                                 if (delta) {
                                     const content = delta.content || '';
                                     const reasoning = delta.reasoning_content || delta.reasoning || '';
-                                    
+
                                     if (content) fullText += content;
                                     if (reasoning) fullReasoningText += reasoning;
 
@@ -1948,11 +1948,12 @@ const Agent = {
 
     async _streamHiddenAgent(msgEl, systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, loadingDiv = null) {
         const bodyEl = msgEl.querySelector('.agent-msg-ai-body') || msgEl.querySelector('.agent-msg-ai') || msgEl;
-        
+
         let thinkingDropdown = null;
         let thinkingContent = null;
         let contentContainer = null;
         let isThinkingComplete = false;
+        let hasScrolledForThisResponse = false;
         const modelName = modelOverride || this.defaultModel;
 
         const responseText = await this._callHiddenAgent(
@@ -1966,12 +1967,17 @@ const Agent = {
                     loadingDiv.remove();
                     loadingDiv = null;
                 }
+                
+                if (!hasScrolledForThisResponse) {
+                    hasScrolledForThisResponse = true;
+                    this.scrollToBottom(true);
+                }
                 if (chunk.reasoning_content) {
                     if (!thinkingDropdown) {
                         thinkingDropdown = document.createElement('details');
                         thinkingDropdown.className = 'agent-thinking-dropdown bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-2.5 mb-2.5 opacity-90';
                         thinkingDropdown.open = false;
-                        
+
                         const summary = document.createElement('summary');
                         summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
                         summary.innerHTML = `
@@ -2055,8 +2061,6 @@ const Agent = {
                         bodyEl.appendChild(usageBadge);
                     }
                 }
-
-                this.scrollToBottom(false);
             }
         );
 
@@ -2092,7 +2096,7 @@ const Agent = {
         try {
             if (cmd.action === 'insert') {
                 const dataItems = Array.isArray(cmd.data) ? cmd.data : [cmd.data];
-                
+
                 if (cmd.table === 'classes') {
                     const list = await DB.getClasses();
                     for (const item of dataItems) {
@@ -2169,8 +2173,8 @@ const Agent = {
     async _executeCommandWithVerification(cmd) {
         const capturedErrors = [];
         const originalConsoleError = console.error;
-        
-        console.error = function(...args) {
+
+        console.error = function (...args) {
             capturedErrors.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
             originalConsoleError.apply(console, args);
         };
@@ -2200,7 +2204,7 @@ const Agent = {
 
     async _silentLogToGoogleSheets(errorDetails) {
         const webhookUrl = localStorage.getItem('google_sheets_webhook_url') || '';
-        
+
         // التسجيل الاحتياطي الصامت في Firestore (حتى لا تضيع الأخطاء إذا لم يكن Webhook مهيئاً)
         try {
             await DB.insert('v2_agentic_logs', {
@@ -2300,11 +2304,11 @@ const Agent = {
 
         Agent.setStatus('جاري معالجة الملف...', true);
 
-                if (file.type && file.type.startsWith('image/')) {
+        if (file.type && file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const dataUrl = e.target.result;
-                
+
                 // Show thumbnail
                 if (thumbnail) {
                     thumbnail.src = dataUrl;
@@ -2344,7 +2348,7 @@ const Agent = {
             };
             Agent.currentFingerprint = null;
             Agent.currentMatchedStudent = null;
-            
+
             if (statusEl) {
                 statusEl.textContent = 'ملف جاهز';
                 statusEl.style.color = '#4caf50';
@@ -2369,12 +2373,12 @@ const Agent = {
                 if (s.descriptors) {
                     try {
                         descriptors = typeof s.descriptors === 'string' ? JSON.parse(s.descriptors) : s.descriptors;
-                    } catch(e) {}
+                    } catch (e) { }
                 } else if (s.descriptor) {
                     try {
                         const single = typeof s.descriptor === 'string' ? JSON.parse(s.descriptor) : s.descriptor;
                         if (single) descriptors = [single];
-                    } catch(e) {}
+                    } catch (e) { }
                 }
 
                 if (!Array.isArray(descriptors)) continue;
@@ -2407,7 +2411,7 @@ const Agent = {
                 };
             }
             return { success: true, match: null, reason: 'لم يتم العثور على طالب مطابق لهذه البصمة في قاعدة البيانات.' };
-        } catch(e) {
+        } catch (e) {
             console.error('Error searching fingerprint:', e);
             return { success: false, error: e.message };
         }
@@ -2417,14 +2421,14 @@ const Agent = {
         const id = `diag-${Date.now()}`;
         const div = document.createElement('div');
         div.className = 'animate-fade-in mb-3 mx-2';
-        
+
         let stepsHtml = '';
         if (data.attempts && data.attempts.length > 0) {
             stepsHtml = data.attempts.map((attempt, index) => {
                 const isSuccess = attempt.success;
                 const statusIcon = isSuccess ? 'check_circle' : 'cancel';
                 const statusColor = isSuccess ? 'text-green-500' : 'text-red-500';
-                
+
                 return `
                     <div class="relative pl-6 pb-4 border-l border-dashed ${index === data.attempts.length - 1 ? 'border-transparent' : 'border-black/10 dark:border-white/10'} last:pb-0">
                         <div class="absolute -left-[8px] top-0.5 w-4 h-4 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center border border-black/10 dark:border-white/5">
