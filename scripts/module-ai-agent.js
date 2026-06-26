@@ -6,7 +6,7 @@
 const Agent = {
     // ════════════════ CONFIGURATION ════════════════
     provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
-    defaultModel: 'qwen/qwen3.7-plus', // Default model to use (e.g. sakana/fugu-ultra)
+    defaultModel: 'xiaomi/mimo-v2.5-pro', // Default model to use (e.g. sakana/fugu-ultra)
 
     // API Keys - can be set directly here or fall back to Gemini/localStorage settings
     apiKeys: {
@@ -1903,7 +1903,8 @@ const Agent = {
                                 const delta = parsed.choices?.[0]?.delta;
                                 if (delta) {
                                     const content = delta.content || '';
-                                    const reasoning = delta.reasoning_content || delta.reasoning || '';
+                                    const reasoning = delta.reasoning_content || delta.reasoning || delta.thinking || '';
+                                    const toolCalls = delta.tool_calls || null;
 
                                     if (content) fullText += content;
                                     if (reasoning) fullReasoningText += reasoning;
@@ -1911,6 +1912,7 @@ const Agent = {
                                     onChunk({
                                         content: content,
                                         reasoning_content: reasoning,
+                                        tool_calls: toolCalls,
                                         fullContent: fullText,
                                         fullReasoning: fullReasoningText,
                                         usage: parsed.usage || null
@@ -1948,12 +1950,63 @@ const Agent = {
     async _streamHiddenAgent(msgEl, systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, loadingDiv = null) {
         const bodyEl = msgEl.querySelector('.agent-msg-ai-body') || msgEl.querySelector('.agent-msg-ai') || msgEl;
 
-        let thinkingDropdown = null;
-        let thinkingContent = null;
-        let contentContainer = null;
+        // Remove loading indicator immediately since we are showing the thinking dropdown inside the AI bubble instead
+        if (loadingDiv) {
+            loadingDiv.remove();
+            loadingDiv = null;
+        }
+
+        // Determine if there is search intent in the user message
+        let userText = '';
+        if (typeof userMessage === 'string') {
+            userText = userMessage;
+        } else if (Array.isArray(userMessage)) {
+            const textObj = userMessage.find(m => m.type === 'text');
+            if (textObj) userText = textObj.text || '';
+        }
+        const searchKeywords = ['ابحث', 'البحث', 'نت', 'النت', 'إنترنت', 'الإنترنت', 'ويب', 'الويب', 'غوغل', 'قوقل', 'أخبار', 'الاخبار', 'الطقس', 'طقس', 'سعر', 'اسعار', 'الأسعار', 'اليوم', 'مباراة', 'مباريات'];
+        const hasSearchIntent = searchKeywords.some(keyword => userText.toLowerCase().includes(keyword));
+
+        // Create thinking dropdown immediately
+        let thinkingDropdown = document.createElement('details');
+        thinkingDropdown.className = 'agent-thinking-dropdown mb-2.5 opacity-90';
+        thinkingDropdown.open = true; // Open immediately to show streaming reasoning/searching!
+
+        const summary = document.createElement('summary');
+        summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 flex items-center gap-1.5 font-bold hover:text-neutral-700 dark:hover:text-white/70';
+        summary.innerHTML = `
+            <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
+            <span class="thinking-label">${hasSearchIntent ? 'جاري البحث في الإنترنت...' : 'جاري التفكير...'}</span>
+        `;
+        thinkingDropdown.appendChild(summary);
+
+        let thinkingContent = document.createElement('div');
+        thinkingContent.className = 'agent-thinking-content text-[11px] text-gray-600 dark:text-gray-300 pl-3 border-l border-orange-500/30 mt-2 leading-relaxed whitespace-pre-wrap';
+        thinkingContent.style.fontFamily = "'Tajawal', sans-serif";
+        thinkingContent.style.display = 'none'; // Hidden until there is reasoning text
+        thinkingDropdown.appendChild(thinkingContent);
+
+        // Put it as the first element in the bubble
+        bodyEl.insertBefore(thinkingDropdown, bodyEl.firstChild);
+
         let isThinkingComplete = false;
         let hasScrolledForThisResponse = false;
         const modelName = modelOverride || this.defaultModel;
+
+        // Cycle thinking phrases if not searching
+        if (!hasSearchIntent) {
+            const thinkingPhrases = ["جاري التفكير...", "تحليل الاستفسار...", "ما زلت أفكر...", "تحضير الإجابة..."];
+            let phraseIdx = 0;
+            thinkingDropdown.dataset.thinkingInterval = setInterval(() => {
+                const label = thinkingDropdown.querySelector('.thinking-label');
+                if (label && !isThinkingComplete) {
+                    phraseIdx = (phraseIdx + 1) % thinkingPhrases.length;
+                    label.textContent = thinkingPhrases[phraseIdx];
+                }
+            }, 2500);
+        }
+
+        let contentContainer = null;
 
         const responseText = await this._callHiddenAgent(
             systemContext,
@@ -1962,52 +2015,37 @@ const Agent = {
             modelName,
             useFreshMemory,
             async (chunk) => {
-                if (loadingDiv) {
-                    loadingDiv.remove();
-                    loadingDiv = null;
-                }
-                
                 if (!hasScrolledForThisResponse) {
                     hasScrolledForThisResponse = true;
                     this.scrollToBottom(true);
                 }
-                if (chunk.reasoning_content) {
-                    if (!thinkingDropdown) {
-                        thinkingDropdown = document.createElement('details');
-                        thinkingDropdown.className = 'agent-thinking-dropdown mb-2.5 opacity-90';
-                        thinkingDropdown.open = false;
 
-                        const summary = document.createElement('summary');
-                        summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 flex items-center gap-1.5 font-bold hover:text-neutral-700 dark:hover:text-white/70';
-                        summary.innerHTML = `
-                            <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
-                            <span class="thinking-label">جاري التفكير...</span>
-                        `;
-                        thinkingDropdown.appendChild(summary);
+                // Detect if search tool was triggered
+                let isSearchingWeb = false;
+                if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+                    isSearchingWeb = true;
+                }
 
-                        thinkingContent = document.createElement('div');
-                        thinkingContent.className = 'agent-thinking-content text-[11px] text-gray-600 dark:text-gray-300 pl-3 border-l border-orange-500/30 mt-2 leading-relaxed whitespace-pre-wrap';
-                        thinkingContent.style.fontFamily = "'Tajawal', sans-serif";
-                        thinkingDropdown.appendChild(thinkingContent);
-
-                        bodyEl.insertBefore(thinkingDropdown, bodyEl.firstChild);
-
-                        // Cycle thinking phrases
-                        const thinkingPhrases = ["جاري التفكير...", "تحليل الاستفسار...", "ما زلت أفكر...", "تحضير الإجابة..."];
-                        let phraseIdx = 0;
-                        thinkingDropdown.dataset.thinkingInterval = setInterval(() => {
-                            const label = thinkingDropdown.querySelector('.thinking-label');
-                            if (label && !isThinkingComplete) {
-                                phraseIdx = (phraseIdx + 1) % thinkingPhrases.length;
-                                label.textContent = thinkingPhrases[phraseIdx];
-                            }
-                        }, 2500);
+                if (isSearchingWeb) {
+                    const label = thinkingDropdown.querySelector('.thinking-label');
+                    if (label && !isThinkingComplete && label.textContent !== 'جاري البحث في الإنترنت...') {
+                        label.textContent = 'جاري البحث في الإنترنت...';
+                        if (thinkingDropdown.dataset.thinkingInterval) {
+                            clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
+                            delete thinkingDropdown.dataset.thinkingInterval;
+                        }
                     }
+                }
+
+                // Stream reasoning/thinking text
+                if (chunk.reasoning_content && thinkingContent) {
+                    thinkingContent.style.display = 'block';
                     thinkingContent.textContent = chunk.fullReasoning;
                 }
 
+                // Stream actual content
                 if (chunk.content) {
-                    if (thinkingDropdown && !isThinkingComplete) {
+                    if (!isThinkingComplete) {
                         isThinkingComplete = true;
                         if (thinkingDropdown.dataset.thinkingInterval) {
                             clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
@@ -2020,9 +2058,9 @@ const Agent = {
                         }
                         const label = thinkingDropdown.querySelector('.thinking-label');
                         if (label) {
-                            label.textContent = 'تم التفكير';
+                            label.textContent = isSearchingWeb || hasSearchIntent ? 'تم التفكير والبحث في الإنترنت' : 'تم التفكير';
                         }
-                        thinkingDropdown.open = false;
+                        thinkingDropdown.open = false; // Collapse when complete!
                     }
 
                     if (!contentContainer) {
@@ -2039,6 +2077,7 @@ const Agent = {
                     }
                 }
 
+                // Handle token usage metrics if dev-mode is on
                 if (chunk.usage) {
                     const settings = await DB.getSettings();
                     if (settings?.customization?.['dev-mode']) {
@@ -2063,7 +2102,7 @@ const Agent = {
             }
         );
 
-        if (thinkingDropdown && !isThinkingComplete) {
+        if (!isThinkingComplete) {
             isThinkingComplete = true;
             if (thinkingDropdown.dataset.thinkingInterval) {
                 clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
@@ -2075,7 +2114,9 @@ const Agent = {
                 spinner.textContent = 'check_circle';
             }
             const label = thinkingDropdown.querySelector('.thinking-label');
-            if (label) label.textContent = 'تم التفكير';
+            if (label) {
+                label.textContent = hasSearchIntent ? 'تم التفكير والبحث في الإنترنت' : 'تم التفكير';
+            }
             thinkingDropdown.open = false;
         }
 
