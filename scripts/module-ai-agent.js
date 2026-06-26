@@ -10,10 +10,27 @@ const Agent = {
     isStreaming: false,
     currentMatchedStudent: null,
 
+    scrollToBottom(force = false) {
+        const messages = document.getElementById('agent-messages');
+        if (!messages) return;
+        if (force) {
+            messages.scrollTop = messages.scrollHeight;
+            this.userHasScrolledUp = false;
+        } else {
+            if (this.userHasScrolledUp) return;
+            const isAtBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 120;
+            if (isAtBottom) {
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+    },
+
     async init() {
         if (typeof GmailManager !== 'undefined') {
             await GmailManager.init();
         }
+        this.userHasScrolledUp = false;
+        this.lastScrollTop = 0;
         this.renderToggle();
         this.chatHistory = [{ role: 'system', content: await this.getSystemContext() }];
     },
@@ -92,7 +109,10 @@ const Agent = {
 8) stats — إحصائيات سريعة
 |||COMMAND|||{"type":"stats","data":{"title":"إحصائيات","items":[{"label":"الطلاب","value":"150"}]}}
 
-9) web_search — البحث في الويب (مدمج تلقائياً عبر OpenRouter)
+9) identify_student — التعرف على الوجه واستخراج البصمة الرقمية من الصورة المرفوعة
+|||COMMAND|||{"type":"identify_student"}
+
+10) web_search — البحث في الويب (مدمج تلقائياً عبر OpenRouter)
 عندما يسألك المستخدم عن معلومات عامة، حية، أو تاريخية خارج قاعدة البيانات المحلية، سيقوم خادم OpenRouter تلقائياً بتشغيل أداة البحث وإرجاع النتائج لك لتصيغ ردك النهائي بها.
 
 ═══ قواعد صارمة ═══
@@ -404,6 +424,23 @@ const Agent = {
                 }
             });
         });
+
+        const messages = document.getElementById('agent-messages');
+        if (messages) {
+            this.lastScrollTop = messages.scrollTop;
+            messages.addEventListener('scroll', () => {
+                if (this.isStreaming) {
+                    if (messages.scrollTop < this.lastScrollTop - 4) {
+                        this.userHasScrolledUp = true;
+                    }
+                    const isNearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 30;
+                    if (isNearBottom) {
+                        this.userHasScrolledUp = false;
+                    }
+                }
+                this.lastScrollTop = messages.scrollTop;
+            });
+        }
     },
 
     clearChat() {
@@ -486,21 +523,36 @@ const Agent = {
                 this.chatHistory.unshift({ role: 'system', content: liveContext });
             }
  
-            // Clear file preview details after getSystemContext has processed them
+            // Capture uploaded file reference before clearing preview UI
+            const uploadedFile = this.currentUploadedFile;
             this.clearFilePreviewUI();
  
             // --- المحاولة الأولى (الوكيل الخفي) ---
             console.log('[AutoPilot] Launching hidden agent (Attempt 1)...');
-            loadingDiv.remove();
             const msgEl = this.addMessage('', 'ai');
-            const hiddenResponse = await this._streamHiddenAgent(msgEl, liveContext, text, this.chatHistory);
+            let finalUserContent = text;
+            if (uploadedFile && uploadedFile.dataUrl && uploadedFile.type.startsWith('image/')) {
+                finalUserContent = [
+                    {
+                        type: 'text',
+                        text: text || 'حلل هذه الصورة'
+                    },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: uploadedFile.dataUrl
+                        }
+                    }
+                ];
+            }
+            const hiddenResponse = await this._streamHiddenAgent(msgEl, liveContext, finalUserContent, this.chatHistory, null, false, loadingDiv);
  
             const DELIMITER = '|||COMMAND|||';
             const hasCommand = hiddenResponse.includes(DELIMITER);
  
             if (!hasCommand) {
                 // محادثة طبيعية عادية، لا داعي للتحقق أو الفشل
-                this.chatHistory.push({ role: 'user', content: text });
+                this.chatHistory.push({ role: 'user', content: finalUserContent });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
                 return;
             }
@@ -532,19 +584,91 @@ const Agent = {
                 });
                 throw new Error(parseErrText);
             }
- 
-            // إظهار النص التمهيدي للتأكيد فوراً (مع دائرة الأفاتار)
-            if (mainText) {
-                this.addMessage(mainText, 'ai');
+
+            // تحديث حالة التفكير لتوضيح الأداة المستدعاة
+            const thinkingDropdown = msgEl.querySelector('.agent-thinking-dropdown');
+            if (thinkingDropdown) {
+                if (thinkingDropdown.dataset.thinkingInterval) {
+                    clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
+                }
+                const label = thinkingDropdown.querySelector('.thinking-label');
+                const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
+                if (label) {
+                    if (parsedCmd.type === 'database_action') {
+                        label.textContent = parsedCmd.action === 'select' ? 'جاري البحث في قاعدة البيانات...' : 'جاري تحديث قاعدة البيانات...';
+                    } else if (parsedCmd.type === 'identify_student') {
+                        label.textContent = 'جاري مطابقة بصمة الوجه...';
+                    } else if (parsedCmd.type === 'send_email') {
+                        label.textContent = 'جاري إرسال البريد الإلكتروني...';
+                    } else if (parsedCmd.type === 'send_notification') {
+                        label.textContent = 'جاري إرسال الإشعار...';
+                    } else if (parsedCmd.type === 'export_excel' || parsedCmd.type === 'export_word') {
+                        label.textContent = 'جاري تصدير التقرير...';
+                    } else {
+                        label.textContent = 'جاري تشغيل الأداة المطلوبة...';
+                    }
+                }
+                if (spinner) {
+                    spinner.textContent = 'sync';
+                    spinner.style.animation = 'spin 1.2s linear infinite';
+                }
             }
  
             // تنفيذ مع التحقق
             console.log('[AutoPilot] Executing and verifying command:', parsedCmd);
             const result = await this._executeCommandWithVerification(parsedCmd);
+
+            if (thinkingDropdown) {
+                const label = thinkingDropdown.querySelector('.thinking-label');
+                const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
+                if (label) {
+                    label.textContent = result.success ? 'تم التفكير وتلبية طلبك بنجاح' : 'فشل الإجراء المتخذ';
+                }
+                if (spinner) {
+                    spinner.className = 'material-symbols-outlined text-[14px] ' + (result.success ? 'text-green-500' : 'text-red-500');
+                    spinner.style.animation = 'none';
+                    spinner.textContent = result.success ? 'check_circle' : 'error';
+                }
+            }
  
             if (result.success) {
-                this.chatHistory.push({ role: 'user', content: text });
+                this.chatHistory.push({ role: 'user', content: finalUserContent });
                 this.chatHistory.push({ role: 'assistant', content: hiddenResponse });
+
+                if (parsedCmd.type === 'identify_student') {
+                    const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
+                    let resultsText = '';
+                    if (!idRes.success) {
+                        resultsText = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
+                    } else if (!idRes.faceDetected) {
+                        resultsText = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
+                    } else {
+                        resultsText = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف وجه واستخراج البصمة بنجاح.\n` +
+                            `- البصمة الرقمية للوجه (descriptor): "${JSON.stringify(idRes.fingerprint)}"\n` +
+                            (idRes.match 
+                                ? `- تم مطابقة الوجه مع الطالب التالي في قاعدة البيانات:\n` +
+                                  `  * الاسم: ${idRes.match.name}\n` +
+                                  `  * معرف الطالب (ID): ${idRes.match.id}\n` +
+                                  `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
+                                  `  * معرف الصف (classId): ${idRes.match.classId}\n` +
+                                  `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
+                                : `- لم يتم مطابقة الوجه مع أي طالب مسجل حالياً في قاعدة البيانات.\n` +
+                                  `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
+                    }
+
+                    this.chatHistory.push({ role: 'user', content: resultsText });
+
+                    this.setStatus('جاري صياغة الرد النهائي...', true);
+                    const finalMsgEl = this.addMessage('', 'ai');
+
+                    await this._streamHiddenAgent(
+                        finalMsgEl,
+                        liveContext,
+                        "الرجاء صياغة الرد النهائي للمستخدم بناءً على نتائج أداة التعرف على الوجه السابقة المعروضة أمامك، وتزويد التفاصيل المطلوبة.",
+                        this.chatHistory
+                    );
+                    return;
+                }
 
                 if (parsedCmd.type === 'database_action' && parsedCmd.action === 'select') {
                     const resultsData = this.lastQueryResult?.data || [];
@@ -600,14 +724,14 @@ const Agent = {
 `;
  
             try {
-                correctionLoading.remove();
                 const fallbackMsgEl = this.addMessage('', 'ai');
                 const fallbackResponse = await this._streamHiddenAgent(fallbackMsgEl,
                     liveContext, 
                     correctionPrompt, 
                     [], // ذاكرة نظيفة تماماً لتفادي الهلوسة البرمجية
-                    'xiaomi/mimo-v2.5-pro',
-                    true // تفعيل ذاكرة نظيفة
+                    'sakana/fugu-ultra',
+                    true, // تفعيل ذاكرة نظيفة
+                    correctionLoading
                 );
  
                 correctionNotice.remove();
@@ -639,13 +763,97 @@ const Agent = {
                     throw new Error(parseErrText);
                 }
  
+                // تحديث حالة التفكير لتوضيح الأداة المستدعاة للمحاولة الثانية
+                const fallbackThinkingDropdown = fallbackMsgEl.querySelector('.agent-thinking-dropdown');
+                if (fallbackThinkingDropdown) {
+                    if (fallbackThinkingDropdown.dataset.thinkingInterval) {
+                        clearInterval(parseInt(fallbackThinkingDropdown.dataset.thinkingInterval));
+                    }
+                    const label = fallbackThinkingDropdown.querySelector('.thinking-label');
+                    const spinner = fallbackThinkingDropdown.querySelector('span.material-symbols-outlined');
+                    if (label) {
+                        if (parsedFallbackCmd.type === 'database_action') {
+                            label.textContent = parsedFallbackCmd.action === 'select' ? 'جاري البحث في قاعدة البيانات...' : 'جاري تحديث قاعدة البيانات...';
+                        } else if (parsedFallbackCmd.type === 'identify_student') {
+                            label.textContent = 'جاري مطابقة بصمة الوجه...';
+                        } else if (parsedFallbackCmd.type === 'send_email') {
+                            label.textContent = 'جاري إرسال البريد الإلكتروني...';
+                        } else if (parsedFallbackCmd.type === 'send_notification') {
+                            label.textContent = 'جاري إرسال الإشعار...';
+                        } else if (parsedFallbackCmd.type === 'export_excel' || parsedFallbackCmd.type === 'export_word') {
+                            label.textContent = 'جاري تصدير التقرير...';
+                        } else {
+                            label.textContent = 'جاري تشغيل الأداة المطلوبة...';
+                        }
+                    }
+                    if (spinner) {
+                        spinner.textContent = 'sync';
+                        spinner.style.animation = 'spin 1.2s linear infinite';
+                    }
+                }
+
                 // تنفيذ مع التحقق من جديد
                 console.log('[AutoPilot] Executing and verifying fallback command:', parsedFallbackCmd);
                 const fallbackResult = await this._executeCommandWithVerification(parsedFallbackCmd);
+
+                if (fallbackThinkingDropdown) {
+                    const label = fallbackThinkingDropdown.querySelector('.thinking-label');
+                    const spinner = fallbackThinkingDropdown.querySelector('span.material-symbols-outlined');
+                    if (label) {
+                        label.textContent = fallbackResult.success ? 'تم تصحيح المشكلة وتلبية طلبك بنجاح' : 'فشل تصحيح المشكلة';
+                    }
+                    if (spinner) {
+                        spinner.className = 'material-symbols-outlined text-[14px] ' + (fallbackResult.success ? 'text-green-500' : 'text-red-500');
+                        spinner.style.animation = 'none';
+                        spinner.textContent = fallbackResult.success ? 'check_circle' : 'error';
+                    }
+                }
  
                 if (fallbackResult.success) {
-                    this.chatHistory.push({ role: 'user', content: text });
+                    this.chatHistory.push({ role: 'user', content: finalUserContent });
                     this.chatHistory.push({ role: 'assistant', content: fallbackResponse });
+
+                    if (parsedFallbackCmd.type === 'identify_student') {
+                        const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
+                        let resultsText = '';
+                        if (!idRes.success) {
+                            resultsText = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
+                        } else if (!idRes.faceDetected) {
+                            resultsText = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
+                        } else {
+                            resultsText = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف وجه واستخراج البصمة بنجاح.\n` +
+                                `- البصمة الرقمية للوجه (descriptor): "${JSON.stringify(idRes.fingerprint)}"\n` +
+                                (idRes.match 
+                                    ? `- تم مطابقة الوجه مع الطالب التالي في قاعدة البيانات:\n` +
+                                      `  * الاسم: ${idRes.match.name}\n` +
+                                      `  * معرف الطالب (ID): ${idRes.match.id}\n` +
+                                      `  * الرقم الأكاديمي (academicId): ${idRes.match.academicId}\n` +
+                                      `  * معرف الصف (classId): ${idRes.match.classId}\n` +
+                                      `  * مسافة التطابق (Confidence Distance): ${idRes.match.distance.toFixed(4)}\n`
+                                    : `- لم يتم مطابقة الوجه مع أي طالب مسجل حالياً في قاعدة البيانات.\n` +
+                                      `- حقل "descriptors" للطالب في قاعدة البيانات يجب أن يتم تحديثه/إضافته كـ JSON stringified array يحتوي على البصمة الرقمية، أي: "descriptors": ${JSON.stringify([idRes.fingerprint])}\n`);
+                        }
+
+                        this.chatHistory.push({ role: 'user', content: resultsText });
+
+                        this.setStatus('جاري صياغة الرد النهائي...', true);
+                        const finalMsgEl = this.addMessage('', 'ai');
+
+                        await this._streamHiddenAgent(
+                            finalMsgEl,
+                            liveContext,
+                            "الرجاء صياغة الرد النهائي للمستخدم بناءً على نتائج أداة التعرف على الوجه السابقة المعروضة أمامك، وتزويد التفاصيل المطلوبة.",
+                            this.chatHistory
+                        );
+
+                        attempts.push({
+                            title: 'التشخيص والتصحيح الذاتي (المحاولة الثانية)',
+                            success: true,
+                            action: `تم التعرف على الوجه بنجاح: ${JSON.stringify(parsedFallbackCmd)}`
+                        });
+                        this._renderDiagnosticsCard(document.getElementById('agent-messages'), { attempts });
+                        return;
+                    }
 
                     if (parsedFallbackCmd.type === 'database_action' && parsedFallbackCmd.action === 'select') {
                         const resultsData = this.lastQueryResult?.data || [];
@@ -675,9 +883,6 @@ const Agent = {
                         return;
                     }
                     
-                    if (fallbackMainText) {
-                        this.addMessagePlain(fallbackMainText);
-                    }
                     const successText = `🎉 تم تصحيح المشكلة بنجاح تام وإتمام العملية!`;
                     this.addMessagePlain(successText);
  
@@ -842,44 +1047,51 @@ const Agent = {
     addLoadingIndicator() {
         const messages = document.getElementById('agent-messages');
         const div = document.createElement('div');
-        div.className = 'flex gap-2';
+        div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl max-w-[280px]';
+        div.style.padding = '10px 14px';
+        div.style.alignSelf = 'flex-start';
+        div.style.marginBottom = '12px';
+        
         div.innerHTML = `
-            <div class="bg-white/5 border border-white/10 p-3 rounded-2xl rounded-tr-none animate-fade-in flex items-center justify-center">
-                <svg class="pencil-loader" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <clipPath id="pencil-eraser">
-                            <rect rx="5" ry="5" width="30" height="30"></rect>
-                        </clipPath>
-                    </defs>
-                    <circle class="pencil__stroke" r="70" fill="none" stroke="transparent" stroke-width="2" stroke-dasharray="439.82 439.82" stroke-dashoffset="439.82" stroke-linecap="round" transform="rotate(-113,100,100)" />
-                    <image href="assets/AI-logo.png" x="60" y="60" width="80" height="80" class="pencil__logo" />
-                    <g class="pencil__rotate" transform="translate(100,100)">
-                        <g fill="none">
-                            <circle class="pencil__body1" r="64" stroke="hsl(33,90%,50%)" stroke-width="30" stroke-dasharray="402.12 402.12" stroke-dashoffset="402" transform="rotate(-90)" />
-                            <circle class="pencil__body2" r="74" stroke="hsl(33,90%,60%)" stroke-width="10" stroke-dasharray="464.96 464.96" stroke-dashoffset="465" transform="rotate(-90)" />
-                            <circle class="pencil__body3" r="54" stroke="hsl(33,90%,40%)" stroke-width="10" stroke-dasharray="339.29 339.29" stroke-dashoffset="339" transform="rotate(-90)" />
-                        </g>
-                        <g class="pencil__eraser" transform="rotate(-90) translate(49,0)">
-                            <g class="pencil__eraser-skew">
-                                <rect fill="hsl(343,90%,70%)" rx="5" ry="5" width="30" height="30" />
-                                <rect fill="hsl(343,90%,60%)" width="5" height="30" clip-path="url(#pencil-eraser)" />
-                                <rect fill="hsl(223,10%,90%)" width="30" height="20" />
-                                <rect fill="hsl(223,10%,70%)" width="15" height="20" />
-                                <rect fill="hsl(223,10%,80%)" width="5" height="20" />
-                                <rect fill="hsla(223,10%,10%,0.2)" y="6" width="30" height="2" />
-                                <rect fill="hsla(223,10%,10%,0.2)" y="13" width="30" height="2" />
-                            </g>
-                        </g>
-                        <g class="pencil__point" transform="rotate(-90) translate(49,-30)">
-                            <polygon fill="hsl(33,90%,70%)" points="15 0,30 30,0 30" />
-                            <polygon fill="hsl(33,90%,50%)" points="15 0,6 30,0 30" />
-                            <polygon fill="hsl(223,10%,10%)" points="15 0,20 10,10 10" />
-                        </g>
-                    </g>
-                </svg>
-            </div>`;
+            <div class="flex items-center gap-1 shrink-0" style="direction: ltr;">
+                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.1s; display: inline-block;"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.2s; display: inline-block;"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.3s; display: inline-block;"></span>
+            </div>
+            <div class="loading-text text-xs text-white/70 font-semibold">جاري تحضير الرد...</div>
+        `;
+        
+        const textEl = div.querySelector('.loading-text');
+        const phrases = [
+            "جاري تحضير الرد...",
+            "نجمع لك أفضل البيانات...",
+            "يكتب الآن...",
+            "يرجى الانتظار ثوانٍ معدودة...",
+            "نصوغ لك إجابة دقيقة...",
+            "نستخرج السجلات المطلوبة..."
+        ];
+        let phraseIdx = 0;
+        const intervalId = setInterval(() => {
+            if (div.parentNode) {
+                phraseIdx = (phraseIdx + 1) % phrases.length;
+                textEl.textContent = phrases[phraseIdx];
+            } else {
+                clearInterval(intervalId);
+            }
+        }, 2500);
+        
+        div.dataset.intervalId = intervalId;
+        
+        const originalRemove = div.remove;
+        div.remove = function() {
+            if (this.dataset.intervalId) {
+                clearInterval(parseInt(this.dataset.intervalId));
+            }
+            originalRemove.call(this);
+        };
+
         messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
+        this.scrollToBottom(true);
         return div;
     },
 
@@ -1002,8 +1214,79 @@ const Agent = {
             await this._handleSendNotification(messages, cmd);
         } else if (cmd.type === 'full_system_export') {
             await this._handleFullSystemExport(messages, cmd);
+        } else if (cmd.type === 'identify_student') {
+            await this._handleIdentifyStudent(messages, cmd);
         } else {
             console.warn('Unknown command type:', cmd.type);
+        }
+    },
+
+    async _handleIdentifyStudent(messages, cmd) {
+        const div = document.createElement('div');
+        div.className = 'animate-fade-in mb-3 mx-2';
+        div.innerHTML = `
+            <div class="bg-gray-800 text-white p-3 rounded-2xl text-[10px] font-bold flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm text-primary">face</span>
+                    <span>جاري تشغيل أداة التعرف على الوجه...</span>
+                </div>
+                <div id="face-status-${Date.now()}" class="text-primary">جاري المعالجة...</div>
+            </div>`;
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+        const status = div.querySelector('div:last-child');
+
+        try {
+            if (!this.lastUploadedImageForTools) {
+                throw new Error("لم يتم العثور على أي صورة مرفوعة حالياً للتعرف عليها.");
+            }
+
+            status.textContent = 'تحميل الصورة...';
+            const img = new Image();
+            img.src = this.lastUploadedImageForTools;
+
+            const descriptor = await new Promise((resolve, reject) => {
+                img.onload = async () => {
+                    try {
+                        const desc = await FaceDetection.getDescriptorFromImage(img);
+                        resolve(desc);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                img.onerror = () => reject(new Error("فشل تحميل الصورة المرفوعة لمعالجتها."));
+            });
+
+            if (!descriptor) {
+                status.textContent = 'لم يتم كشف وجه ✗';
+                status.className = 'text-red-400';
+                this.lastIdentifyResult = { success: true, faceDetected: false };
+                return;
+            }
+
+            status.textContent = 'مطابقة البصمة...';
+            const matchResult = await this.searchStudentByFingerprint(descriptor);
+            
+            this.lastIdentifyResult = {
+                success: true,
+                faceDetected: true,
+                fingerprint: descriptor,
+                match: (matchResult && matchResult.success && matchResult.match) ? matchResult.match : null
+            };
+
+            if (this.lastIdentifyResult.match) {
+                status.textContent = `تم التعرف: ${this.lastIdentifyResult.match.name} ✓`;
+                status.className = 'text-green-400';
+            } else {
+                status.textContent = 'بصمة صالحة (غير مسجل) ✓';
+                status.className = 'text-green-400';
+            }
+        } catch (e) {
+            status.textContent = 'فشل ✗';
+            status.className = 'text-red-400';
+            console.error('Face Identification Error:', e);
+            this.lastIdentifyResult = { success: false, error: e.message };
+            this.addMessage(`❌ فشل التعرف على الوجه: ${e.message}`, 'ai');
         }
     },
 
@@ -1140,23 +1423,25 @@ const Agent = {
         const div = document.createElement('div');
         div.className = 'animate-fade-in mb-3 mx-2';
         div.innerHTML = `
-            <div class="bg-gray-800 text-white p-3 rounded-2xl text-[10px] font-bold flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm text-primary">database</span>
-                    <span>تنفيذ عملية: ${cmd.action} على ${cmd.table}</span>
+            <div class="bg-white/5 border border-white/10 text-white p-3.5 rounded-2xl text-xs font-bold flex flex-col gap-2 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm text-primary">database</span>
+                        <span>تنفيذ عملية: ${cmd.action === 'select' ? 'بحث' : cmd.action} على ${cmd.table}</span>
+                    </div>
+                    <div id="db-status-${Date.now()}" class="text-primary font-bold">جاري...</div>
                 </div>
-                <div id="db-status-${Date.now()}" class="text-primary">جاري...</div>
             </div>`;
         messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
+        this.scrollToBottom(true);
 
-        const status = div.querySelector('div:last-child');
+        const status = div.querySelector('div.text-primary');
 
         // التحقق من المعرفات الوهمية (Placeholders)
         const placeholderIds = ['ID_HERE', 'STUDENT_ID', 'TEACHER_ID', 'CLASS_ID', 'ID_CLASS', 'NEW_ID'];
         if (cmd.id && placeholderIds.includes(cmd.id)) {
             status.textContent = 'خطأ: معرف غير صالح';
-            status.className = 'text-red-400';
+            status.className = 'text-red-400 font-bold';
             this.addMessage(`⚠️ تنبيه: حاول الوكيل استخدام معرف غير حقيقي (${cmd.id}). يرجى تزويده بالمعرف الصحيح من القوائم.`, 'ai');
             return;
         }
@@ -1242,7 +1527,42 @@ const Agent = {
                 };
 
                 status.textContent = `تم العثور على ${results.length} نتائج ✓`;
-                status.className = 'text-green-400';
+                status.className = 'text-green-400 font-bold';
+
+                if (results.length > 0) {
+                    const resDiv = document.createElement('div');
+                    resDiv.className = 'mt-2 p-2.5 bg-black/30 rounded-xl text-[10.5px] text-white/90 max-h-48 overflow-y-auto space-y-1.5 hide-scrollbar';
+                    resDiv.style.border = '1px solid rgba(255,255,255,0.05)';
+                    resDiv.style.direction = 'rtl';
+                    resDiv.innerHTML = results.map((item, idx) => {
+                        if (cmd.table === 'students') {
+                            return `<div class="flex justify-between border-b border-white/5 pb-1 gap-4">
+                                <span class="truncate font-semibold">${idx + 1}. ${item.name}</span>
+                                <span class="shrink-0 text-white/60">الأكاديمي: ${item.academicId || '-'}</span>
+                            </div>`;
+                        } else if (cmd.table === 'teachers') {
+                            return `<div class="flex justify-between border-b border-white/5 pb-1 gap-4">
+                                <span class="truncate font-semibold">${idx + 1}. ${item.name}</span>
+                                <span class="shrink-0 text-white/60">الوزارة: ${item.ministryId || '-'}</span>
+                            </div>`;
+                        } else if (cmd.table === 'classes') {
+                            return `<div class="flex justify-between border-b border-white/5 pb-1 gap-4">
+                                <span class="truncate font-semibold">${idx + 1}. ${item.name}</span>
+                                <span class="shrink-0 text-white/60">الشعبة: ${item.section || 'عام'}</span>
+                            </div>`;
+                        } else if (cmd.table === 'records') {
+                            const present = item.details?.filter(d => d.status === 'present').length || 0;
+                            const absent = item.details?.filter(d => d.status === 'absent').length || 0;
+                            return `<div class="flex justify-between border-b border-white/5 pb-1 gap-4">
+                                <span class="font-semibold">${idx + 1}. التاريخ: ${item.date}</span>
+                                <span class="shrink-0 text-white/60">حضور: ${present} | غياب: ${absent}</span>
+                            </div>`;
+                        }
+                        return `<div class="border-b border-white/5 pb-1 text-[9px] truncate">${idx + 1}. ${JSON.stringify(item)}</div>`;
+                    }).join('');
+                    div.firstElementChild.appendChild(resDiv);
+                    this.scrollToBottom(true);
+                }
             } else if (cmd.action === 'insert') {
                 const dataItems = Array.isArray(cmd.data) ? cmd.data : [cmd.data];
                 status.textContent = `جاري إضافة ${dataItems.length} عنصر...`;
@@ -1251,6 +1571,7 @@ const Agent = {
                     await DB.insert(cmd.table, item);
                 }
                 status.textContent = 'تمت الإضافة بنجاح ✓';
+                status.className = 'text-green-400 font-bold';
             } else {
                 // الحذف والتعديل يتطلب معرفات
                 const ids = cmd.ids || [cmd.id || cmd.ID || cmd.studentId || cmd.teacherId || cmd.classId || cmd.academicId];
@@ -1268,10 +1589,9 @@ const Agent = {
                         await DB.delete(cmd.table, finalId);
                     }
                 }
-                status.textContent = 'تم تنفيذ المجموعة بنجاح ✓';
+                status.textContent = 'تم التنفيذ بنجاح ✓';
+                status.className = 'text-green-400 font-bold';
             }
-
-            status.className = 'text-green-400';
 
 
 
@@ -1443,15 +1763,15 @@ const Agent = {
         } catch (e) {
             console.warn("Failed to fetch model pricing:", e);
         }
-        if (modelName === "xiaomi/mimo-v2.5-pro") {
-            return { prompt: "0.00000015", completion: "0.0000006" };
+        if (modelName === "sakana/fugu-ultra") {
+            return { prompt: "0.000002", completion: "0.000002" };
         }
         return { prompt: "0", completion: "0" };
     },
 
     async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, onChunk = null) {
         const currentProvider = this.provider;
-        const modelName = modelOverride || "xiaomi/mimo-v2.5-pro";
+        const modelName = modelOverride || "sakana/fugu-ultra";
         const providers = {
             inworld: {
                 url: "https://api.inworld.ai/v1/chat/completions",
@@ -1467,11 +1787,7 @@ const Agent = {
                     "X-Title": "Attendance AI Agent"
                 },
                 body: {
-                    model: modelName,
-                    provider: {
-                        only: ["xiaomi"],
-                        allow_fallbacks: false
-                    }
+                    model: modelName
                 }
             }
         };
@@ -1597,14 +1913,14 @@ const Agent = {
         }
     },
 
-    async _streamHiddenAgent(msgEl, systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false) {
+    async _streamHiddenAgent(msgEl, systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, loadingDiv = null) {
         const bodyEl = msgEl.querySelector('.agent-msg-ai-body') || msgEl.querySelector('.agent-msg-ai') || msgEl;
         
         let thinkingDropdown = null;
         let thinkingContent = null;
         let contentContainer = null;
         let isThinkingComplete = false;
-        const modelName = modelOverride || "xiaomi/mimo-v2.5-pro";
+        const modelName = modelOverride || "sakana/fugu-ultra";
 
         const responseText = await this._callHiddenAgent(
             systemContext,
@@ -1613,11 +1929,15 @@ const Agent = {
             modelName,
             useFreshMemory,
             async (chunk) => {
+                if (loadingDiv) {
+                    loadingDiv.remove();
+                    loadingDiv = null;
+                }
                 if (chunk.reasoning_content) {
                     if (!thinkingDropdown) {
                         thinkingDropdown = document.createElement('details');
-                        thinkingDropdown.className = 'agent-thinking-dropdown bg-black/10 border border-white/5 rounded-2xl p-2.5 mb-2.5';
-                        thinkingDropdown.open = true;
+                        thinkingDropdown.className = 'agent-thinking-dropdown bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-2.5 mb-2.5 opacity-90';
+                        thinkingDropdown.open = false;
                         
                         const summary = document.createElement('summary');
                         summary.className = 'text-xs text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
@@ -1628,10 +1948,22 @@ const Agent = {
                         thinkingDropdown.appendChild(summary);
 
                         thinkingContent = document.createElement('div');
-                        thinkingContent.className = 'agent-thinking-content text-[11px] text-white/60 pl-3 border-l border-white/10 mt-2 leading-relaxed font-mono whitespace-pre-wrap';
+                        thinkingContent.className = 'agent-thinking-content text-[11px] text-gray-600 dark:text-gray-300 pl-3 border-l border-orange-500/30 mt-2 leading-relaxed whitespace-pre-wrap';
+                        thinkingContent.style.fontFamily = "'Tajawal', sans-serif";
                         thinkingDropdown.appendChild(thinkingContent);
 
                         bodyEl.insertBefore(thinkingDropdown, bodyEl.firstChild);
+
+                        // Cycle thinking phrases
+                        const thinkingPhrases = ["جاري التفكير...", "تحليل الاستفسار...", "ما زلت أفكر...", "تحضير الإجابة..."];
+                        let phraseIdx = 0;
+                        thinkingDropdown.dataset.thinkingInterval = setInterval(() => {
+                            const label = thinkingDropdown.querySelector('.thinking-label');
+                            if (label && !isThinkingComplete) {
+                                phraseIdx = (phraseIdx + 1) % thinkingPhrases.length;
+                                label.textContent = thinkingPhrases[phraseIdx];
+                            }
+                        }, 2500);
                     }
                     thinkingContent.textContent = chunk.fullReasoning;
                 }
@@ -1639,6 +1971,9 @@ const Agent = {
                 if (chunk.content) {
                     if (thinkingDropdown && !isThinkingComplete) {
                         isThinkingComplete = true;
+                        if (thinkingDropdown.dataset.thinkingInterval) {
+                            clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
+                        }
                         const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
                         if (spinner) {
                             spinner.className = 'material-symbols-outlined text-[14px] text-green-500';
@@ -1688,14 +2023,15 @@ const Agent = {
                     }
                 }
 
-                const messages = document.getElementById('agent-messages');
-                if (messages) {
-                    messages.scrollTop = messages.scrollHeight;
-                }
+                this.scrollToBottom(false);
             }
         );
 
         if (thinkingDropdown && !isThinkingComplete) {
+            isThinkingComplete = true;
+            if (thinkingDropdown.dataset.thinkingInterval) {
+                clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
+            }
             const spinner = thinkingDropdown.querySelector('span.material-symbols-outlined');
             if (spinner) {
                 spinner.className = 'material-symbols-outlined text-[14px] text-green-500';
@@ -1931,7 +2267,7 @@ const Agent = {
 
         Agent.setStatus('جاري معالجة الملف...', true);
 
-        if (file.type && file.type.startsWith('image/')) {
+                if (file.type && file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const dataUrl = e.target.result;
@@ -1945,68 +2281,21 @@ const Agent = {
                     previewIcon.classList.add('hidden');
                 }
 
-                // Save it to Agent.currentUploadedFile
+                // Save it to Agent.currentUploadedFile and lastUploadedImageForTools
                 Agent.currentUploadedFile = {
                     name: file.name,
                     type: file.type,
                     dataUrl: dataUrl
                 };
+                Agent.lastUploadedImageForTools = dataUrl;
+                Agent.currentFingerprint = null;
+                Agent.currentMatchedStudent = null;
 
                 if (statusEl) {
-                    statusEl.textContent = 'جاري استخراج البصمة الرقمية...';
-                    statusEl.style.color = '#ffa726';
+                    statusEl.textContent = 'تم تحميل الصورة بنجاح ✓';
+                    statusEl.style.color = '#4caf50';
                 }
-
-                // Compute the digital fingerprint
-                try {
-                    const img = new Image();
-                    img.src = dataUrl;
-                    img.onload = async () => {
-                        const descriptor = await FaceDetection.getDescriptorFromImage(img);
-                        if (descriptor) {
-                            Agent.currentFingerprint = descriptor;
-                            console.log("Hodoori Agent: Extracted digital fingerprint successfully:", descriptor);
-                            
-                            if (statusEl) {
-                                statusEl.textContent = 'جاري البحث في قاعدة البيانات...';
-                                statusEl.style.color = '#ffa726';
-                            }
-                            
-                            const matchResult = await Agent.searchStudentByFingerprint(descriptor);
-                            if (matchResult && matchResult.success && matchResult.match) {
-                                Agent.currentMatchedStudent = matchResult.match;
-                                console.log("Hodoori Agent: Matched student:", matchResult.match);
-                                if (statusEl) {
-                                    statusEl.textContent = `طالب مطابق: ${matchResult.match.name} ✓`;
-                                    statusEl.style.color = '#4caf50';
-                                }
-                            } else {
-                                Agent.currentMatchedStudent = null;
-                                if (statusEl) {
-                                    statusEl.textContent = 'بصمة رقمية صالحة (غير مسجل) ✓';
-                                    statusEl.style.color = '#4caf50';
-                                }
-                            }
-                        } else {
-                            Agent.currentFingerprint = null;
-                            Agent.currentMatchedStudent = null;
-                            if (statusEl) {
-                                statusEl.textContent = '⚠️ لم يتم العثور على وجه';
-                                statusEl.style.color = '#f44336';
-                            }
-                        }
-                        Agent.setStatus('جاهز للمساعدة', false);
-                    };
-                } catch (err) {
-                    console.error("Error extracting descriptor from uploaded file:", err);
-                    Agent.currentFingerprint = null;
-                    Agent.currentMatchedStudent = null;
-                    if (statusEl) {
-                        statusEl.textContent = '❌ فشل المعالجة';
-                        statusEl.style.color = '#f44336';
-                    }
-                    Agent.setStatus('جاهز للمساعدة', false);
-                }
+                Agent.setStatus('جاهز للمساعدة', false);
             };
             reader.readAsDataURL(file);
         } else {

@@ -409,23 +409,24 @@
         }
 
         .agent-msg-ai-avatar {
-            width: 38px !important;
-            height: 38px !important;
-            border-radius: 50% !important;
-            background: #ffffff !important;
-            border: 1.5px solid rgba(255, 167, 38, 0.2) !important;
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            border: none !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             flex-shrink: 0 !important;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.03) !important;
-            overflow: hidden !important;
+            box-shadow: none !important;
+            overflow: visible !important;
         }
 
         .agent-msg-ai-avatar img {
-            width: 80% !important;
-            height: 80% !important;
+            width: 100% !important;
+            height: 100% !important;
             object-fit: contain !important;
+            mix-blend-mode: multiply !important;
         }
 
         .agent-msg-ai-body {
@@ -453,8 +454,8 @@
         }
         
         .theme-dark-orange .agent-msg-ai-avatar {
-            background: #23201d !important;
-            border-color: rgba(255, 167, 38, 0.3) !important;
+            background: transparent !important;
+            border: none !important;
         }
 
         /* Premium Markdown & Typography Rendering (Overrides Tailwind resets) */
@@ -1684,17 +1685,17 @@
                 // Force unexpand if empty
                 if (textarea.value.trim() === '') {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = '38px'; // Reset to default single-line height
+                    textarea.style.height = '36px'; // Reset to default single-line height
                 }
-                // If scrollHeight is greater than 45px (meaning it wraps to 2 lines) or includes newlines
-                else if (sHeight > 45 || textarea.value.includes('\n')) {
+                // If scrollHeight is greater than 48px (meaning it wraps to 2 lines) or includes newlines
+                else if (sHeight > 48 || textarea.value.includes('\n')) {
                     capsule.classList.add('expanded');
                     // Recalculate and set height with the expanded layout rules applied
                     textarea.style.height = 'auto';
                     textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
                 } else {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = '38px';
+                    textarea.style.height = '36px';
                 }
             } else {
                 textarea.style.height = 'auto';
@@ -3412,10 +3413,17 @@
                         ${fileContentHtml}
                     </div>`;
             } else {
+                const lastChild = messages.lastElementChild;
+                const isContinuation = lastChild && (
+                    lastChild.classList.contains('agent-msg-ai-row') || 
+                    lastChild.classList.contains('autopilot-loading-row') ||
+                    lastChild.querySelector('.agent-msg-ai-body')
+                );
+
                 div.className = `agent-msg-ai-row animate-fade-in mx-2`;
                 div.innerHTML = `
-                    <div class="agent-msg-ai-avatar">
-                        <img src="assets/AI-logo.png" alt="حضوري" style="width: 36px; height: 36px; object-fit: contain;" />
+                    <div class="agent-msg-ai-avatar"${isContinuation ? ' style="display: none !important;"' : ''}>
+                        <img src="assets/AI-logo.png" alt="حضوري" style="width: 48px; height: 48px; object-fit: contain; mix-blend-mode: multiply;" />
                     </div>
                     <div class="agent-msg-ai-body agent-markdown">
                         ${formattedContent}
@@ -3461,42 +3469,51 @@
         Agent.addLoadingIndicator = function () {
             const messages = document.getElementById('agent-messages');
             const div = document.createElement('div');
-            div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center justify-start';
-            div.style.padding = '4px 8px';
+            div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl max-w-[280px]';
+            div.style.padding = '10px 14px';
+            div.style.alignSelf = 'flex-start';
+            div.style.marginBottom = '12px';
+            
             div.innerHTML = `
-                <svg class="pencil-loader" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width: 32px; height: 32px;">
-                    <defs>
-                        <clipPath id="pencil-eraser">
-                            <rect rx="5" ry="5" width="30" height="30"></rect>
-                        </clipPath>
-                    </defs>
-                    <circle class="pencil__stroke" r="70" fill="none" stroke="transparent" stroke-width="2" stroke-dasharray="439.82 439.82" stroke-dashoffset="439.82" stroke-linecap="round" transform="rotate(-113,100,100)" />
-                    <g class="pencil__rotate" transform="translate(100,100)">
-                        <g fill="none">
-                            <circle class="pencil__body1" r="64" stroke="hsl(33,90%,50%)" stroke-width="30" stroke-dasharray="402.12 402.12" stroke-dashoffset="402" transform="rotate(-90)" />
-                            <circle class="pencil__body2" r="74" stroke="hsl(33,90%,60%)" stroke-width="10" stroke-dasharray="464.96 464.96" stroke-dashoffset="465" transform="rotate(-90)" />
-                            <circle class="pencil__body3" r="54" stroke="hsl(33,90%,40%)" stroke-width="10" stroke-dasharray="339.29 339.29" stroke-dashoffset="339" transform="rotate(-90)" />
-                        </g>
-                        <g class="pencil__eraser" transform="rotate(-90) translate(49,0)">
-                            <g class="pencil__eraser-skew">
-                                <rect fill="hsl(343,90%,70%)" rx="5" ry="5" width="30" height="30" />
-                                <rect fill="hsl(343,90%,60%)" width="5" height="30" clip-path="url(#pencil-eraser)" />
-                                <rect fill="hsl(223,10%,90%)" width="30" height="20" />
-                                <rect fill="hsl(223,10%,70%)" width="15" height="20" />
-                                <rect fill="hsl(223,10%,80%)" width="5" height="20" />
-                                <rect fill="hsla(223,10%,10%,0.2)" y="6" width="30" height="2" />
-                                <rect fill="hsla(223,10%,10%,0.2)" y="13" width="30" height="2" />
-                            </g>
-                        </g>
-                        <g class="pencil__point" transform="rotate(-90) translate(49,-30)">
-                            <polygon fill="hsl(33,90%,70%)" points="15 0,30 30,0 30" />
-                            <polygon fill="hsl(33,90%,50%)" points="15 0,6 30,0 30" />
-                            <polygon fill="hsl(223,10%,10%)" points="15 0,20 10,10 10" />
-                        </g>
-                    </g>
-                </svg>`;
+                <div class="flex items-center gap-1 shrink-0" style="direction: ltr;">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.1s; display: inline-block;"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.2s; display: inline-block;"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.3s; display: inline-block;"></span>
+                </div>
+                <div class="loading-text text-xs text-white/70 font-semibold">جاري تحضير الرد...</div>
+            `;
+            
+            const textEl = div.querySelector('.loading-text');
+            const phrases = [
+                "جاري تحضير الرد...",
+                "نجمع لك أفضل البيانات...",
+                "يكتب الآن...",
+                "يرجى الانتظار ثوانٍ معدودة...",
+                "نصوغ لك إجابة دقيقة...",
+                "نستخرج السجلات المطلوبة..."
+            ];
+            let phraseIdx = 0;
+            const intervalId = setInterval(() => {
+                if (div.parentNode) {
+                    phraseIdx = (phraseIdx + 1) % phrases.length;
+                    textEl.textContent = phrases[phraseIdx];
+                } else {
+                    clearInterval(intervalId);
+                }
+            }, 2500);
+            
+            div.dataset.intervalId = intervalId;
+            
+            const originalRemove = div.remove;
+            div.remove = function() {
+                if (this.dataset.intervalId) {
+                    clearInterval(parseInt(this.dataset.intervalId));
+                }
+                originalRemove.call(this);
+            };
+
             messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
+            Agent.scrollToBottom(true);
             return div;
         };
 
