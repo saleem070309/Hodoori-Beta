@@ -4,7 +4,32 @@
  */
 
 const Agent = {
-    provider: 'openrouter', // <--- غير القيمة هنا لـ 'openrouter' أو 'inworld' للتبديل بينهما
+    // ════════════════ CONFIGURATION ════════════════
+    provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
+    defaultModel: 'sakana/fugu-ultra', // Default model to use (e.g. sakana/fugu-ultra)
+    
+    // API Keys - can be set directly here or fall back to Gemini/localStorage settings
+    apiKeys: {
+        openrouter: '', // If empty, will fallback to Gemini.getOpenRouterKey()
+        inworld: '',    // If empty, will fallback to Gemini.getInworldKey()
+        deepinfra: ''   // Put your DeepInfra API key here (e.g., 'your_key')
+    },
+
+    getEffectiveProvider() {
+        if (this.provider !== 'auto') {
+            return this.provider;
+        }
+        const openrouterKey = this.apiKeys.openrouter || (typeof Gemini !== 'undefined' ? Gemini.getOpenRouterKey() : '');
+        const deepinfraKey = this.apiKeys.deepinfra || localStorage.getItem('deepinfra_api_key') || '';
+        const inworldKey = this.apiKeys.inworld || (typeof Gemini !== 'undefined' ? Gemini.getInworldKey() : '');
+
+        if (openrouterKey) return 'openrouter';
+        if (deepinfraKey) return 'deepinfra';
+        if (inworldKey) return 'inworld';
+        return 'openrouter'; // Fallback
+    },
+    // ══════════════════════════════════════════════
+
     chatHistory: [],
     isOpen: false,
     isStreaming: false,
@@ -729,7 +754,7 @@ const Agent = {
                     liveContext, 
                     correctionPrompt, 
                     [], // ذاكرة نظيفة تماماً لتفادي الهلوسة البرمجية
-                    'sakana/fugu-ultra',
+                    this.defaultModel,
                     true, // تفعيل ذاكرة نظيفة
                     correctionLoading
                 );
@@ -936,7 +961,7 @@ const Agent = {
                 chatHistory: this.chatHistory,
                 error: e.message,
                 timestamp: new Date().toISOString(),
-                provider: this.provider,
+                provider: this.getEffectiveProvider(),
                 uploadedFile: this.lastUploadedFile || null,
                 systemContext: liveContext
             };
@@ -1763,29 +1788,37 @@ const Agent = {
         } catch (e) {
             console.warn("Failed to fetch model pricing:", e);
         }
-        if (modelName === "sakana/fugu-ultra") {
+        if (modelName === this.defaultModel) {
             return { prompt: "0.000002", completion: "0.000002" };
         }
         return { prompt: "0", completion: "0" };
     },
 
     async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, onChunk = null) {
-        const currentProvider = this.provider;
-        const modelName = modelOverride || "sakana/fugu-ultra";
+        const currentProvider = this.getEffectiveProvider();
+        const modelName = modelOverride || this.defaultModel;
         const providers = {
             inworld: {
                 url: "https://api.inworld.ai/v1/chat/completions",
-                key: Gemini.getInworldKey(),
+                key: this.apiKeys.inworld || (typeof Gemini !== 'undefined' ? Gemini.getInworldKey() : ''),
                 headers: {},
                 body: { model: modelName }
             },
             openrouter: {
                 url: "https://openrouter.ai/api/v1/chat/completions",
-                key: Gemini.getOpenRouterKey(),
+                key: this.apiKeys.openrouter || (typeof Gemini !== 'undefined' ? Gemini.getOpenRouterKey() : ''),
                 headers: {
                     "HTTP-Referer": window.location.origin,
                     "X-Title": "Attendance AI Agent"
                 },
+                body: {
+                    model: modelName
+                }
+            },
+            deepinfra: {
+                url: "https://api.deepinfra.com/v1/openai/chat/completions",
+                key: this.apiKeys.deepinfra || localStorage.getItem('deepinfra_api_key') || '',
+                headers: {},
                 body: {
                     model: modelName
                 }
@@ -1920,7 +1953,7 @@ const Agent = {
         let thinkingContent = null;
         let contentContainer = null;
         let isThinkingComplete = false;
-        const modelName = modelOverride || "sakana/fugu-ultra";
+        const modelName = modelOverride || this.defaultModel;
 
         const responseText = await this._callHiddenAgent(
             systemContext,
