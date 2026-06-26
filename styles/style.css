@@ -961,7 +961,7 @@ body {
   background: transparent !important;
   outline: none !important;
   box-shadow: none !important;
-  padding: 8px 12px !important; /* perfectly centered padding */
+  padding: 10px 12px 6px 12px !important; /* perfectly centered padding shifted slightly down */
   font-size: 0.95rem;
   font-weight: 500;
   resize: none;
