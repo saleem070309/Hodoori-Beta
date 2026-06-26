@@ -1685,7 +1685,7 @@
                 // Force unexpand if empty
                 if (textarea.value.trim() === '') {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = '36px'; // Reset to default single-line height
+                    textarea.style.height = '38px'; // Reset to default single-line height
                 }
                 // If scrollHeight is greater than 48px (meaning it wraps to 2 lines) or includes newlines
                 else if (sHeight > 48 || textarea.value.includes('\n')) {
@@ -1695,7 +1695,7 @@
                     textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
                 } else {
                     capsule.classList.remove('expanded');
-                    textarea.style.height = '36px';
+                    textarea.style.height = '38px';
                 }
             } else {
                 textarea.style.height = 'auto';

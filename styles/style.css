@@ -961,16 +961,17 @@ body {
   background: transparent !important;
   outline: none !important;
   box-shadow: none !important;
-  padding: 6px 12px !important; /* perfectly centered padding */
+  padding: 8px 12px !important; /* perfectly centered padding */
   font-size: 0.95rem;
   font-weight: 500;
   resize: none;
-  min-height: 36px;
+  min-height: 38px;
   max-height: 150px;
   direction: rtl; /* write in Arabic */
   font-family: 'Tajawal', sans-serif;
   line-height: 1.4;
   transition: all 0.25s ease;
+  margin: 0 !important;
 }
 
 .assistant-capsule-left-actions {
