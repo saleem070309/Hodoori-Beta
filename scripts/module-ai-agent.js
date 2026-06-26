@@ -1975,7 +1975,7 @@ const Agent = {
                 if (chunk.reasoning_content) {
                     if (!thinkingDropdown) {
                         thinkingDropdown = document.createElement('details');
-                        thinkingDropdown.className = 'agent-thinking-dropdown bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-2.5 mb-2.5 opacity-90';
+                        thinkingDropdown.className = 'agent-thinking-dropdown mb-2.5 opacity-90';
                         thinkingDropdown.open = false;
 
                         const summary = document.createElement('summary');

@@ -2763,7 +2763,6 @@ button:focus, a:focus, input:focus, textarea:focus, select:focus, div:focus {
   }
   
   .agent-thinking-dropdown {
-    padding: 8px !important;
     margin-bottom: 8px !important;
   }
 
