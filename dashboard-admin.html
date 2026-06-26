@@ -3401,7 +3401,7 @@
                             <div class="text-[9px] text-gray-400 mt-1 truncate" style="max-width: 200px;">${Agent.currentUploadedFile.name}</div>
                         </div>`;
                     } else {
-                        fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/10 max-w-[200px]">
+                        fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10 max-w-[200px]">
                             <span class="material-symbols-outlined text-sm text-gray-400">description</span>
                             <span class="text-[9px] text-gray-400 truncate">${Agent.currentUploadedFile.name}</span>
                         </div>`;
@@ -3469,7 +3469,7 @@
         Agent.addLoadingIndicator = function () {
             const messages = document.getElementById('agent-messages');
             const div = document.createElement('div');
-            div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl max-w-[280px]';
+            div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl max-w-[280px]';
             div.style.padding = '10px 14px';
             div.style.alignSelf = 'flex-start';
             div.style.marginBottom = '12px';
@@ -3480,7 +3480,7 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.2s; display: inline-block;"></span>
                     <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.3s; display: inline-block;"></span>
                 </div>
-                <div class="loading-text text-xs text-white/70 font-semibold">جاري تحضير الرد...</div>
+                <div class="loading-text text-xs text-neutral-600 dark:text-white/70 font-semibold">جاري تحضير الرد...</div>
             `;
             
             const textEl = div.querySelector('.loading-text');

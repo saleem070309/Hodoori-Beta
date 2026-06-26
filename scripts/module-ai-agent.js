@@ -316,24 +316,24 @@ const Agent = {
             // Chat Container
             const container = document.createElement('div');
             container.id = 'agent-container';
-            container.className = 'hidden fixed bottom-24 left-4 right-4 h-[75vh] z-[100] bg-white/10 rounded-[2.5rem] border border-white/20 flex flex-col transition-all duration-400 opacity-0 translate-y-4';
+            container.className = 'hidden fixed bottom-24 left-4 right-4 h-[75vh] z-[100] bg-white/95 dark:bg-white/10 rounded-[2.5rem] border border-black/10 dark:border-white/20 flex flex-col shadow-2xl transition-all duration-400 opacity-0 translate-y-4';
             container.innerHTML = `
-                <div class="px-5 py-4 flex justify-between items-center border-b border-white/10 shrink-0">
+                <div class="px-5 py-4 flex justify-between items-center border-b border-black/10 dark:border-white/10 shrink-0">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                             <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings:'FILL' 1">auto_awesome</span>
                         </div>
                         <div>
-                            <h3 class="font-bold text-white text-sm leading-tight">AutoPilot</h3>
-                            <div id="agent-status" class="text-xs text-white/40">جاهز للمساعدة</div>
+                            <h3 class="font-bold text-neutral-800 dark:text-white text-sm leading-tight">AutoPilot</h3>
+                            <div id="agent-status" class="text-xs text-neutral-500 dark:text-white/40">جاهز للمساعدة</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button id="agent-clear-btn" title="مسح المحادثة" class="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                        <button id="agent-clear-btn" title="مسح المحادثة" class="w-8 h-8 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-neutral-500 dark:text-white/40 hover:text-neutral-800 dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 transition-all">
                             <span class="material-symbols-outlined text-sm">delete_sweep</span>
                         </button>
-                        <button onclick="Agent.toggleChat()" class="text-white/40 hover:text-white transition-colors flex items-center justify-center">
-                            <img src="assets/icons/close.svg" alt="إغلاق" style="width: 14px; height: 14px; object-fit: contain; filter: brightness(0) invert(1);" />
+                        <button onclick="Agent.toggleChat()" class="text-neutral-500 dark:text-white/40 hover:text-neutral-800 dark:hover:text-white transition-colors flex items-center justify-center">
+                            <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
                         </button>
                     </div>
                 </div>
@@ -355,24 +355,24 @@ const Agent = {
                 </div>
 
                 <div id="agent-suggestions" class="px-4 pb-2 flex gap-2 overflow-x-auto shrink-0 hide-scrollbar">
-                    <button class="suggestion-btn shrink-0 text-xs bg-white/5 border border-white/10 text-white/60 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-all whitespace-nowrap">
+                    <button class="suggestion-btn shrink-0 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-600 dark:text-white/60 px-3 py-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white transition-all whitespace-nowrap">
                         طلاب بغياب كثير
                     </button>
-                    <button class="suggestion-btn shrink-0 text-xs bg-white/5 border border-white/10 text-white/60 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-all whitespace-nowrap">
+                    <button class="suggestion-btn shrink-0 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-600 dark:text-white/60 px-3 py-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white transition-all whitespace-nowrap">
                         تقرير إكسل شامل
                     </button>
-                    <button class="suggestion-btn shrink-0 text-xs bg-white/5 border border-white/10 text-white/60 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-all whitespace-nowrap">
+                    <button class="suggestion-btn shrink-0 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-600 dark:text-white/60 px-3 py-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white transition-all whitespace-nowrap">
                         إحصائيات اليوم
                     </button>
-                    <button class="suggestion-btn shrink-0 text-xs bg-white/5 border border-white/10 text-white/60 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-all whitespace-nowrap">
+                    <button class="suggestion-btn shrink-0 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-600 dark:text-white/60 px-3 py-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white transition-all whitespace-nowrap">
                         رسم بياني للحضور
                     </button>
                 </div>
 
-                <div class="p-3 border-t border-white/10 bg-black/20 shrink-0 rounded-b-[2.5rem]">
+                <div class="p-3 border-t border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20 shrink-0 rounded-b-[2.5rem]">
                     <div class="relative flex items-center gap-2">
                         <textarea id="agent-input" placeholder="اكتب سؤالك هنا..." 
-                            class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-primary/50 text-white placeholder:text-white/20 resize-none overflow-y-auto max-h-32 hide-scrollbar"
+                            class="flex-1 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-primary/50 text-neutral-800 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-white/20 resize-none overflow-y-auto max-h-32 hide-scrollbar"
                             rows="1"></textarea>
                         <button id="agent-send-btn" onclick="Agent.sendMessage()" class="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center active:scale-90 transition-transform shrink-0">
                             <span class="material-symbols-outlined text-sm">send</span>
@@ -447,8 +447,8 @@ const Agent = {
         const messages = document.getElementById('agent-messages');
         messages.innerHTML = `
             <div class="flex flex-col items-start animate-fade-in mx-1">
-                <span class="text-[9px] font-black text-white/40 mb-1 px-1 uppercase tracking-tight">AutoPilot</span>
-                <div class="bg-primary/10 border border-primary/20 p-3.5 rounded-2xl rounded-tr-sm text-xs leading-relaxed max-w-[92%] text-white/90">
+                <span class="text-[9px] font-black text-neutral-500 dark:text-white/40 mb-1 px-1 uppercase tracking-tight">AutoPilot</span>
+                <div class="bg-primary/10 border border-primary/20 p-3.5 rounded-2xl rounded-tr-sm text-xs leading-relaxed max-w-[92%] text-neutral-800 dark:text-white/90">
                     تم مسح المحادثة. كيف يمكنني مساعدتك؟
                 </div>
             </div>`;
@@ -476,7 +476,7 @@ const Agent = {
         const status = document.getElementById('agent-status');
         if (status) {
             status.textContent = text;
-            status.className = active ? 'text-xs text-primary animate-pulse' : 'text-xs text-white/40';
+            status.className = active ? 'text-xs text-primary animate-pulse' : 'text-xs text-neutral-500 dark:text-white/40';
         }
     },
 
@@ -992,7 +992,7 @@ const Agent = {
                     <div class="text-[9px] text-gray-400 mt-1 truncate" style="max-width: 200px;">${Agent.currentUploadedFile.name}</div>
                 </div>`;
             } else {
-                fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/10 max-w-[200px]">
+                fileContentHtml = `<div class="agent-msg-file-attachment mt-2 flex items-center gap-2 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10 max-w-[200px]">
                     <span class="material-symbols-outlined text-sm text-gray-400">description</span>
                     <span class="text-[9px] text-gray-400 truncate">${Agent.currentUploadedFile.name}</span>
                 </div>`;
@@ -1047,7 +1047,7 @@ const Agent = {
     addLoadingIndicator() {
         const messages = document.getElementById('agent-messages');
         const div = document.createElement('div');
-        div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl max-w-[280px]';
+        div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl max-w-[280px]';
         div.style.padding = '10px 14px';
         div.style.alignSelf = 'flex-start';
         div.style.marginBottom = '12px';
@@ -1058,7 +1058,7 @@ const Agent = {
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.2s; display: inline-block;"></span>
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0.3s; display: inline-block;"></span>
             </div>
-            <div class="loading-text text-xs text-white/70 font-semibold">جاري تحضير الرد...</div>
+            <div class="loading-text text-xs text-neutral-600 dark:text-white/70 font-semibold">جاري تحضير الرد...</div>
         `;
         
         const textEl = div.querySelector('.loading-text');
@@ -1423,7 +1423,7 @@ const Agent = {
         const div = document.createElement('div');
         div.className = 'animate-fade-in mb-3 mx-2';
         div.innerHTML = `
-            <div class="bg-white/5 border border-white/10 text-white p-3.5 rounded-2xl text-xs font-bold flex flex-col gap-2 shadow-sm">
+            <div class="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-800 dark:text-white p-3.5 rounded-2xl text-xs font-bold flex flex-col gap-2 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-sm text-primary">database</span>
@@ -1940,7 +1940,7 @@ const Agent = {
                         thinkingDropdown.open = false;
                         
                         const summary = document.createElement('summary');
-                        summary.className = 'text-xs text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
+                        summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
                         summary.innerHTML = `
                             <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
                             <span class="thinking-label">جاري التفكير...</span>
@@ -2393,11 +2393,11 @@ const Agent = {
                 const statusColor = isSuccess ? 'text-green-500' : 'text-red-500';
                 
                 return `
-                    <div class="relative pl-6 pb-4 border-l border-dashed ${index === data.attempts.length - 1 ? 'border-transparent' : 'border-white/10'} last:pb-0">
-                        <div class="absolute -left-[8px] top-0.5 w-4 h-4 rounded-full bg-gray-900 flex items-center justify-center border border-white/5">
+                    <div class="relative pl-6 pb-4 border-l border-dashed ${index === data.attempts.length - 1 ? 'border-transparent' : 'border-black/10 dark:border-white/10'} last:pb-0">
+                        <div class="absolute -left-[8px] top-0.5 w-4 h-4 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center border border-black/10 dark:border-white/5">
                             <span class="material-symbols-outlined text-[12px] ${statusColor}">${statusIcon}</span>
                         </div>
-                        <div class="text-[11px] font-black text-white/90 leading-tight">${attempt.title}</div>
+                        <div class="text-[11px] font-black text-neutral-800 dark:text-white/90 leading-tight">${attempt.title}</div>
                         ${attempt.error ? `<div class="text-[10px] text-red-300/80 font-mono mt-1 p-2 bg-red-950/20 border border-red-950/40 rounded-xl overflow-x-auto select-text">${attempt.error}</div>` : ''}
                         ${attempt.action ? `<div class="text-[10px] text-gray-400 font-bold mt-1 leading-normal break-all">${attempt.action}</div>` : ''}
                     </div>
@@ -2406,15 +2406,15 @@ const Agent = {
         }
 
         div.innerHTML = `
-            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-lg">
-                <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all select-none" onclick="document.getElementById('${id}').classList.toggle('hidden')">
+            <div class="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-3xl overflow-hidden shadow-lg">
+                <div class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-all select-none" onclick="document.getElementById('${id}').classList.toggle('hidden')">
                     <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-sm text-amber-500" style="font-variation-settings:'FILL' 1">construction</span>
                         <span class="text-[11px] font-black text-amber-500">مخطط سير عملية التشخيص والصيانة الذاتية</span>
                     </div>
-                    <span class="material-symbols-outlined text-white/40 text-xs">expand_more</span>
+                    <span class="material-symbols-outlined text-neutral-500 dark:text-white/40 text-xs">expand_more</span>
                 </div>
-                <div id="${id}" class="hidden p-4 border-t border-white/10 bg-black/10">
+                <div id="${id}" class="hidden p-4 border-t border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/10">
                     <div class="space-y-4 relative pr-2">
                         ${stepsHtml}
                     </div>
