@@ -944,7 +944,10 @@ const Agent = {
             // إزالة الرسائل التمهيدية المتبقية إن وجدت
             if (typeof loadingDiv !== 'undefined' && loadingDiv.parentNode) loadingDiv.remove();
 
-            this.addMessage(`❌ أعتذر منك بشدة، واجهت المهمة خطأ مستعصياً بعد عدة محاولات ولم تكتمل العملية بنجاح. تم تدوين تقرير التشخيص للإدارة فوراً لتصحيح المشكلة.`, 'ai');
+            const friendlyErr = (e.message && (e.message.includes('مهلة') || e.message.includes('timeout') || e.name === 'AbortError'))
+                ? e.message
+                : `أعتذر منك بشدة، واجهت المهمة خطأ مستعصياً بعد عدة محاولات ولم تكتمل العملية بنجاح. تم تدوين تقرير التشخيص للإدارة فوراً لتصحيح المشكلة.`;
+            this.addMessage(`❌ ${friendlyErr}`, 'ai');
 
             if (attempts.length === 0) {
                 attempts.push({
@@ -1860,90 +1863,123 @@ const Agent = {
             }
         }
 
-        const response = await fetch(config.url, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${config.key}`,
-                "Content-Type": "application/json",
-                ...config.headers
-            },
-            body: JSON.stringify(requestBody)
-        });
+        // Set up AbortController for connection & idle timeout protection
+        const controller = new AbortController();
+        const signal = controller.signal;
 
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(err.error?.message || `HTTP ${response.status}`);
-        }
+        let idleTimeoutId = null;
+        const resetIdleTimeout = () => {
+            if (idleTimeoutId) clearTimeout(idleTimeoutId);
+            idleTimeoutId = setTimeout(() => {
+                console.warn('[AutoPilot] Request/Stream idle timeout reached (30s). Aborting request.');
+                controller.abort();
+            }, 30000); // 30 seconds timeout
+        };
 
-        if (onChunk) {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let buffer = '';
-            let fullText = '';
-            let fullReasoningText = '';
-            let usageData = null;
+        resetIdleTimeout();
 
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+        try {
+            const response = await fetch(config.url, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${config.key}`,
+                    "Content-Type": "application/json",
+                    ...config.headers
+                },
+                body: JSON.stringify(requestBody),
+                signal: signal
+            });
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop();
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error?.message || `HTTP ${response.status}`);
+            }
 
-                    for (const line of lines) {
-                        const cleaned = line.trim();
-                        if (!cleaned) continue;
-                        if (cleaned.startsWith('data: ')) {
-                            const dataStr = cleaned.slice(6);
-                            if (dataStr === '[DONE]') continue;
-                            try {
-                                const parsed = JSON.parse(dataStr);
-                                const delta = parsed.choices?.[0]?.delta;
-                                if (delta) {
-                                    const content = delta.content || '';
-                                    const reasoning = delta.reasoning_content || delta.reasoning || delta.thinking || '';
-                                    const toolCalls = delta.tool_calls || null;
+            if (onChunk) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = '';
+                let fullText = '';
+                let fullReasoningText = '';
+                let usageData = null;
 
-                                    if (content) fullText += content;
-                                    if (reasoning) fullReasoningText += reasoning;
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
 
-                                    onChunk({
-                                        content: content,
-                                        reasoning_content: reasoning,
-                                        tool_calls: toolCalls,
-                                        fullContent: fullText,
-                                        fullReasoning: fullReasoningText,
-                                        usage: parsed.usage || null
-                                    });
+                        resetIdleTimeout(); // Reset the timer on every active chunk received!
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+
+                        for (const line of lines) {
+                            const cleaned = line.trim();
+                            if (!cleaned) continue;
+                            if (cleaned.startsWith('data: ')) {
+                                const dataStr = cleaned.slice(6);
+                                if (dataStr === '[DONE]') continue;
+                                try {
+                                    const parsed = JSON.parse(dataStr);
+                                    const delta = parsed.choices?.[0]?.delta;
+                                    if (delta) {
+                                        const content = delta.content || '';
+                                        const reasoning = delta.reasoning_content || delta.reasoning || delta.thinking || '';
+                                        const toolCalls = delta.tool_calls || null;
+
+                                        if (content) fullText += content;
+                                        if (reasoning) fullReasoningText += reasoning;
+
+                                        onChunk({
+                                            content: content,
+                                            reasoning_content: reasoning,
+                                            tool_calls: toolCalls,
+                                            fullContent: fullText,
+                                            fullReasoning: fullReasoningText,
+                                            usage: parsed.usage || null
+                                        });
+                                    }
+                                    if (parsed.usage) {
+                                        usageData = parsed.usage;
+                                        onChunk({
+                                            content: '',
+                                            reasoning_content: '',
+                                            fullContent: fullText,
+                                            fullReasoning: fullReasoningText,
+                                            usage: parsed.usage
+                                        });
+                                    }
+                                } catch (e) {
+                                    // Ignore partial line errors
                                 }
-                                if (parsed.usage) {
-                                    usageData = parsed.usage;
-                                    onChunk({
-                                        content: '',
-                                        reasoning_content: '',
-                                        fullContent: fullText,
-                                        fullReasoning: fullReasoningText,
-                                        usage: parsed.usage
-                                    });
-                                }
-                            } catch (e) {
-                                // Ignore partial line errors
                             }
                         }
                     }
+                } catch (streamErr) {
+                    if (streamErr.name === 'AbortError') {
+                        throw new Error('انتهت مهلة استجابة الخادم أثناء قراءة البث (30 ثانية).');
+                    }
+                    console.error("Error reading stream:", streamErr);
+                    throw streamErr;
+                } finally {
+                    if (idleTimeoutId) clearTimeout(idleTimeoutId);
                 }
-            } catch (streamErr) {
-                console.error("Error reading stream:", streamErr);
-            }
 
-            return fullText;
-        } else {
-            const data = await response.json();
-            const resultText = data.choices?.[0]?.message?.content;
-            if (!resultText) throw new Error('لم يأتِ رد من النموذج');
-            return resultText;
+                return fullText;
+            } else {
+                const data = await response.json();
+                if (idleTimeoutId) clearTimeout(idleTimeoutId);
+                const resultText = data.choices?.[0]?.message?.content;
+                if (!resultText) throw new Error('لم يأتِ رد من النموذج');
+                return resultText;
+            }
+        } catch (fetchErr) {
+            if (idleTimeoutId) clearTimeout(idleTimeoutId);
+            if (fetchErr.name === 'AbortError') {
+                throw new Error('انتهت مهلة استجابة الخادم (30 ثانية). يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.');
+            }
+            throw fetchErr;
         }
     },
 
