@@ -1072,8 +1072,7 @@ const Agent = {
     addLoadingIndicator() {
         const messages = document.getElementById('agent-messages');
         const div = document.createElement('div');
-        div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 p-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl max-w-[280px]';
-        div.style.padding = '10px 14px';
+        div.className = 'autopilot-loading-row animate-fade-in mx-2 flex items-center gap-3 py-1.5 px-0.5 max-w-[280px]';
         div.style.alignSelf = 'flex-start';
         div.style.marginBottom = '12px';
 
@@ -1979,7 +1978,7 @@ const Agent = {
                         thinkingDropdown.open = false;
 
                         const summary = document.createElement('summary');
-                        summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 px-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg flex items-center gap-1.5 font-bold';
+                        summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 flex items-center gap-1.5 font-bold hover:text-neutral-700 dark:hover:text-white/70';
                         summary.innerHTML = `
                             <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
                             <span class="thinking-label">جاري التفكير...</span>
