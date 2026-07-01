@@ -6,7 +6,7 @@
 const Agent = {
     // ════════════════ CONFIGURATION ════════════════
     provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
-    defaultModel: 'z-ai/glm-5.2', // Default model to use (e.g. sakana/fugu-ultra)
+    defaultModel: 'xiaomi/mimo-v2.5-pro', // Default model to use (e.g. sakana/fugu-ultra)
 
     // API Keys - can be set directly here or fall back to Gemini/localStorage settings
     apiKeys: {
