@@ -28,6 +28,17 @@ const Agent = {
         if (inworldKey) return 'inworld';
         return 'openrouter'; // Fallback
     },
+
+    isVisionModel(modelName) {
+        if (!modelName) return false;
+        const lower = modelName.toLowerCase();
+        return lower.includes('vision') || 
+               lower.includes('gemini') || 
+               lower.includes('claude-3') || 
+               lower.includes('gpt-4o') || 
+               lower.includes('pixtral') || 
+               lower.includes('-vl');
+    },
     // ══════════════════════════════════════════════
 
     chatHistory: [],
@@ -1796,7 +1807,7 @@ const Agent = {
         return { prompt: "0", completion: "0" };
     },
 
-    async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, onChunk = null) {
+    async _callHiddenAgent(systemContext, userMessage, chatHistory = [], modelOverride = null, useFreshMemory = false, onChunk = null, isRetry = false) {
         const currentProvider = this.getEffectiveProvider();
         const modelName = modelOverride || this.defaultModel;
         const providers = {
@@ -1829,18 +1840,38 @@ const Agent = {
 
         const config = providers[currentProvider];
 
-        let messages = [];
+        let originalMessages = [];
         if (useFreshMemory) {
-            messages = [
+            originalMessages = [
                 { role: 'system', content: systemContext },
                 { role: 'user', content: userMessage }
             ];
         } else {
-            messages = [
+            originalMessages = [
                 { role: 'system', content: systemContext },
                 ...chatHistory.filter(h => h.role !== 'system'),
                 { role: 'user', content: userMessage }
             ];
+        }
+
+        // Deep copy messages so we don't mutate external objects
+        let messages = JSON.parse(JSON.stringify(originalMessages));
+
+        // Check if the model supports vision or if this is a retry
+        const supportsVision = this.isVisionModel(modelName) && !isRetry;
+
+        if (!supportsVision) {
+            messages = messages.map(msg => {
+                if (Array.isArray(msg.content)) {
+                    const textObj = msg.content.find(p => p.type === 'text');
+                    const textContent = textObj ? (textObj.text || '') : '';
+                    return {
+                        ...msg,
+                        content: textContent + `\n\n[ملاحظة النظام: قام المستخدم برفع صورة. بما أن هذا النموذج لا يدعم رؤية الصور مباشرة، يرجى تشغيل أداة التعرف على الوجه المحلية (identify_student) لمعالجة الصورة والتعرف على الطالب في ردك باستخدام الصيغة التالية:\n|||COMMAND|||\n{"type": "identify_student"}\n]`
+                    };
+                }
+                return msg;
+            });
         }
 
         const requestBody = {
@@ -1979,6 +2010,14 @@ const Agent = {
             if (fetchErr.name === 'AbortError') {
                 throw new Error('انتهت مهلة استجابة الخادم (30 ثانية). يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.');
             }
+            
+            // Retry fallback: if sending with image fails, retry with text-only prompts
+            const hasImage = originalMessages.some(msg => Array.isArray(msg.content));
+            if (hasImage && !isRetry) {
+                console.warn('[AutoPilot] API call failed with image payload. Retrying with text-only fallback...');
+                return await this._callHiddenAgent(systemContext, userMessage, chatHistory, modelOverride, useFreshMemory, onChunk, true);
+            }
+            
             throw fetchErr;
         }
     },
