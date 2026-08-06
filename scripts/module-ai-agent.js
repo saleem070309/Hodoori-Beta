@@ -6,7 +6,7 @@
 const Agent = {
     // ════════════════ CONFIGURATION ════════════════
     provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
-    defaultModel: 'tencent/hy3:free', // Default model to use (e.g. sakana/fugu-ultra)
+    defaultModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', // Default model to use (e.g. sakana/fugu-ultra)
 
     // API Keys - can be set directly here or fall back to Gemini/localStorage settings
     apiKeys: {
@@ -147,9 +147,6 @@ const Agent = {
 
 9) identify_student — التعرف على الوجه واستخراج البصمة الرقمية من الصورة المرفوعة
 |||COMMAND|||{"type":"identify_student"}
-
-10) web_search — البحث في الويب (مدمج تلقائياً عبر OpenRouter)
-عندما يسألك المستخدم عن معلومات عامة، حية، أو تاريخية خارج قاعدة البيانات المحلية، سيقوم خادم OpenRouter تلقائياً بتشغيل أداة البحث وإرجاع النتائج لك لتصيغ ردك النهائي بها.
 
 ═══ قواعد صارمة ═══
 1. |||COMMAND||| في سطر مستقل في نهاية ردك — بدون json أو \`\`\`.
@@ -1802,7 +1799,7 @@ const Agent = {
             console.warn("Failed to fetch model pricing:", e);
         }
         if (modelName === this.defaultModel) {
-            return { prompt: "0.000002", completion: "0.000002" };
+            return { prompt: "0", completion: "0" };
         }
         return { prompt: "0", completion: "0" };
     },
@@ -1877,14 +1874,13 @@ const Agent = {
         const requestBody = {
             messages: messages,
             temperature: 0.1,
-            max_tokens: 4096,
+            max_tokens: 8192,
             ...config.body
         };
 
-        if (currentProvider === 'openrouter') {
-            requestBody.tools = [
-                { type: 'openrouter:web_search' }
-            ];
+        // Keep reasoning fast and reliable on Nemotron models (free tier is slow at high effort)
+        if (currentProvider === 'openrouter' && modelName.toLowerCase().includes('nemotron')) {
+            requestBody.reasoning_effort = 'medium';
         }
 
         if (onChunk) {
@@ -1902,9 +1898,9 @@ const Agent = {
         const resetIdleTimeout = () => {
             if (idleTimeoutId) clearTimeout(idleTimeoutId);
             idleTimeoutId = setTimeout(() => {
-                console.warn('[AutoPilot] Request/Stream idle timeout reached (30s). Aborting request.');
+                console.warn('[AutoPilot] Request/Stream idle timeout reached (90s). Aborting request.');
                 controller.abort();
-            }, 30000); // 30 seconds timeout
+            }, 90000); // 90 seconds timeout
         };
 
         resetIdleTimeout();
@@ -1989,7 +1985,7 @@ const Agent = {
                     }
                 } catch (streamErr) {
                     if (streamErr.name === 'AbortError') {
-                        throw new Error('انتهت مهلة استجابة الخادم أثناء قراءة البث (30 ثانية).');
+                        throw new Error('انتهت مهلة استجابة الخادم أثناء قراءة البث (90 ثانية).');
                     }
                     console.error("Error reading stream:", streamErr);
                     throw streamErr;
@@ -2008,7 +2004,7 @@ const Agent = {
         } catch (fetchErr) {
             if (idleTimeoutId) clearTimeout(idleTimeoutId);
             if (fetchErr.name === 'AbortError') {
-                throw new Error('انتهت مهلة استجابة الخادم (30 ثانية). يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.');
+                throw new Error('انتهت مهلة استجابة الخادم (90 ثانية). يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.');
             }
             
             // Retry fallback: if sending with image fails, retry with text-only prompts
@@ -2031,27 +2027,16 @@ const Agent = {
             loadingDiv = null;
         }
 
-        // Determine if there is search intent in the user message
-        let userText = '';
-        if (typeof userMessage === 'string') {
-            userText = userMessage;
-        } else if (Array.isArray(userMessage)) {
-            const textObj = userMessage.find(m => m.type === 'text');
-            if (textObj) userText = textObj.text || '';
-        }
-        const searchKeywords = ['ابحث', 'البحث', 'نت', 'النت', 'إنترنت', 'الإنترنت', 'ويب', 'الويب', 'غوغل', 'قوقل', 'أخبار', 'الاخبار', 'الطقس', 'طقس', 'سعر', 'اسعار', 'الأسعار', 'اليوم', 'مباراة', 'مباريات'];
-        const hasSearchIntent = searchKeywords.some(keyword => userText.toLowerCase().includes(keyword));
-
         // Create thinking dropdown immediately
         let thinkingDropdown = document.createElement('details');
         thinkingDropdown.className = 'agent-thinking-dropdown mb-2.5 opacity-90';
-        thinkingDropdown.open = true; // Open immediately to show streaming reasoning/searching!
+        thinkingDropdown.open = true; // Open immediately to show streaming reasoning!
 
         const summary = document.createElement('summary');
         summary.className = 'text-xs text-neutral-500 dark:text-white/50 cursor-pointer select-none py-1 flex items-center gap-1.5 font-bold hover:text-neutral-700 dark:hover:text-white/70';
         summary.innerHTML = `
             <span class="material-symbols-outlined text-[14px] animate-spin text-amber-500" style="font-size:14px; animation: spin 1s linear infinite;">progress_activity</span>
-            <span class="thinking-label">${hasSearchIntent ? 'جاري البحث في الإنترنت...' : 'جاري التفكير...'}</span>
+            <span class="thinking-label">جاري التفكير...</span>
         `;
         thinkingDropdown.appendChild(summary);
 
@@ -2068,8 +2053,8 @@ const Agent = {
         let hasScrolledForThisResponse = false;
         const modelName = modelOverride || this.defaultModel;
 
-        // Cycle thinking phrases if not searching
-        if (!hasSearchIntent) {
+        // Cycle thinking phrases while waiting for a response
+        {
             const thinkingPhrases = ["جاري التفكير...", "تحليل الاستفسار...", "ما زلت أفكر...", "تحضير الإجابة..."];
             let phraseIdx = 0;
             thinkingDropdown.dataset.thinkingInterval = setInterval(() => {
@@ -2095,23 +2080,6 @@ const Agent = {
                     this.scrollToBottom(true);
                 }
 
-                // Detect if search tool was triggered
-                let isSearchingWeb = false;
-                if (chunk.tool_calls && chunk.tool_calls.length > 0) {
-                    isSearchingWeb = true;
-                }
-
-                if (isSearchingWeb) {
-                    const label = thinkingDropdown.querySelector('.thinking-label');
-                    if (label && !isThinkingComplete && label.textContent !== 'جاري البحث في الإنترنت...') {
-                        label.textContent = 'جاري البحث في الإنترنت...';
-                        if (thinkingDropdown.dataset.thinkingInterval) {
-                            clearInterval(parseInt(thinkingDropdown.dataset.thinkingInterval));
-                            delete thinkingDropdown.dataset.thinkingInterval;
-                        }
-                    }
-                }
-
                 // Stream reasoning/thinking text
                 if (chunk.reasoning_content && thinkingContent) {
                     thinkingContent.style.display = 'block';
@@ -2133,7 +2101,7 @@ const Agent = {
                         }
                         const label = thinkingDropdown.querySelector('.thinking-label');
                         if (label) {
-                            label.textContent = isSearchingWeb || hasSearchIntent ? 'تم التفكير والبحث في الإنترنت' : 'تم التفكير';
+                            label.textContent = 'تم التفكير';
                         }
                         thinkingDropdown.open = false; // Collapse when complete!
                     }
@@ -2190,7 +2158,7 @@ const Agent = {
             }
             const label = thinkingDropdown.querySelector('.thinking-label');
             if (label) {
-                label.textContent = hasSearchIntent ? 'تم التفكير والبحث في الإنترنت' : 'تم التفكير';
+                label.textContent = 'تم التفكير';
             }
             thinkingDropdown.open = false;
         }
