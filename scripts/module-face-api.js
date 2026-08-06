@@ -12,8 +12,7 @@ const FaceDetection = {
     isModelsLoaded: false,
     
     // Config for different modes
-    MODELS_URL: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model', // @vladmandic/face-api high-performance models
-    FALLBACK_MODELS_URL: 'https://justadudewhohacks.github.io/face-api.js/models',
+    MODELS_URL: 'https://justadudewhohacks.github.io/face-api.js/models', // Public models
     isSSDLoaded: false,
     
     // Stability tracking
@@ -37,10 +36,10 @@ const FaceDetection = {
         if (this.isModelsLoaded) return;
         
         if (typeof faceapi === 'undefined') {
-            throw new Error("مكتبة @vladmandic/face-api لم يتم تحميلها بشكل صحيح. يرجى التحقق من اتصال الإنترنت.");
+            throw new Error("مكتبة face-api.js لم يتم تحميلها بشكل صحيح. يرجى التحقق من اتصال الإنترنت.");
         }
 
-        // Optimize TensorFlow.js WebGL/WASM backend if available
+        // Optimize TensorFlow.js WebGL backend if available
         if (faceapi.tf) {
             try {
                 const tf = faceapi.tf;
@@ -53,7 +52,7 @@ const FaceDetection = {
                     tf.env().set('WEBGL_PACK', true);
                     tf.env().set('WEBGL_FLUSH_THRESHOLD', -1);
                     tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
-                    console.log("Hodoori: @vladmandic/face-api WebGL Backend optimized successfully.");
+                    console.log("Hodoori: WebGL Backend optimized successfully.");
                 }
                 console.log("Hodoori: Active TFJS Backend is", tf.getBackend());
             } catch (err) {
@@ -62,24 +61,15 @@ const FaceDetection = {
         }
 
         try {
-            console.log("Loading Face AI models (SSD Mobilenet via @vladmandic/face-api)...");
-            try {
-                await Promise.all([
-                    faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODELS_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(this.MODELS_URL),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(this.MODELS_URL)
-                ]);
-            } catch (modelErr) {
-                console.warn("Primary model loading failed, using fallback URL:", modelErr);
-                await Promise.all([
-                    faceapi.nets.ssdMobilenetv1.loadFromUri(this.FALLBACK_MODELS_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(this.FALLBACK_MODELS_URL),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(this.FALLBACK_MODELS_URL)
-                ]);
-            }
+            console.log("Loading Face AI models (SSD Mobilenet)...");
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(this.MODELS_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(this.MODELS_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(this.MODELS_URL)
+            ]);
             this.isModelsLoaded = true;
             this.isSSDLoaded = true;
-            console.log("Face AI Ready (SSD Mobilenet - @vladmandic/face-api)");
+            console.log("Face AI Ready (SSD Mobilenet)");
         } catch (e) {
             console.error("Face API Init Failed:", e);
             throw e;

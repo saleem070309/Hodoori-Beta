@@ -6,7 +6,7 @@
 const Agent = {
     // ════════════════ CONFIGURATION ════════════════
     provider: 'auto', // 'openrouter', 'inworld', 'deepinfra', or 'auto' (selects automatically based on active key)
-    defaultModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', // Default model to use (e.g. sakana/fugu-ultra)
+    defaultModel: 'openrouter/free', // Default model to use (e.g. sakana/fugu-ultra)
 
     // API Keys - can be set directly here or fall back to Gemini/localStorage settings
     apiKeys: {
@@ -32,12 +32,12 @@ const Agent = {
     isVisionModel(modelName) {
         if (!modelName) return false;
         const lower = modelName.toLowerCase();
-        return lower.includes('vision') || 
-               lower.includes('gemini') || 
-               lower.includes('claude-3') || 
-               lower.includes('gpt-4o') || 
-               lower.includes('pixtral') || 
-               lower.includes('-vl');
+        return lower.includes('vision') ||
+            lower.includes('gemini') ||
+            lower.includes('claude-3') ||
+            lower.includes('gpt-4o') ||
+            lower.includes('pixtral') ||
+            lower.includes('-vl');
     },
     // ══════════════════════════════════════════════
 
@@ -2006,14 +2006,14 @@ const Agent = {
             if (fetchErr.name === 'AbortError') {
                 throw new Error('انتهت مهلة استجابة الخادم (90 ثانية). يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.');
             }
-            
+
             // Retry fallback: if sending with image fails, retry with text-only prompts
             const hasImage = originalMessages.some(msg => Array.isArray(msg.content));
             if (hasImage && !isRetry) {
                 console.warn('[AutoPilot] API call failed with image payload. Retrying with text-only fallback...');
                 return await this._callHiddenAgent(systemContext, userMessage, chatHistory, modelOverride, useFreshMemory, onChunk, true);
             }
-            
+
             throw fetchErr;
         }
     },
