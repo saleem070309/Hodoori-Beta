@@ -1,0 +1,27 @@
+{
+  "name": "hodoori-beta",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saleem070309/Hodoori-Beta.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/saleem070309/Hodoori-Beta/issues"
+  },
+  "homepage": "https://github.com/saleem070309/Hodoori-Beta#readme",
+  "dependencies": {
+    "@vladmandic/face-api": "^1.7.15"
+  }
+}
