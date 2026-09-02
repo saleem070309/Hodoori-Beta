@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>تجهيز قاعدة البيانات الأساسية | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    
+    <!-- App Core Styles -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f4f6f8;
+            color: #0f172a;
+        }
+        .setup-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="setup-card w-full max-w-xl p-6 md:p-8">
+        <!-- Brand Header -->
+        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+            <img src="assets/AI-logo.png" alt="حضوري" class="w-10 h-10 object-contain" />
+            <div>
+                <h1 class="text-xl font-black text-slate-900">تجهيز البنية الأساسية لقاعدة البيانات</h1>
+                <p class="text-xs text-slate-500 font-bold">تهيئة الإعدادات العامة والأمان والمجموعات بدون أي بيانات مدارس وهمية</p>
+            </div>
+        </div>
+
+        <!-- Description Box -->
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
+            <h2 class="text-sm font-bold text-amber-900 mb-1 flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                ماذا سيقوم هذا السكربت بتجهيزه؟
+            </h2>
+            <ul class="text-xs font-semibold text-amber-800 space-y-1.5 list-disc list-inside mt-2">
+                <li>إنشاء وثيقة الإعدادات المركزية للنظام (<code class="bg-white/60 px-1 py-0.5 rounded font-mono">v2_settings</code>).</li>
+                <li>تحديد إجراء نهاية اليوم الافتراضي (اعتبار غير المسجلين غياب).</li>
+                <li>ضبط سياسات أمان وتشفير الجلسات (Zero-Knowledge Lockdown).</li>
+                <li>تهيئة المجموعات الرئيسية وسجل التدقيق (<code class="bg-white/60 px-1 py-0.5 rounded font-mono">v2_logs</code>) بدون إضافة أي مدارس أو طلاب.</li>
+            </ul>
+        </div>
+
+        <!-- Progress / Status Box -->
+        <div id="status-box" class="hidden rounded-xl p-4 mb-6 text-xs font-bold"></div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between gap-3 pt-2">
+            <a href="dashboard-admin.html" class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">
+                العودة للوحة الإدارة
+            </a>
+            
+            <button id="btn-init" type="button" onclick="runDatabaseSetup()" class="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-black transition shadow-sm flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M2 12h20"/></svg>
+                <span>بدء تجهيز قاعدة البيانات الآن</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Core Database Dependencies -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/setup-base-db.js"></script>
+
+    <script>
+        async function runDatabaseSetup() {
+            const btn = document.getElementById('btn-init');
+            const statusBox = document.getElementById('status-box');
+
+            btn.disabled = true;
+            btn.innerHTML = `<span>جاري التجهيز...</span>`;
+
+            statusBox.className = 'block bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-4 mb-6 text-xs font-bold';
+            statusBox.innerHTML = `⏳ جاري الاتصال بقاعدة بيانات فايربيس وتهيئة البنية الأساسية...`;
+
+            try {
+                const result = await BaseDatabaseInitializer.initializeBase();
+
+                if (result.success) {
+                    statusBox.className = 'block bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-4 mb-6 text-xs font-bold';
+                    statusBox.innerHTML = `
+                        <div class="flex items-center gap-2 mb-1.5 text-sm">
+                            <span>✅</span>
+                            <span>${result.message}</span>
+                        </div>
+                        <div class="text-[11px] text-emerald-700">
+                            المجموعات المهيأة: <strong>${result.seededCollections.join('، ')}</strong>
+                        </div>
+                    `;
+                    btn.innerHTML = `<span>تم التجهيز بنجاح ✓</span>`;
+                    btn.className = 'px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black transition shadow-sm';
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (err) {
+                statusBox.className = 'block bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 mb-6 text-xs font-bold';
+                statusBox.innerHTML = `❌ حدث خطأ أثناء التجهيز: ${err.message || err}`;
+                btn.disabled = false;
+                btn.innerHTML = `<span>إعادة المحاولة</span>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

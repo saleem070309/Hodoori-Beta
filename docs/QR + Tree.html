@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Minecraft Sakura Tree & Floating Island 3D QR Code</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Three.js & Controls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <!-- GSAP for Smooth Morphing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <!-- QRCode Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      background-color: #ffffff;
+    }
+    /* Sleek Floating Glass Circular Button */
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(236, 72, 153, 0.25);
+      box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.25), 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .glass-btn:hover {
+      box-shadow: 0 14px 30px -4px rgba(236, 72, 153, 0.4), 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+  </style>
+</head>
+
+<body class="h-full w-full bg-white text-slate-800 antialiased overflow-hidden select-none">
+  
+  <!-- 3D WebGL Canvas -->
+  <div id="webgl-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+  <!-- Minimal Floating Circular Morph Toggle Button -->
+  <div class="absolute bottom-8 inset-x-0 flex justify-center z-20 pointer-events-none">
+    <button id="btn-morph-toggle" class="glass-btn w-14 h-14 rounded-full flex items-center justify-center text-pink-600 hover:text-pink-700 hover:scale-110 active:scale-95 transition-all duration-300 pointer-events-auto group relative" title="تحويل">
+      <span class="absolute inset-0 rounded-full bg-pink-400/20 group-hover:bg-pink-400/35 animate-ping opacity-35"></span>
+      <i id="mode-icon" data-lucide="qr-code" class="w-6 h-6 relative z-10 transition-transform duration-300 group-hover:rotate-12"></i>
+    </button>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    /* -------------------------------------------------------------
+     * 1. 8-Bit Web Audio Sound Synthesizer
+     * ------------------------------------------------------------- */
+    class RetroAudioEngine {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+      }
+      playPop(freq = 520, pitchDecay = 1.3) {
+        try {
+          this.init();
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(freq * pitchDecay, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.08);
+        } catch (e) {}
+      }
+      playArpeggio(reverse = false) {
+        const notes = reverse ? [659, 523, 392, 261] : [261, 392, 523, 659];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => this.playPop(freq, 1.2), idx * 65);
+        });
+      }
+    }
+    const sound = new RetroAudioEngine();
+
+    /* -------------------------------------------------------------
+     * 2. Palette Configurations
+     * ------------------------------------------------------------- */
+    const PALETTE = {
+      leaves: [
+        new THREE.Color('#FFB7C5'),
+        new THREE.Color('#FF94AA'),
+        new THREE.Color('#FF708F'),
+        new THREE.Color('#FFA6B9'),
+        new THREE.Color('#FFF2F6')
+      ],
+      woodBark: new THREE.Color('#3E231D'),
+      woodCore: new THREE.Color('#54332B'),
+      woodLight: new THREE.Color('#784B3E'),
+      grassTop: new THREE.Color('#6BAA3C'),
+      grassSide: new THREE.Color('#5E9635'),
+      dirt: new THREE.Color('#785135'),
+      stone: new THREE.Color('#6F777D'),
+      qrDark: new THREE.Color('#0A0512'), // Pitch dark purple-black for high contrast scan readability
+      qrLight: new THREE.Color('#FFFFFF')  // Crisp white base
+    };
+
+    /* -------------------------------------------------------------
+     * 3. QR Matrix Generator
+     * ------------------------------------------------------------- */
+    const currentQRData = 'https://youtube.com';
+    let qrMatrix = [];
+    let qrSize = 25;
+
+    function generateQRMatrix(text) {
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(text);
+        qr.make();
+        qrSize = qr.getModuleCount();
+        const matrix = [];
+        for (let r = 0; r < qrSize; r++) {
+          const row = [];
+          for (let c = 0; c < qrSize; c++) {
+            row.push(qr.isDark(r, c) ? 1 : 0);
+          }
+          matrix.push(row);
+        }
+        return { matrix, size: qrSize };
+      } catch (err) {
+        return { matrix: Array(25).fill(Array(25).fill(1)), size: 25 };
+      }
+    }
+
+    /* -------------------------------------------------------------
+     * 4. High-Performance Zero-Lag Shockwave System
+     * ------------------------------------------------------------- */
+    class HighPerfShockwaveSystem {
+      constructor() {
+        this.waves = [];
+      }
+      add(center) {
+        if (this.waves.length >= 2) this.waves.shift();
+        this.waves.push({
+          x: center.x,
+          y: center.y,
+          z: center.z,
+          age: 0,
+          maxAge: 0.8,
+          speed: 18.0,
+          wavelength: 4.0,
+          amplitude: 1.4
+        });
+      }
+      update(dt) {
+        if (this.waves.length === 0) return false;
+        for (let i = this.waves.length - 1; i >= 0; i--) {
+          this.waves[i].age += dt;
+          if (this.waves[i].age >= this.waves[i].maxAge) {
+            this.waves.splice(i, 1);
+          }
+        }
+        return this.waves.length > 0;
+      }
+      getYOffset(vx, vy, vz) {
+        if (this.waves.length === 0) return 0;
+        let total = 0;
+        for (let i = 0; i < this.waves.length; i++) {
+          const w = this.waves[i];
+          const dx = vx - w.x;
+          const dy = vy - w.y;
+          const dz = vz - w.z;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const waveFront = w.age * w.speed;
+          const diff = dist - waveFront;
+
+          if (Math.abs(diff) < w.wavelength) {
+            const decay = 1.0 - (w.age / w.maxAge);
+            const shape = Math.sin((diff / w.wavelength) * Math.PI);
+            const spatialFalloff = 1.0 - (Math.abs(diff) / w.wavelength);
+            total += shape * spatialFalloff * decay * w.amplitude;
+          }
+        }
+        return total;
+      }
+    }
+    const shockwaveEngine = new HighPerfShockwaveSystem();
+
+    /* -------------------------------------------------------------
+     * 5. Three.js Scene Setup (Clean Pure White World)
+     * ------------------------------------------------------------- */
+    const container = document.getElementById('webgl-container');
+    let scene, camera, renderer, controls;
+    let mainVoxelMesh, islandVoxelMesh;
+    let dirLight, ambientLight;
+
+    const treeVoxels = [];
+    const islandVoxels = [];
+
+    let isQRMode = false;
+    let isTransitioning = false;
+    const morphProgress = { value: 0 };
+
+    // Dynamic Camera Tracking (Starts smoothly from any custom user angle)
+    const camTrack = {
+      target0: new THREE.Vector3(0, 6, 0),
+      target1: new THREE.Vector3(0, 0, 0),
+      up0: new THREE.Vector3(0, 1, 0),
+      up1: new THREE.Vector3(0, 0, -1),
+      r0: 42,
+      r1: 38,
+      phi0: 1.05,
+      phi1: 0.0001,
+      theta0: Math.PI / 4,
+      theta1: 0
+    };
+
+    function updateCamTrackFromCurrent() {
+      const currentPos = camera.position.clone();
+      const currentTarget = controls.target.clone();
+      const currentUp = camera.up.clone();
+
+      camTrack.target0.copy(currentTarget);
+      camTrack.up0.copy(currentUp);
+
+      const offset = currentPos.clone().sub(currentTarget);
+      const r = Math.max(12, offset.length());
+      camTrack.r0 = r;
+      camTrack.r1 = (window.innerWidth < 640) ? 46 : 38;
+
+      camTrack.phi0 = Math.acos(THREE.MathUtils.clamp(offset.y / r, -1, 1));
+      camTrack.phi1 = 0.0001;
+
+      const thetaCurrent = Math.atan2(offset.x, offset.z);
+      camTrack.theta0 = thetaCurrent;
+
+      let dTheta = 0 - thetaCurrent;
+      while (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+      while (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+      camTrack.theta1 = thetaCurrent + dTheta;
+    }
+
+    function initScene() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff); // Pure Clean White Background
+
+      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(32, 24, 32);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 + 0.05;
+      controls.minDistance = 12;
+      controls.maxDistance = 90;
+      controls.target.set(0, 6, 0);
+
+      controls.addEventListener('change', () => {
+        if (!isTransitioning && !isQRMode && morphProgress.value < 0.02) {
+          updateCamTrackFromCurrent();
+        }
+      });
+
+      // Pure White Studio Lighting
+      ambientLight = new THREE.AmbientLight(0xffffff, 0.88);
+      scene.add(ambientLight);
+
+      dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+      dirLight.position.set(24, 40, 20);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 100;
+      const d = 22;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
+      dirLight.shadow.bias = -0.0004;
+      scene.add(dirLight);
+
+      // Build World
+      buildWorld();
+      updateCamTrackFromCurrent();
+      setupRaycaster();
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    /* -------------------------------------------------------------
+     * 6. Procedural World: Sakura Tree & Floating Island Chunk
+     * ------------------------------------------------------------- */
+    function buildWorld() {
+      if (mainVoxelMesh) scene.remove(mainVoxelMesh);
+      if (islandVoxelMesh) scene.remove(islandVoxelMesh);
+      treeVoxels.length = 0;
+      islandVoxels.length = 0;
+
+      const { matrix, size } = generateQRMatrix(currentQRData);
+
+      generateTreeVoxels();
+      generateIslandVoxels();
+      mapVoxelsToQR(matrix, size);
+
+      const boxGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+      const voxelMat = new THREE.MeshStandardMaterial({
+        roughness: 0.6,
+        metalness: 0.05,
+        vertexColors: false
+      });
+
+      // Main Tree / QR dark modules
+      mainVoxelMesh = new THREE.InstancedMesh(boxGeo, voxelMat, treeVoxels.length);
+      mainVoxelMesh.castShadow = true;
+      mainVoxelMesh.receiveShadow = true;
+      mainVoxelMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      scene.add(mainVoxelMesh);
+
+      // Island / QR white quiet-zone backing plate
+      islandVoxelMesh = new THREE.InstancedMesh(boxGeo, voxelMat, islandVoxels.length);
+      islandVoxelMesh.castShadow = true;
+      islandVoxelMesh.receiveShadow = true;
+      islandVoxelMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      scene.add(islandVoxelMesh);
+
+      updateMeshesToProgress(morphProgress.value);
+    }
+
+    function generateTreeVoxels() {
+      const addedKeys = new Set();
+      const addV = (x, y, z, color, type = 'leaf') => {
+        const key = `${x},${y},${z}`;
+        if (addedKeys.has(key)) return;
+        addedKeys.add(key);
+
+        treeVoxels.push({
+          treePos: new THREE.Vector3(x, y, z),
+          treeScale: new THREE.Vector3(1, 1, 1),
+          treeColor: color.clone(),
+          qrPos: new THREE.Vector3(0, 0, 0),
+          qrScale: new THREE.Vector3(1, 1, 1),
+          qrColor: PALETTE.qrDark.clone(),
+          currentPos: new THREE.Vector3(x, y, z),
+          currentColor: color.clone(),
+          currentScale: new THREE.Vector3(1, 1, 1),
+          type: type,
+          dist: Math.sqrt(x * x + z * z),
+          stagger: 0,
+          isFinder: false
+        });
+      };
+
+      // Trunk Base & Height
+      const trunkHeight = 11;
+      for (let y = 1; y <= trunkHeight; y++) {
+        const c = y < 3 ? PALETTE.woodBark : (y % 2 === 0 ? PALETTE.woodCore : PALETTE.woodLight);
+        addV(0, y, 0, c, 'trunk');
+        if (y < 6) {
+          addV(1, y, 0, PALETTE.woodBark, 'trunk');
+          addV(0, y, 1, PALETTE.woodBark, 'trunk');
+          if (y < 3) addV(1, y, 1, PALETTE.woodBark, 'trunk');
+        }
+      }
+      // Roots
+      addV(-1, 1, 0, PALETTE.woodBark, 'trunk');
+      addV(0, 1, -1, PALETTE.woodBark, 'trunk');
+      addV(2, 1, 0, PALETTE.woodBark, 'trunk');
+      addV(0, 1, 2, PALETTE.woodBark, 'trunk');
+
+      // Organic Branches
+      const branches = [
+        { start: [0, 6, 0], dir: [1, 1, 0], len: 4 },
+        { start: [0, 7, 0], dir: [-1, 1, 0], len: 4 },
+        { start: [0, 8, 0], dir: [0, 1, 1], len: 4 },
+        { start: [0, 8, 0], dir: [0, 1, -1], len: 4 },
+        { start: [1, 9, 0], dir: [1, 1, 1], len: 3 },
+        { start: [-1, 9, 0], dir: [-1, 1, -1], len: 3 }
+      ];
+
+      branches.forEach(b => {
+        let [cx, cy, cz] = b.start;
+        for (let i = 0; i < b.len; i++) {
+          cx += b.dir[0];
+          cy += b.dir[1] * 0.65;
+          cz += b.dir[2];
+          addV(Math.round(cx), Math.round(cy), Math.round(cz), PALETTE.woodCore, 'trunk');
+        }
+      });
+
+      // Stepped Foliage Clusters
+      const clusters = [
+        { x: 0, y: 13, z: 0, rx: 4.8, ry: 2.8, rz: 4.8 },
+        { x: 4, y: 10, z: 0, rx: 3.6, ry: 2.4, rz: 3.6 },
+        { x: -4, y: 11, z: 0, rx: 3.6, ry: 2.4, rz: 3.6 },
+        { x: 0, y: 11, z: 4, rx: 3.6, ry: 2.4, rz: 3.6 },
+        { x: 0, y: 11, z: -4, rx: 3.6, ry: 2.4, rz: 3.6 },
+        { x: 3, y: 12, z: 3, rx: 3.2, ry: 2.2, rz: 3.2 },
+        { x: -3, y: 12, z: -3, rx: 3.2, ry: 2.2, rz: 3.2 },
+        { x: -3, y: 12, z: 3, rx: 3.2, ry: 2.2, rz: 3.2 },
+        { x: 3, y: 12, z: -3, rx: 3.2, ry: 2.2, rz: 3.2 }
+      ];
+
+      clusters.forEach(c => {
+        for (let ox = -Math.ceil(c.rx); ox <= Math.ceil(c.rx); ox++) {
+          for (let oy = -Math.ceil(c.ry); oy <= Math.ceil(c.ry); oy++) {
+            for (let oz = -Math.ceil(c.rz); oz <= Math.ceil(c.rz); oz++) {
+              const dist = (ox * ox) / (c.rx * c.rx) + (oy * oy) / (c.ry * c.ry) + (oz * oz) / (c.rz * c.rz);
+              if (dist <= 1.06 && Math.random() > 0.1) {
+                const px = c.x + ox;
+                const py = c.y + oy;
+                const pz = c.z + oz;
+                const colorIdx = Math.floor(Math.random() * PALETTE.leaves.length);
+                addV(px, py, pz, PALETTE.leaves[colorIdx], 'leaf');
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function generateIslandVoxels() {
+      const addIslandV = (x, y, z, color) => {
+        islandVoxels.push({
+          treePos: new THREE.Vector3(x, y, z),
+          treeScale: new THREE.Vector3(1, 1, 1),
+          treeColor: color.clone(),
+          qrPos: new THREE.Vector3(x, y, z),
+          qrScale: new THREE.Vector3(1, 1, 1),
+          qrColor: PALETTE.qrLight.clone(),
+          currentPos: new THREE.Vector3(x, y, z),
+          currentColor: color.clone(),
+          currentScale: new THREE.Vector3(1, 1, 1)
+        });
+      };
+
+      const radius = 10;
+      for (let x = -radius; x <= radius; x++) {
+        for (let z = -radius; z <= radius; z++) {
+          const dist = Math.sqrt(x * x + z * z);
+          if (dist <= radius + (Math.sin(x * 1.5) * Math.cos(z * 1.5) * 1.2)) {
+            // Surface Top Grass
+            addIslandV(x, 0, z, Math.random() > 0.25 ? PALETTE.grassTop : PALETTE.grassSide);
+            // Dirt Sub-layer
+            addIslandV(x, -1, z, PALETTE.dirt);
+            // Tapering inverted cone stone underside
+            const depth = Math.floor((radius - dist) * 0.9 + (Math.sin(x) * 1.4));
+            for (let y = -2; y >= -Math.max(2, depth); y--) {
+              addIslandV(x, y, z, PALETTE.stone);
+            }
+          }
+        }
+      }
+    }
+
+    function mapVoxelsToQR(matrix, size) {
+      const qrDarkCells = [];
+      const halfSize = size / 2;
+
+      const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
+
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (matrix[r][c] === 1) {
+            const qx = c - halfSize + 0.5;
+            const qz = r - halfSize + 0.5;
+            qrDarkCells.push({
+              pos: new THREE.Vector3(qx, 0.5, qz),
+              isFinder: isFinder(r, c),
+              dist: Math.sqrt(qx * qx + qz * qz)
+            });
+          }
+        }
+      }
+
+      qrDarkCells.sort((a, b) => {
+        if (a.isFinder && !b.isFinder) return -1;
+        if (!a.isFinder && b.isFinder) return 1;
+        return a.dist - b.dist;
+      });
+
+      treeVoxels.sort((a, b) => {
+        if (a.type === 'leaf' && b.type === 'trunk') return -1;
+        if (a.type === 'trunk' && b.type === 'leaf') return 1;
+        return a.treePos.y - b.treePos.y;
+      });
+
+      const totalDark = qrDarkCells.length;
+      for (let i = 0; i < treeVoxels.length; i++) {
+        const v = treeVoxels[i];
+        if (i < totalDark) {
+          const cell = qrDarkCells[i];
+          v.qrPos.copy(cell.pos);
+          v.qrScale.set(1.0, 0.98, 1.0);
+          v.qrColor.copy(PALETTE.qrDark);
+          v.activeInQR = true;
+          v.isFinder = cell.isFinder;
+          v.stagger = cell.isFinder ? (i / totalDark) * 0.35 : 0.35 + (i / totalDark) * 0.55;
+        } else {
+          v.qrPos.set((Math.random() - 0.5) * size * 0.7, -2.0, (Math.random() - 0.5) * size * 0.7);
+          v.qrScale.set(0.001, 0.001, 0.001);
+          v.qrColor.copy(PALETTE.qrLight);
+          v.activeInQR = false;
+          v.stagger = 0.5 + Math.random() * 0.4;
+        }
+      }
+
+      // Quiet Zone Island Base
+      const quietPadding = Math.ceil(size / 2) + 2;
+      islandVoxels.forEach((iv, index) => {
+        const gridX = (index % (quietPadding * 2 + 1)) - quietPadding;
+        const gridZ = Math.floor(index / (quietPadding * 2 + 1)) - quietPadding;
+
+        if (Math.abs(gridX) <= quietPadding && Math.abs(gridZ) <= quietPadding) {
+          iv.qrPos.set(gridX, 0, gridZ);
+          iv.qrColor.copy(PALETTE.qrLight);
+          iv.qrScale.set(1.01, 1.0, 1.01);
+        } else {
+          iv.qrPos.set(iv.treePos.x, iv.treePos.y - 12, iv.treePos.z);
+          iv.qrScale.set(0.001, 0.001, 0.001);
+          iv.qrColor.copy(PALETTE.qrLight);
+        }
+      });
+    }
+
+    const dummyObj = new THREE.Object3D();
+    const tempColor = new THREE.Color();
+
+    function getCinematicCameraState(t) {
+      const ease = gsap.parseEase('power2.inOut')(t);
+      
+      const target = new THREE.Vector3().lerpVectors(camTrack.target0, camTrack.target1, ease);
+      const theta = THREE.MathUtils.lerp(camTrack.theta0, camTrack.theta1, ease);
+      const phi = THREE.MathUtils.lerp(camTrack.phi0, camTrack.phi1, ease);
+      
+      const arcHeight = Math.sin(ease * Math.PI) * Math.max(6, camTrack.r0 * 0.2);
+      const r = THREE.MathUtils.lerp(camTrack.r0, camTrack.r1, ease) + arcHeight;
+      
+      const x = r * Math.sin(phi) * Math.sin(theta);
+      const y = r * Math.cos(phi);
+      const z = r * Math.sin(phi) * Math.cos(theta);
+      
+      const pos = new THREE.Vector3(target.x + x, target.y + y, target.z + z);
+      const up = new THREE.Vector3().lerpVectors(camTrack.up0, camTrack.up1, ease).normalize();
+      
+      return { pos, target, up };
+    }
+
+    function updateMeshesToProgress(t) {
+      if (isTransitioning || (!controls.enabled && isQRMode)) {
+        const camState = getCinematicCameraState(t);
+        camera.position.copy(camState.pos);
+        camera.up.copy(camState.up);
+        controls.target.copy(camState.target);
+        camera.lookAt(camState.target);
+      }
+
+      const waveWeight = Math.max(0, 1 - t * 2.0);
+
+      // 1. Update Tree Voxels -> QR dark pixels
+      for (let i = 0; i < treeVoxels.length; i++) {
+        const v = treeVoxels[i];
+        
+        const startW = v.stagger * 0.45;
+        const endW = startW + 0.55;
+        const localT = THREE.MathUtils.clamp((t - startW) / (endW - startW), 0, 1);
+        const easeT = gsap.parseEase('power2.inOut')(localT);
+
+        const arc = Math.sin(easeT * Math.PI) * (v.activeInQR ? (v.isFinder ? 6.5 : 4.5) : -3.5);
+        const swirlAngle = Math.sin(easeT * Math.PI) * Math.PI * 1.5;
+
+        const curX = THREE.MathUtils.lerp(v.treePos.x, v.qrPos.x, easeT);
+        let curY = THREE.MathUtils.lerp(v.treePos.y, v.qrPos.y, easeT) + arc;
+        const curZ = THREE.MathUtils.lerp(v.treePos.z, v.qrPos.z, easeT);
+
+        if (waveWeight > 0) {
+          curY += shockwaveEngine.getYOffset(v.treePos.x, v.treePos.y, v.treePos.z) * waveWeight;
+        }
+
+        dummyObj.position.set(curX, curY, curZ);
+        
+        v.currentScale.lerpVectors(v.treeScale, v.qrScale, easeT);
+        dummyObj.scale.copy(v.currentScale);
+        dummyObj.rotation.set(0, swirlAngle, 0);
+        dummyObj.updateMatrix();
+
+        mainVoxelMesh.setMatrixAt(i, dummyObj.matrix);
+
+        tempColor.copy(v.treeColor).lerp(v.qrColor, easeT);
+        mainVoxelMesh.setColorAt(i, tempColor);
+      }
+      mainVoxelMesh.instanceMatrix.needsUpdate = true;
+      if (mainVoxelMesh.instanceColor) mainVoxelMesh.instanceColor.needsUpdate = true;
+
+      // 2. Update Island Voxels -> White Quiet Zone Base
+      for (let i = 0; i < islandVoxels.length; i++) {
+        const iv = islandVoxels[i];
+        const easeT = gsap.parseEase('power2.inOut')(t);
+
+        iv.currentPos.lerpVectors(iv.treePos, iv.qrPos, easeT);
+        iv.currentScale.lerpVectors(iv.treeScale, iv.qrScale, easeT);
+
+        dummyObj.position.copy(iv.currentPos);
+        dummyObj.scale.copy(iv.currentScale);
+        dummyObj.rotation.set(0, 0, 0);
+        dummyObj.updateMatrix();
+
+        islandVoxelMesh.setMatrixAt(i, dummyObj.matrix);
+
+        tempColor.copy(iv.treeColor).lerp(iv.qrColor, easeT);
+        islandVoxelMesh.setColorAt(i, tempColor);
+      }
+      islandVoxelMesh.instanceMatrix.needsUpdate = true;
+      if (islandVoxelMesh.instanceColor) islandVoxelMesh.instanceColor.needsUpdate = true;
+    }
+
+    /* -------------------------------------------------------------
+     * 7. Smooth Zero-Snap Morph Toggle
+     * ------------------------------------------------------------- */
+    function toggleMode() {
+      if (isTransitioning) return;
+      isTransitioning = true;
+      isQRMode = !isQRMode;
+
+      const modeIcon = document.getElementById('mode-icon');
+      const duration = 2.4;
+
+      if (isQRMode) {
+        updateCamTrackFromCurrent();
+        controls.enabled = false;
+        sound.playArpeggio(false);
+
+        modeIcon.setAttribute('data-lucide', 'trees');
+        lucide.createIcons();
+
+        gsap.to(dirLight, { intensity: 0.25, duration: duration * 0.7 });
+        gsap.to(ambientLight, { intensity: 1.45, duration: duration * 0.7 });
+
+        gsap.to(morphProgress, {
+          value: 1,
+          duration: duration,
+          ease: 'power2.inOut',
+          onUpdate: () => updateMeshesToProgress(morphProgress.value),
+          onComplete: () => {
+            isTransitioning = false;
+          }
+        });
+
+      } else {
+        controls.enabled = false;
+        sound.playArpeggio(true);
+
+        modeIcon.setAttribute('data-lucide', 'qr-code');
+        lucide.createIcons();
+
+        gsap.to(dirLight, { intensity: 1.15, duration: duration * 0.8 });
+        gsap.to(ambientLight, { intensity: 0.88, duration: duration * 0.8 });
+
+        gsap.to(morphProgress, {
+          value: 0,
+          duration: duration,
+          ease: 'power2.inOut',
+          onUpdate: () => updateMeshesToProgress(morphProgress.value),
+          onComplete: () => {
+            camera.up.set(0, 1, 0);
+            controls.enabled = true;
+            isTransitioning = false;
+            updateCamTrackFromCurrent();
+          }
+        });
+      }
+    }
+
+    document.getElementById('btn-morph-toggle').addEventListener('click', toggleMode);
+
+    /* -------------------------------------------------------------
+     * 8. Click Shockwave Raycaster
+     * ------------------------------------------------------------- */
+    function setupRaycaster() {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      let downX = 0, downY = 0, downTime = 0;
+
+      window.addEventListener('pointerdown', (e) => {
+        downX = e.clientX;
+        downY = e.clientY;
+        downTime = performance.now();
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        const moveDist = Math.hypot(e.clientX - downX, e.clientY - downY);
+        const duration = performance.now() - downTime;
+        if (moveDist > 6 || duration > 350) return;
+        if (isQRMode || morphProgress.value > 0.05 || e.clientY > window.innerHeight - 100) return;
+        
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObject(mainVoxelMesh);
+        if (intersects.length > 0) {
+          sound.playPop(620, 1.4);
+          shockwaveEngine.add(intersects[0].point);
+        }
+      });
+    }
+
+    /* -------------------------------------------------------------
+     * 9. Render Loop & Responsive Handling
+     * ------------------------------------------------------------- */
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      if (isQRMode) {
+        camera.position.y = window.innerWidth < 640 ? 46 : 38;
+      }
+      updateCamTrackFromCurrent();
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsedTime = clock.getElapsedTime();
+
+      if (!isQRMode && morphProgress.value < 0.001 && controls.enabled) {
+        controls.update();
+        scene.rotation.y = Math.sin(elapsedTime * 0.18) * 0.02;
+      } else {
+        scene.rotation.y = 0;
+      }
+
+      const hasActiveWaves = shockwaveEngine.update(dt);
+      if (hasActiveWaves && !isTransitioning && morphProgress.value < 0.05) {
+        updateMeshesToProgress(morphProgress.value);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.onload = function () {
+      initScene();
+      animate();
+    };
+  </script>
+</body>
+</html>

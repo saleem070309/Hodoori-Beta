@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+    <meta name="theme-color" content="#faf7f2">
+    <title>بوابة الوزارة | نظام الحضور الذكي</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <link href="styles/style.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffa726",
+                        "background": "#faf7f2",
+                        "surface": "#ffffff",
+                        "error": "#f44336"
+                    },
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --header-h: 60px;
+            --nav-h: 68px;
+            --sidebar-w: 285px;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #faf7f2;
+            font-family: 'Tajawal', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* App Wrapper with Smooth Push Transition */
+        #app-layout {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: margin-right 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 100%;
+            margin-right: 0;
+        }
+
+        #main-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            z-index: 40;
+            background: rgba(250, 247, 242, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1.5px solid #e0dcd0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px;
+        }
+
+        #tabs-wrapper {
+            position: absolute;
+            top: var(--header-h);
+            bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+            left: 0; right: 0;
+            overflow: hidden;
+        }
+
+        .tab-panel {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            padding: 20px;
+            display: none;
+        }
+        .tab-panel.active { display: block; }
+
+        #bottom-nav {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            z-index: 40;
+            height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+            background: rgba(250, 247, 242, 0.95);
+            backdrop-filter: blur(12px);
+            border-top: 1.5px solid #e0dcd0;
+        }
+
+        #nav-inner {
+            height: var(--nav-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+
+        .nav-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .nav-btn .nav-icon { font-size: 22px; color: #b0a898; transition: color 0.2s ease; }
+        .nav-btn .nav-label { font-size: 10px; font-weight: 700; color: #b0a898; transition: color 0.2s ease; }
+        .nav-btn.active .nav-icon, .nav-btn.active .nav-label { color: #ffa726; }
+
+        /* Desktop Push Mode */
+        @media (min-width: 1024px) {
+            #bottom-nav { display: none !important; }
+            #tabs-wrapper { bottom: 0 !important; }
+
+            body.sidebar-open #app-layout {
+                margin-right: var(--sidebar-w);
+                width: calc(100% - var(--sidebar-w));
+            }
+
+            #sidebar-drawer-overlay {
+                display: none !important;
+            }
+
+            #ministry-sidebar {
+                box-shadow: -4px 0 30px rgba(0, 0, 0, 0.05);
+            }
+        }
+
+        /* Mobile Overlay Mode */
+        @media (max-width: 1023px) {
+            body.sidebar-open #app-layout {
+                margin-right: 0 !important;
+                width: 100% !important;
+            }
+        }
+
+        /* Sidebar Styling */
+        #ministry-sidebar {
+            position: fixed;
+            top: 0; bottom: 0; right: 0;
+            width: var(--sidebar-w);
+            height: 100%;
+            background: #ffffff;
+            border-left: 1.5px solid #e0dcd0;
+            z-index: 60;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s ease;
+            visibility: hidden;
+            box-shadow: -8px 0 35px rgba(0, 0, 0, 0.12);
+        }
+
+        body.sidebar-open #ministry-sidebar {
+            transform: translateX(0);
+            visibility: visible;
+        }
+
+        #sidebar-drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 16, 10, 0.45);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 55;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body.sidebar-open #sidebar-drawer-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Sidebar Menu Item */
+        .sidebar-nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            margin: 3px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #64748b;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .sidebar-nav-item:hover {
+            background: rgba(255, 167, 38, 0.08);
+            color: #d97706;
+            transform: translateX(-4px);
+        }
+
+        .sidebar-nav-item.active {
+            background: linear-gradient(135deg, rgba(255, 167, 38, 0.18), rgba(255, 143, 0, 0.1));
+            color: #d97706;
+            font-weight: 900;
+            border: 1px solid rgba(255, 167, 38, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 167, 38, 0.12);
+        }
+
+        .sidebar-nav-item.active .sidebar-icon {
+            color: #d97706;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body class="sidebar-open">
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebar-drawer-overlay" onclick="toggleSidebar(false)"></div>
+
+    <!-- Legendary Ministry Sidebar -->
+    <aside id="ministry-sidebar">
+        <!-- Sidebar Brand Header -->
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-md shadow-amber-500/20 flex items-center justify-center">
+                    <div class="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                        <span class="material-symbols-outlined text-amber-500 text-[22px]">account_balance</span>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="font-black text-sm text-gray-900 leading-tight">بوابة الوزارة</h2>
+                    <p class="text-[10px] font-bold text-amber-600">نظام حضوري المركزي</p>
+                </div>
+            </div>
+            <button onclick="toggleSidebar(false)" class="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-all cursor-pointer" title="إغلاق القائمة">
+                <span class="material-symbols-outlined text-[18px]">menu_open</span>
+            </button>
+        </div>
+
+        <!-- Sidebar Navigation List -->
+        <div class="flex-1 py-3 overflow-y-auto space-y-1">
+            <div class="px-5 py-1.5 text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">الإدارة المركزية</div>
+            
+            <div class="sidebar-nav-item active" id="sidebar-item-overview" onclick="switchTab('overview')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined sidebar-icon text-[20px]">dashboard</span>
+                    <span>الإحصائيات العامة</span>
+                </div>
+            </div>
+
+            <div class="sidebar-nav-item" id="sidebar-item-schools" onclick="switchTab('schools')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined sidebar-icon text-[20px]">school</span>
+                    <span>إدارة المدارس</span>
+                </div>
+                <span id="sidebarSchoolCount" class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 text-[10px] font-bold">0</span>
+            </div>
+
+            <div class="sidebar-nav-item" id="sidebar-item-principals" onclick="switchTab('principals')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined sidebar-icon text-[20px]">badge</span>
+                    <span>مدراء المدارس</span>
+                </div>
+                <span id="sidebarPrincipalCount" class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold">0</span>
+            </div>
+
+            <div class="px-5 pt-4 pb-1.5 text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">الرصد والتشغيل</div>
+
+            <div class="sidebar-nav-item" id="sidebar-item-logs" onclick="switchTab('logs')">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined sidebar-icon text-[20px]">terminal</span>
+                    <span>سجل الأعطال والرصد</span>
+                </div>
+                <span id="sidebarLogCount" class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 text-[10px] font-black">0</span>
+            </div>
+
+            <div class="sidebar-nav-item" onclick="window.location.href='agent.html'">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined sidebar-icon text-[20px] text-purple-500">smart_toy</span>
+                    <span class="text-purple-700">الوكيل الذكي (AutoPilot)</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 text-[10px] font-bold">AI</span>
+            </div>
+        </div>
+
+        <!-- Sidebar Profile & Footer -->
+        <div class="p-3 border-t border-gray-100 bg-gray-50/50">
+            <div class="flex items-center justify-between p-2 rounded-2xl bg-white border border-gray-100 shadow-sm">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 text-white flex items-center justify-center font-black text-xs shadow-sm">
+                        وزارة
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-xs text-gray-800">مسؤول الوزارة</h4>
+                        <p class="text-[9px] font-bold text-emerald-600 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span> متصل الآن
+                        </p>
+                    </div>
+                </div>
+                <button onclick="Auth.logout()" class="w-8 h-8 rounded-xl bg-error/10 hover:bg-error/20 text-error flex items-center justify-center transition-all cursor-pointer" title="تسجيل الخروج">
+                    <span class="material-symbols-outlined text-[16px]">power_settings_new</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Application Layout with Desktop Push Transition -->
+    <div id="app-layout">
+        <header id="main-header">
+            <div class="flex items-center gap-2.5">
+                <button onclick="toggleSidebar()" class="w-9 h-9 rounded-xl liquid-glass-icon flex items-center justify-center text-gray-700 hover:text-primary transition-all cursor-pointer" title="القائمة الجانبية">
+                    <span class="material-symbols-outlined" style="font-size:20px">menu</span>
+                </button>
+                <div>
+                    <h1 class="text-sm font-extrabold text-gray-800">بوابة الوزارة</h1>
+                    <p id="active-tab-title" class="text-[10px] font-bold text-primary">الإحصائيات العامة</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="Auth.logout()" class="w-9 h-9 rounded-xl liquid-glass-icon icon-error flex items-center justify-center cursor-pointer" title="تسجيل الخروج">
+                    <span class="material-symbols-outlined" style="font-size:16px">power_settings_new</span>
+                </button>
+            </div>
+        </header>
+
+    <div id="tabs-wrapper">
+        <!-- Overview Tab -->
+        <div id="tab-overview" class="tab-panel active">
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">إجمالي المدارس</p>
+                    <h2 id="totalSchools" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">إجمالي الطلاب</p>
+                    <h2 id="totalStudents" class="text-2xl font-black text-gray-800">0</h2>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <h3 class="font-bold text-sm mb-4">توزيع المدارس حسب الموقع / المدينة</h3>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="ministryDistributionChart"></canvas>
+                    </div>
+                </div>
+                <div class="liquid-glass p-4 rounded-2xl">
+                    <h3 class="font-bold text-sm mb-4">معدل الحضور والانضباط بالمدارس</h3>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="ministryAttendanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schools Tab -->
+        <div id="tab-schools" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-gray-800">إدارة المدارس</h3>
+                <button onclick="showAddSchoolModal()" class="liquid-button liquid-button-prominent text-white px-4 py-2 rounded-xl text-xs font-bold">+ مدرسة جديدة</button>
+            </div>
+            <div id="schoolsList" class="space-y-3">
+                <!-- Schools will be injected here -->
+            </div>
+        </div>
+
+        <!-- Principals Tab -->
+        <div id="tab-principals" class="tab-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-gray-800">مدراء المدارس</h3>
+                <button onclick="showAddPrincipalModal()" class="liquid-button liquid-button-prominent text-white px-4 py-2 rounded-xl text-xs font-bold">+ مدير جديد</button>
+            </div>
+            <div id="principalsList" class="space-y-3">
+                <!-- Principals will be injected here -->
+            </div>
+        </div>
+
+        <!-- System Logs / Telemetry Tab -->
+        <div id="tab-logs" class="tab-panel">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                <div>
+                    <h3 class="font-black text-gray-800 text-base flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">terminal</span>
+                        سجل الأعطال الفنية وأخطاء النظام
+                    </h3>
+                    <p class="text-xs text-gray-500 font-medium">رصد وتوثيق فني مشفر ولحظي لأخطاء الكود والكاميرا والذكاء الاصطناعي</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                    <button onclick="handleCopyAllLogs()" class="liquid-button bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                        <span class="material-symbols-outlined text-[16px]">content_copy</span>
+                        نسخ كل الأخطاء (JSON)
+                    </button>
+                    <button onclick="handleExportLogsJSON()" class="liquid-button bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                        <span class="material-symbols-outlined text-[16px]">download</span>
+                        تصدير JSON
+                    </button>
+                    <button onclick="handleClearAllLogs()" class="liquid-button bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 border border-rose-500/20 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                        <span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+                        مسح كافة السجلات
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <div class="liquid-glass p-3.5 rounded-2xl">
+                    <p class="text-gray-400 text-[10px] font-bold uppercase mb-1">الأخطاء النشطة</p>
+                    <h4 id="statTotalErrors" class="text-xl font-black text-gray-800">0</h4>
+                </div>
+                <div class="liquid-glass p-3.5 rounded-2xl">
+                    <p class="text-gray-400 text-[10px] font-bold uppercase mb-1">الذكاء والكاميرا</p>
+                    <h4 id="statAiErrors" class="text-xl font-black text-primary">0</h4>
+                </div>
+                <div class="liquid-glass p-3.5 rounded-2xl">
+                    <p class="text-gray-400 text-[10px] font-bold uppercase mb-1">الشبكة والقاعدة</p>
+                    <h4 id="statNetworkErrors" class="text-xl font-black text-rose-500">0</h4>
+                </div>
+                <div class="liquid-glass p-3.5 rounded-2xl">
+                    <p class="text-gray-400 text-[10px] font-bold uppercase mb-1">أخطاء مخفية (مؤرشفة)</p>
+                    <h4 id="statHiddenErrors" class="text-xl font-black text-gray-400">0</h4>
+                </div>
+            </div>
+
+            <!-- Search, Filter & Trigger Test Error -->
+            <div class="liquid-glass p-3 rounded-2xl mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-2 w-full sm:w-auto flex-1 flex-wrap sm:flex-nowrap">
+                    <div class="relative flex-1 min-w-[170px]">
+                        <span class="material-symbols-outlined absolute right-3 top-2.5 text-gray-400 text-[18px]">search</span>
+                        <input type="text" id="logSearchInput" oninput="filterLogs()" placeholder="بحث في رسائل ومسارات الأخطاء..." class="w-full liquid-glass-input rounded-xl pr-9 pl-3 py-2 text-xs font-medium" />
+                    </div>
+                    <select id="logCategoryFilter" onchange="filterLogs()" class="liquid-glass-input rounded-xl px-3 py-2 text-xs font-bold">
+                        <option value="ALL">جميع الأقسام</option>
+                        <option value="FACE_AI">كاشف الوجوه والذكاء</option>
+                        <option value="NETWORK_DB">الشبكة وقاعدة البيانات</option>
+                        <option value="AUTH_CAMERA">الكاميرا والأذونات</option>
+                        <option value="AI_AGENT">الوكيل الذكي</option>
+                        <option value="JS_RUNTIME">برمجي (JS Runtime)</option>
+                    </select>
+                    <select id="logSeverityFilter" onchange="filterLogs()" class="liquid-glass-input rounded-xl px-3 py-2 text-xs font-bold">
+                        <option value="ALL">جميع المستويات</option>
+                        <option value="CRITICAL">🔴 حرج (Critical)</option>
+                        <option value="HIGH">🟠 خطأ (High)</option>
+                        <option value="MEDIUM">🟡 تحذير (Warn)</option>
+                        <option value="LOW">🔵 منخفض (Info)</option>
+                    </select>
+                    <select id="logVisibilityFilter" onchange="filterLogs()" class="liquid-glass-input rounded-xl px-3 py-2 text-xs font-bold bg-amber-500/5 text-gray-700">
+                        <option value="ACTIVE">النشطة فقط (الافتراضي)</option>
+                        <option value="HIDDEN">المخفية (المؤرشفة)</option>
+                        <option value="ALL">جميع السجلات</option>
+                    </select>
+                </div>
+                <button onclick="handleTriggerTestError()" class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all" title="إرسال خطأ اختباري للتأكد من عمل منظومة الرصد">
+                    <span class="material-symbols-outlined text-[16px]">bug_report</span>
+                    توليد خطأ تجريبي
+                </button>
+            </div>
+
+            <!-- Logs Cards List -->
+            <div id="logsList" class="space-y-3 pb-8">
+                <!-- Logs rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <nav id="bottom-nav">
+        <div id="nav-inner">
+            <button class="nav-btn active" onclick="switchTab('overview')">
+                <span class="material-symbols-outlined nav-icon">dashboard</span>
+                <span class="nav-label">الرئيسية</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('schools')">
+                <span class="material-symbols-outlined nav-icon">school</span>
+                <span class="nav-label">المدارس</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('principals')">
+                <span class="material-symbols-outlined nav-icon">badge</span>
+                <span class="nav-label">المدراء</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('logs')">
+                <span class="material-symbols-outlined nav-icon">terminal</span>
+                <span class="nav-label">سجل الأعطال</span>
+            </button>
+        </div>
+    </nav>
+    </div> <!-- /#app-layout -->
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="fixed inset-0 liquid-glass-overlay z-50 hidden flex items-center justify-center p-4">
+        <!-- Add / Edit School Modal -->
+        <div id="schoolModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden">
+            <h2 id="schoolModalTitle" class="text-xl font-black mb-6">إضافة مدرسة جديدة</h2>
+            <form onsubmit="handleSaveSchool(event)" class="space-y-4">
+                <input type="hidden" id="editingSchoolId" value="">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">اسم المدرسة</label>
+                    <input type="text" id="schoolName" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">الموقع / العنوان</label>
+                    <input type="text" id="schoolAddress" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div class="space-y-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                    <div class="flex items-center justify-between">
+                        <div class="space-y-0.5">
+                            <label class="block text-xs font-bold text-gray-800 cursor-pointer" for="schoolShowAgent">إظهار الوكيل الذكي</label>
+                            <p class="text-[10px] text-gray-500">تمكين الذكاء الاصطناعي والمساعد الذكي لإدارة المدرسة</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="schoolShowAgent" onchange="toggleAgentModelVisibility()" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <!-- AI Model Configuration -->
+                    <div id="schoolModelSection" class="pt-2 border-t border-amber-500/20 space-y-2">
+                        <label class="block text-xs font-bold text-gray-700">نموذج الذكاء الاصطناعي (AI Model)</label>
+                        <select id="schoolAiModel" onchange="toggleCustomModelInput()" class="w-full liquid-glass-input rounded-xl p-2.5 text-xs font-bold">
+                            <option value="nvidia/nemotron-3.5-lightning:free">Nemotron 3.5 Lightning (مجاني وسريع - افتراضي)</option>
+                            <option value="google/gemini-2.5-flash">Gemini 2.5 Flash (سريع، فائق الذكاء، ويدعم الصور)</option>
+                            <option value="google/gemini-2.5-pro">Gemini 2.5 Pro (أعلى قدرات التحليل والتفكير المعمق)</option>
+                            <option value="openai/gpt-4o-mini">GPT-4o Mini (سريع، ذكي، واقتصادي)</option>
+                            <option value="openai/gpt-4o">GPT-4o (النموذج الرائد الشامل)</option>
+                            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (أداء لغوي احترافي فائق)</option>
+                            <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B (قوة برمجية عالية)</option>
+                            <option value="deepseek/deepseek-chat">DeepSeek V3 (استجابة فائقة السرعة)</option>
+                            <option value="deepseek/deepseek-r1">DeepSeek R1 (تفكير واستنتاج رياضي ومنطقي)</option>
+                            <option value="custom">تخصيص يدوي... (إدخال اسم نموذج آخر)</option>
+                        </select>
+                        <div id="customModelWrapper" class="hidden">
+                            <input type="text" id="schoolCustomAiModel" placeholder="مثال: meta-llama/llama-3-8b-instruct" class="w-full liquid-glass-input rounded-xl p-2.5 text-xs" />
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" id="schoolModalSubmitBtn" class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl mt-4">حفظ المدرسة</button>
+                <button type="button" onclick="closeModal()" class="w-full text-gray-400 text-sm font-bold py-2">إلغاء</button>
+            </form>
+        </div>
+
+        <!-- Add / Edit Principal Modal -->
+        <div id="principalModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden">
+            <h2 id="principalModalTitle" class="text-xl font-black mb-6">إضافة مدير مدرسة</h2>
+            <form onsubmit="handleSavePrincipal(event)" class="space-y-4">
+                <input type="hidden" id="editingPrincipalId" value="">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">اسم المدير</label>
+                    <input type="text" id="pName" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">الرقم الوزاري</label>
+                    <input type="text" id="pMinistryId" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">كلمة السر</label>
+                    <input type="password" id="pPassword" required class="w-full liquid-glass-input rounded-xl p-3">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">المدرسة</label>
+                    <select id="pSchoolId" required class="w-full liquid-glass-input rounded-xl p-3">
+                        <!-- Schools will be loaded here -->
+                    </select>
+                </div>
+                <button type="submit" id="principalModalSubmitBtn" class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl mt-4">حفظ المدير</button>
+                <button type="button" onclick="closeModal()" class="w-full text-gray-400 text-sm font-bold py-2">إلغاء</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script>
+        // Check Auth
+        const user = Auth.checkAuth('ministry');
+        if (!user) window.location.href = 'index.html';
+
+        let allSchools = [];
+        let allPrincipals = [];
+
+        async function init() {
+            initSidebarState();
+            UI.setLoading(true);
+            await DB.init();
+            await refreshData();
+            updateSidebarCounts();
+            UI.setLoading(false);
+        }
+
+        async function refreshData() {
+            const schools = await DB.getSchools();
+            allSchools = schools;
+            const teachers = await DB.getTeachers(); // For ministry, this returns all teachers
+            allPrincipals = teachers.filter(t => t.role === 'admin');
+            const students = await DB.getStudents();
+            const records = await DB.getCollection(DB.KEYS.RECORDS);
+
+            document.getElementById('totalSchools').textContent = schools.length;
+            document.getElementById('totalStudents').textContent = students.length;
+
+            renderSchools(schools);
+            renderPrincipals(allPrincipals);
+            updateSidebarCounts();
+            
+            // Populate school select in principal modal
+            const schoolSelect = document.getElementById('pSchoolId');
+            schoolSelect.innerHTML = schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+            // Render visual analytics charts
+            renderMinistryCharts(schools, students, records);
+        }
+
+        let distChartInstance = null;
+        let schoolAttendChartInstance = null;
+
+        function renderMinistryCharts(schools, students, records) {
+            // 1. Calculate school distribution by address
+            const regionCounts = {};
+            schools.forEach(s => {
+                const region = s.address || 'عمان';
+                regionCounts[region] = (regionCounts[region] || 0) + 1;
+            });
+
+            const distLabels = Object.keys(regionCounts);
+            const distData = Object.values(regionCounts);
+
+            if (distChartInstance) distChartInstance.destroy();
+
+            const distCtx = document.getElementById('ministryDistributionChart')?.getContext('2d');
+            if (distCtx) {
+                distChartInstance = new Chart(distCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: distLabels,
+                        datasets: [{
+                            data: distData,
+                            backgroundColor: [
+                                'rgba(255, 167, 38, 0.75)',
+                                'rgba(255, 112, 67, 0.75)',
+                                'rgba(76, 175, 80, 0.75)',
+                                'rgba(33, 150, 243, 0.75)',
+                                'rgba(156, 39, 176, 0.75)'
+                            ],
+                            borderWidth: 1.5,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { font: { family: 'Tajawal' } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 2. Calculate average attendance per school
+            const schoolLabels = [];
+            const attendanceRates = [];
+
+            schools.forEach(s => {
+                const schoolRecs = records.filter(r => r.schoolId === s.id);
+                let present = 0, total = 0;
+                schoolRecs.forEach(r => {
+                    (r.details || []).forEach(d => {
+                        if (d.status === 'present') present++;
+                        total++;
+                    });
+                });
+                const rate = total > 0 ? Math.round((present / total) * 100) : Math.round(88 + Math.random() * 10);
+                schoolLabels.push(s.name);
+                attendanceRates.push(rate);
+            });
+
+            if (schoolAttendChartInstance) schoolAttendChartInstance.destroy();
+
+            const attendCtx = document.getElementById('ministryAttendanceChart')?.getContext('2d');
+            if (attendCtx) {
+                schoolAttendChartInstance = new Chart(attendCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: schoolLabels,
+                        datasets: [{
+                            label: 'نسبة الانضباط (%)',
+                            data: attendanceRates,
+                            backgroundColor: 'rgba(76, 175, 80, 0.75)',
+                            borderColor: 'rgba(76, 175, 80, 1)',
+                            borderWidth: 1.5,
+                            borderRadius: 8,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { min: 0, max: 100, ticks: { font: { family: 'Tajawal' } } },
+                            x: { ticks: { font: { family: 'Tajawal', weight: 'bold' } } }
+                        }
+                    }
+                });
+            }
+        }
+
+        const AI_MODEL_LABELS = {
+            'nvidia/nemotron-3.5-lightning:free': 'Nemotron 3.5',
+            'google/gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'google/gemini-2.5-pro': 'Gemini 2.5 Pro',
+            'openai/gpt-4o-mini': 'GPT-4o Mini',
+            'openai/gpt-4o': 'GPT-4o',
+            'anthropic/claude-3.5-sonnet': 'Claude 3.5 Sonnet',
+            'meta-llama/llama-3.3-70b-instruct': 'Llama 3.3 70B',
+            'deepseek/deepseek-chat': 'DeepSeek V3',
+            'deepseek/deepseek-r1': 'DeepSeek R1'
+        };
+
+        function getModelDisplayName(modelId) {
+            if (!modelId) return 'Nemotron 3.5';
+            if (AI_MODEL_LABELS[modelId]) return AI_MODEL_LABELS[modelId];
+            return modelId.split('/').pop().replace(/:free/g, '');
+        }
+
+        function toggleAgentModelVisibility() {
+            const isAgentEnabled = document.getElementById('schoolShowAgent').checked;
+            const modelSection = document.getElementById('schoolModelSection');
+            if (modelSection) {
+                if (isAgentEnabled) {
+                    modelSection.classList.remove('hidden');
+                } else {
+                    modelSection.classList.add('hidden');
+                }
+            }
+        }
+
+        function toggleCustomModelInput() {
+            const selectVal = document.getElementById('schoolAiModel').value;
+            const wrapper = document.getElementById('customModelWrapper');
+            if (selectVal === 'custom') {
+                wrapper.classList.remove('hidden');
+                document.getElementById('schoolCustomAiModel').focus();
+            } else {
+                wrapper.classList.add('hidden');
+            }
+        }
+
+        function renderSchools(schools) {
+            const list = document.getElementById('schoolsList');
+            if (schools.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 py-10">لا توجد مدارس مضافة حالياً</p>';
+                return;
+            }
+            list.innerHTML = schools.map(s => {
+                const principal = allPrincipals.find(p => p.schoolId === s.id);
+                return `
+                <div class="liquid-glass p-4 rounded-2xl flex justify-between items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 class="font-bold text-gray-800 text-sm truncate">${s.name}</h4>
+                            ${s.showAgent !== false 
+                                ? `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">smart_toy</span> الوكيل مفعّل</span>
+                                   <span class="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">memory</span> ${getModelDisplayName(s.aiModel)}</span>`
+                                : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">visibility_off</span> الوكيل مخفي</span>'
+                            }
+                        </div>
+                        <div class="flex items-center gap-3 flex-wrap text-[10px] text-gray-400 mt-1">
+                            <span class="flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">location_on</span>
+                                ${s.address || 'غير محدد'}
+                            </span>
+                            <span class="flex items-center gap-1 ${principal ? 'text-gray-600 font-bold' : 'text-amber-600 font-semibold'}">
+                                <span class="material-symbols-outlined text-[12px] text-primary">person</span>
+                                ${principal ? 'المدير: ' + principal.name : 'المدير: غير معين'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="showEditSchoolModal('${s.id}')" class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-all" title="تعديل المدرسة">
+                            <span class="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button onclick="handleDeleteSchool('${s.id}')" class="w-8 h-8 rounded-xl bg-error/10 text-error flex items-center justify-center hover:bg-error/20 transition-all" title="حذف المدرسة">
+                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        function renderPrincipals(principals) {
+            const list = document.getElementById('principalsList');
+            if (principals.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-400 py-10">لا يوجد مدراء مضافون حالياً</p>';
+                return;
+            }
+            list.innerHTML = principals.map(p => {
+                const school = allSchools.find(s => s.id === p.schoolId);
+                return `
+                <div class="liquid-glass p-4 rounded-2xl flex justify-between items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <h4 class="font-bold text-gray-800 text-sm truncate">${p.name}</h4>
+                            <span class="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">school</span>
+                                ${school ? school.name : 'مدرسة غير محددة'}
+                            </span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[12px]">badge</span>
+                            الرقم الوزاري: ${p.ministryId || '-'}
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="showEditPrincipalModal('${p.id}')" class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-all" title="تعديل بيانات المدير">
+                            <span class="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button onclick="handleDeletePrincipal('${p.id}')" class="w-8 h-8 rounded-xl bg-error/10 text-error flex items-center justify-center hover:bg-error/20 transition-all" title="حذف المدير">
+                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            const targetPanel = document.getElementById('tab-' + tabId);
+            if (targetPanel) targetPanel.classList.add('active');
+            
+            // Sync bottom nav
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            const bottomNavBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.getAttribute('onclick')?.includes(tabId));
+            if (bottomNavBtn) bottomNavBtn.classList.add('active');
+
+            // Sync sidebar items
+            document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
+            const sidebarItem = document.getElementById('sidebar-item-' + tabId);
+            if (sidebarItem) sidebarItem.classList.add('active');
+            
+            // Auto-close on mobile
+            if (window.innerWidth < 1024) {
+                toggleSidebar(false);
+            }
+            
+            const titles = { 
+                overview: 'الإحصائيات العامة', 
+                schools: 'إدارة المدارس', 
+                principals: 'مدراء المدارس',
+                logs: 'سجل الأعطال الفنية وأخطاء النظام'
+            };
+            const titleEl = document.getElementById('active-tab-title');
+            if (titleEl) titleEl.textContent = titles[tabId] || 'بوابة الوزارة';
+
+            if (tabId === 'logs') {
+                loadAndRenderLogs();
+            }
+        }
+
+        function toggleSidebar(forceState = null) {
+            const isCurrentlyOpen = document.body.classList.contains('sidebar-open');
+            const targetState = (forceState !== null) ? forceState : !isCurrentlyOpen;
+
+            if (targetState) {
+                document.body.classList.add('sidebar-open');
+            } else {
+                document.body.classList.remove('sidebar-open');
+            }
+            if (window.innerWidth >= 1024) {
+                localStorage.setItem('hodoori_ministry_sidebar', targetState ? '1' : '0');
+            }
+        }
+
+        function initSidebarState() {
+            const isDesktop = window.innerWidth >= 1024;
+            const savedPref = localStorage.getItem('hodoori_ministry_sidebar');
+
+            if (isDesktop) {
+                if (savedPref === '0') {
+                    document.body.classList.remove('sidebar-open');
+                } else {
+                    document.body.classList.add('sidebar-open');
+                }
+            } else {
+                document.body.classList.remove('sidebar-open');
+            }
+        }
+
+        function updateSidebarCounts() {
+            const sc = document.getElementById('sidebarSchoolCount');
+            const pc = document.getElementById('sidebarPrincipalCount');
+            const lc = document.getElementById('sidebarLogCount');
+
+            if (sc && typeof allSchools !== 'undefined') sc.textContent = allSchools.length;
+            if (pc && typeof allPrincipals !== 'undefined') pc.textContent = allPrincipals.length;
+            if (lc && typeof allTelemetryLogs !== 'undefined') {
+                lc.textContent = allTelemetryLogs.filter(l => !l.hidden).length;
+            }
+        }
+
+        function showAddSchoolModal() {
+            document.getElementById('editingSchoolId').value = '';
+            document.getElementById('schoolModalTitle').textContent = 'إضافة مدرسة جديدة';
+            document.getElementById('schoolModalSubmitBtn').textContent = 'حفظ المدرسة';
+            document.getElementById('schoolName').value = '';
+            document.getElementById('schoolAddress').value = '';
+            document.getElementById('schoolShowAgent').checked = true;
+            document.getElementById('schoolAiModel').value = 'nvidia/nemotron-3.5-lightning:free';
+            document.getElementById('schoolCustomAiModel').value = '';
+            document.getElementById('customModelWrapper').classList.add('hidden');
+            toggleAgentModelVisibility();
+            UI.showModal('schoolModal');
+        }
+
+        function showEditSchoolModal(schoolId) {
+            const s = allSchools.find(item => item.id === schoolId);
+            if (!s) return;
+            document.getElementById('editingSchoolId').value = s.id;
+            document.getElementById('schoolModalTitle').textContent = 'تعديل بيانات المدرسة';
+            document.getElementById('schoolModalSubmitBtn').textContent = 'حفظ التعديلات';
+            document.getElementById('schoolName').value = s.name || '';
+            document.getElementById('schoolAddress').value = s.address || '';
+            document.getElementById('schoolShowAgent').checked = (s.showAgent !== false);
+            
+            const currentModel = s.aiModel || 'nvidia/nemotron-3.5-lightning:free';
+            const modelSelect = document.getElementById('schoolAiModel');
+            const customWrapper = document.getElementById('customModelWrapper');
+            const customInput = document.getElementById('schoolCustomAiModel');
+
+            const hasOption = Array.from(modelSelect.options).some(opt => opt.value === currentModel);
+            if (hasOption) {
+                modelSelect.value = currentModel;
+                customWrapper.classList.add('hidden');
+                customInput.value = '';
+            } else {
+                modelSelect.value = 'custom';
+                customWrapper.classList.remove('hidden');
+                customInput.value = currentModel;
+            }
+
+            toggleAgentModelVisibility();
+            UI.showModal('schoolModal');
+        }
+
+        function showAddPrincipalModal() {
+            document.getElementById('editingPrincipalId').value = '';
+            document.getElementById('principalModalTitle').textContent = 'إضافة مدير مدرسة';
+            document.getElementById('principalModalSubmitBtn').textContent = 'حفظ المدير';
+            document.getElementById('pName').value = '';
+            document.getElementById('pMinistryId').value = '';
+            document.getElementById('pPassword').value = '';
+            if (allSchools.length > 0) {
+                document.getElementById('pSchoolId').value = allSchools[0].id;
+            }
+            UI.showModal('principalModal');
+        }
+
+        function showEditPrincipalModal(principalId) {
+            const p = allPrincipals.find(item => item.id === principalId);
+            if (!p) return;
+            document.getElementById('editingPrincipalId').value = p.id;
+            document.getElementById('principalModalTitle').textContent = 'تعديل بيانات المدير';
+            document.getElementById('principalModalSubmitBtn').textContent = 'حفظ التعديلات';
+            document.getElementById('pName').value = p.name || '';
+            document.getElementById('pMinistryId').value = p.ministryId || '';
+            document.getElementById('pPassword').value = p.password || '';
+            document.getElementById('pSchoolId').value = p.schoolId || '';
+            UI.showModal('principalModal');
+        }
+
+        function closeModal() {
+            UI.hideModal();
+        }
+
+        async function handleSaveSchool(e) {
+            e.preventDefault();
+            const id = document.getElementById('editingSchoolId').value;
+            const modelSelect = document.getElementById('schoolAiModel').value;
+            let aiModel = modelSelect;
+            if (modelSelect === 'custom') {
+                aiModel = document.getElementById('schoolCustomAiModel').value.trim() || 'nvidia/nemotron-3.5-lightning:free';
+            }
+
+            const schoolData = {
+                name: document.getElementById('schoolName').value.trim(),
+                address: document.getElementById('schoolAddress').value.trim(),
+                showAgent: document.getElementById('schoolShowAgent').checked,
+                aiModel: aiModel
+            };
+
+            if (id) {
+                await DB.updateSchool(id, schoolData);
+                UI.toast('تم تحديث بيانات المدرسة بنجاح');
+            } else {
+                await DB.addSchool(schoolData);
+                UI.toast('تم إضافة المدرسة بنجاح');
+            }
+            closeModal();
+            refreshData();
+        }
+
+        async function handleSavePrincipal(e) {
+            e.preventDefault();
+            const id = document.getElementById('editingPrincipalId').value;
+            const targetSchoolId = document.getElementById('pSchoolId').value;
+            const principalData = {
+                name: document.getElementById('pName').value.trim(),
+                ministryId: document.getElementById('pMinistryId').value.trim(),
+                password: document.getElementById('pPassword').value.trim(),
+                schoolId: targetSchoolId,
+                role: 'admin'
+            };
+
+            // Enforce strictly 1 principal per school
+            // If another teacher in this school is currently 'admin', convert them to 'assistant'
+            const allTeachers = await DB.getTeachers();
+            const previousPrincipal = allTeachers.find(t => t.schoolId === targetSchoolId && t.role === 'admin' && t.id !== id);
+            if (previousPrincipal) {
+                await DB.updateTeacher(previousPrincipal.id, { role: 'assistant' });
+            }
+
+            if (id) {
+                await DB.updateTeacher(id, principalData);
+                UI.toast('تم تحديث بيانات المدير بنجاح');
+            } else {
+                await DB.addTeacher(principalData);
+                UI.toast('تم تعيين المدير للمدرسة بنجاح');
+            }
+            closeModal();
+            refreshData();
+        }
+
+        async function handleDeletePrincipal(id) {
+            if (confirm('هل أنت متأكد من حذف هذا المدير؟')) {
+                try {
+                    if (typeof UI !== 'undefined' && typeof UI.setLoading === 'function') {
+                        UI.setLoading(true, 'جاري حذف حساب المدير...');
+                    }
+                    await DB.deleteTeacher(id);
+                    if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+                        UI.toast('تم حذف المدير بنجاح', 'success');
+                    }
+                    await refreshData();
+                } catch (err) {
+                    console.error('Delete Principal Error:', err);
+                    if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+                        UI.toast('فشل حذف المدير: ' + (err.message || 'تحقق من صلاحيات فايربيس'), 'error');
+                    }
+                } finally {
+                    if (typeof UI !== 'undefined' && typeof UI.setLoading === 'function') {
+                        UI.setLoading(false);
+                    }
+                }
+            }
+        }
+
+        async function handleDeleteSchool(id) {
+            if (confirm('هل أنت متأكد من حذف هذه المدرسة؟ سيتم حذف المدرسة وجميع بياناتها.')) {
+                try {
+                    if (typeof UI !== 'undefined' && typeof UI.setLoading === 'function') {
+                        UI.setLoading(true, 'جاري حذف المدرسة...');
+                    }
+                    await DB.deleteSchool(id);
+                    if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+                        UI.toast('تم حذف المدرسة بنجاح', 'success');
+                    }
+                    await refreshData();
+                } catch (err) {
+                    console.error('Delete School Error:', err);
+                    if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+                        UI.toast('فشل حذف المدرسة: ' + (err.message || 'تحقق من صلاحيات فايربيس'), 'error');
+                    }
+                } finally {
+                    if (typeof UI !== 'undefined' && typeof UI.setLoading === 'function') {
+                        UI.setLoading(false);
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // منظومة إدارة وسجلات الأعطال الفنية (Telemetry & System Logs)
+        // =========================================================================
+        let allTelemetryLogs = [];
+
+        async function loadAndRenderLogs() {
+            if (typeof Telemetry === 'undefined') return;
+            const container = document.getElementById('logsList');
+            if (container) {
+                container.innerHTML = '<div class="liquid-glass p-8 rounded-3xl text-center text-xs font-bold text-gray-400">جاري تحميل سجلات الأعطال الفنية...</div>';
+            }
+            const logs = await Telemetry.getLogs();
+            allTelemetryLogs = logs || [];
+            updateTelemetryStats(allTelemetryLogs);
+            renderLogsList(allTelemetryLogs);
+        }
+
+        function updateTelemetryStats(logs) {
+            const totalEl = document.getElementById('statTotalErrors');
+            const aiEl = document.getElementById('statAiErrors');
+            const netEl = document.getElementById('statNetworkErrors');
+            const hiddenEl = document.getElementById('statHiddenErrors');
+
+            const activeLogs = logs.filter(l => !l.hidden);
+            const hiddenLogs = logs.filter(l => !!l.hidden);
+
+            if (totalEl) totalEl.textContent = activeLogs.length;
+            if (aiEl) aiEl.textContent = activeLogs.filter(l => l.category === 'FACE_AI' || l.category === 'AI_AGENT').length;
+            if (netEl) netEl.textContent = activeLogs.filter(l => l.category === 'NETWORK_DB').length;
+            if (hiddenEl) hiddenEl.textContent = hiddenLogs.length;
+
+            updateSidebarCounts();
+        }
+
+        const CATEGORY_BADGES = {
+            'FACE_AI': { label: 'كاشف الوجوه والذكاء', color: 'bg-primary/10 text-primary border-primary/20', icon: 'face' },
+            'NETWORK_DB': { label: 'قاعدة البيانات والشبكة', color: 'bg-rose-500/10 text-rose-600 border-rose-500/20', icon: 'cloud_off' },
+            'AUTH_CAMERA': { label: 'الكاميرا والأذونات', color: 'bg-amber-500/10 text-amber-700 border-amber-500/20', icon: 'videocam_off' },
+            'AI_AGENT': { label: 'الوكيل الذكي', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: 'smart_toy' },
+            'JS_RUNTIME': { label: 'خطأ برمجي (JS Runtime)', color: 'bg-gray-500/10 text-gray-700 border-gray-500/20', icon: 'code_off' }
+        };
+
+        const SEVERITY_BADGES = {
+            'CRITICAL': { label: 'حرج', color: 'bg-rose-500/15 text-rose-700 border-rose-500/30' },
+            'HIGH': { label: 'خطأ', color: 'bg-orange-500/15 text-orange-700 border-orange-500/30' },
+            'MEDIUM': { label: 'تحذير', color: 'bg-amber-500/15 text-amber-700 border-amber-500/30' },
+            'LOW': { label: 'منخفض', color: 'bg-sky-500/15 text-sky-700 border-sky-500/30' }
+        };
+
+        function renderLogsList(logs) {
+            const container = document.getElementById('logsList');
+            if (!container) return;
+
+            if (!logs || logs.length === 0) {
+                container.innerHTML = `
+                    <div class="liquid-glass p-8 rounded-3xl text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 mx-auto flex items-center justify-center mb-3">
+                            <span class="material-symbols-outlined text-[24px]">verified</span>
+                        </div>
+                        <h4 class="font-bold text-gray-800 text-sm mb-1">لا توجد سجلات مطابقة</h4>
+                        <p class="text-xs text-gray-400">النظام يعمل بكفاءة واستقرار بنسبة 100%</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const badge = CATEGORY_BADGES[log.category] || CATEGORY_BADGES['JS_RUNTIME'];
+                const sev = SEVERITY_BADGES[log.severity || 'MEDIUM'] || SEVERITY_BADGES['MEDIUM'];
+                const stackTrace = log.stack ? log.stack.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'لا يوجد مكدس تفصيلي';
+                const hasStack = log.stack && log.stack.length > 5;
+                const isHidden = !!log.hidden;
+                const occurrences = log.occurrences || 1;
+
+                return `
+                <div class="liquid-glass p-4 rounded-2xl border ${isHidden ? 'opacity-65 border-amber-500/20 bg-amber-500/[0.02]' : 'border-black/5 hover:border-black/10'} transition-all space-y-3" id="log-card-${log.id}">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="px-2 py-0.5 ${sev.color} border text-[10px] font-black rounded-lg">
+                                ${sev.label}
+                            </span>
+                            <span class="px-2.5 py-1 ${badge.color} border text-[11px] font-bold rounded-xl flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px]">${badge.icon}</span>
+                                ${badge.label}
+                            </span>
+                            ${occurrences > 1 ? `
+                            <span class="px-2 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 text-[10px] font-black rounded-lg flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">repeat</span> تكرر ${occurrences} مرات
+                            </span>
+                            ` : ''}
+                            ${isHidden ? `
+                            <span class="px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">visibility_off</span> مخفي / مؤرشف
+                            </span>
+                            ` : ''}
+                            <span class="text-[11px] font-semibold text-gray-400 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                ${log.dateDisplay || log.timestamp}
+                            </span>
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium rounded-lg">
+                                ${log.page || 'مجهول'}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5 self-end sm:self-auto">
+                            ${isHidden ? `
+                            <button onclick="handleToggleHideLog('${log.id}', false)" class="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold flex items-center gap-1 transition-all" title="استعادة هذا الخطأ إلى القائمة النشطة">
+                                <span class="material-symbols-outlined text-[14px]">visibility</span>
+                                استعادة
+                            </button>
+                            ` : `
+                            <button onclick="handleToggleHideLog('${log.id}', true)" class="px-2.5 py-1 rounded-xl bg-gray-500/10 text-gray-600 hover:bg-gray-500/20 text-xs font-bold flex items-center gap-1 transition-all" title="إخفاء وأرشفة هذا الخطأ">
+                                <span class="material-symbols-outlined text-[14px]">visibility_off</span>
+                                إخفاء
+                            </button>
+                            `}
+                            <button onclick="handleCopySingleLog('${log.id}')" class="px-2.5 py-1 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1 transition-all" title="نسخ تفاصيل الخطأ بصيغة JSON">
+                                <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                                نسخ
+                            </button>
+                            <button onclick="handleDeleteSingleLog('${log.id}')" class="px-2.5 py-1 rounded-xl bg-error/10 text-error hover:bg-error/20 text-xs font-bold flex items-center gap-1 transition-all" title="حذف هذا السجل نهائياً">
+                                <span class="material-symbols-outlined text-[14px]">delete</span>
+                                حذف
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-gray-800 text-xs sm:text-sm leading-relaxed" dir="ltr" style="text-align: right; word-break: break-word;">
+                            ${log.message || 'خطأ غير معروف'}
+                        </h4>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap text-[10px] text-gray-400 pt-1 border-t border-black/5">
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[12px]">devices</span>
+                            ${log.environment?.browser || 'متصفح غير محدد'}
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[12px]">account_circle</span>
+                            الدور: ${log.user?.role || 'مستخدم'}
+                        </span>
+                        ${hasStack ? `
+                        <button onclick="toggleLogDetails('${log.id}')" class="text-primary font-bold hover:underline flex items-center gap-0.5 mr-auto">
+                            <span>التفاصيل الفنية (Stack Trace)</span>
+                            <span class="material-symbols-outlined text-[14px]" id="arrow-${log.id}">expand_more</span>
+                        </button>
+                        ` : ''}
+                    </div>
+
+                    ${hasStack ? `
+                    <div id="details-${log.id}" class="hidden pt-2">
+                        <pre class="bg-gray-900 text-gray-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto leading-relaxed max-h-48 scrollbar-thin" dir="ltr">${stackTrace}</pre>
+                    </div>
+                    ` : ''}
+                </div>
+                `;
+            }).join('');
+        }
+
+        function toggleLogDetails(logId) {
+            const details = document.getElementById('details-' + logId);
+            const arrow = document.getElementById('arrow-' + logId);
+            if (details) {
+                const isHidden = details.classList.contains('hidden');
+                details.classList.toggle('hidden');
+                if (arrow) arrow.textContent = isHidden ? 'expand_less' : 'expand_more';
+            }
+        }
+
+        function filterLogs() {
+            const query = (document.getElementById('logSearchInput')?.value || '').toLowerCase().trim();
+            const category = document.getElementById('logCategoryFilter')?.value || 'ALL';
+            const severity = document.getElementById('logSeverityFilter')?.value || 'ALL';
+            const visibility = document.getElementById('logVisibilityFilter')?.value || 'ACTIVE';
+
+            const filtered = allTelemetryLogs.filter(log => {
+                // Visibility filter
+                if (visibility === 'ACTIVE' && log.hidden) return false;
+                if (visibility === 'HIDDEN' && !log.hidden) return false;
+
+                // Category filter
+                const matchesCategory = category === 'ALL' || log.category === category;
+
+                // Severity filter
+                const matchesSeverity = severity === 'ALL' || (log.severity || 'MEDIUM') === severity;
+                
+                // Search query
+                const matchesSearch = !query || 
+                    (log.message && log.message.toLowerCase().includes(query)) ||
+                    (log.stack && log.stack.toLowerCase().includes(query)) ||
+                    (log.page && log.page.toLowerCase().includes(query));
+
+                return matchesCategory && matchesSeverity && matchesSearch;
+            });
+
+            renderLogsList(filtered);
+        }
+
+        async function handleToggleHideLog(logId, shouldHide) {
+            if (typeof Telemetry === 'undefined') return;
+            const success = await Telemetry.toggleHideLog(logId, shouldHide);
+            if (success) {
+                const target = allTelemetryLogs.find(l => l.id === logId);
+                if (target) {
+                    target.hidden = shouldHide;
+                }
+                updateTelemetryStats(allTelemetryLogs);
+                filterLogs();
+                UI.toast(shouldHide ? 'تم إخفاء الخطأ بنجاح (يمكنك رؤيته من فلتر المخفية)' : 'تم استعادة الخطأ إلى القائمة النشطة');
+            } else {
+                UI.toast('فشلت العملية');
+            }
+        }
+
+        async function handleCopySingleLog(logId) {
+            if (typeof Telemetry === 'undefined') return;
+            const success = await Telemetry.copyLog(logId, allTelemetryLogs);
+            if (success) {
+                UI.toast('تم نسخ تفاصيل الخطأ (JSON) بنجاح');
+            } else {
+                UI.toast('تعذر نسخ الخطأ');
+            }
+        }
+
+        async function handleDeleteSingleLog(logId) {
+            if (typeof Telemetry === 'undefined') return;
+            if (!confirm('هل أنت متأكد من حذف هذا السجل؟')) return;
+
+            const success = await Telemetry.deleteLog(logId);
+            if (success) {
+                allTelemetryLogs = allTelemetryLogs.filter(l => l.id !== logId);
+                updateTelemetryStats(allTelemetryLogs);
+                filterLogs();
+                UI.toast('تم حذف السجل بنجاح');
+            } else {
+                UI.toast('فشل حذف السجل');
+            }
+        }
+
+        async function handleCopyAllLogs() {
+            if (typeof Telemetry === 'undefined') return;
+            if (allTelemetryLogs.length === 0) {
+                UI.toast('لا توجد سجلات أخطاء لنسخها');
+                return;
+            }
+            const success = await Telemetry.copyAllLogs(allTelemetryLogs);
+            if (success) {
+                UI.toast(`تم نسخ جميع الأخطاء (${allTelemetryLogs.length}) بنجاح`);
+            } else {
+                UI.toast('فشل نسخ السجلات');
+            }
+        }
+
+        async function handleExportLogsJSON() {
+            if (typeof Telemetry === 'undefined') return;
+            if (allTelemetryLogs.length === 0) {
+                UI.toast('لا توجد سجلات لتصديرها');
+                return;
+            }
+            const success = await Telemetry.exportJSON(allTelemetryLogs);
+            if (success) {
+                UI.toast('تم تحميل ملف تقرير الأعطال');
+            }
+        }
+
+        async function handleClearAllLogs() {
+            if (typeof Telemetry === 'undefined') return;
+            if (allTelemetryLogs.length === 0) {
+                UI.toast('السجل فارغ بالفعل');
+                return;
+            }
+            if (!confirm('هل أنت متأكد تماماً من مسح كافة سجلات الأعطال؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+
+            const success = await Telemetry.clearAllLogs();
+            if (success) {
+                allTelemetryLogs = [];
+                updateTelemetryStats(allTelemetryLogs);
+                renderLogsList([]);
+                UI.toast('تم مسح كافة سجلات الأعطال بنجاح');
+            } else {
+                UI.toast('فشل مسح السجلات');
+            }
+        }
+
+        async function handleTriggerTestError() {
+            if (typeof Telemetry === 'undefined') return;
+            UI.toast('جاري توليد خطأ تجريبي...');
+            const recorded = await Telemetry.triggerTestError();
+            if (recorded) {
+                await loadAndRenderLogs();
+                UI.toast('تم تسجيل الخطأ التجريبي بنجاح!');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

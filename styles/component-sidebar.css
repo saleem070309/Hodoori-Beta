@@ -1,0 +1,481 @@
+/**
+ * @fileoverview Standalone Sidebar Component Styles & Global Settings Modal
+ * @project Hodoori (حضوري) - Intelligent Educational Platform
+ * @author Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+ * @copyright © 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All rights reserved.
+ */
+
+/* ─── Legendary 2-Line Menu Trigger Button ─── */
+.hodoori-menu-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5.5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hodoori-menu-btn:hover {
+  opacity: 0.8;
+}
+
+.hodoori-menu-btn:active {
+  transform: scale(0.92);
+}
+
+.menu-line {
+  display: block;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: #1c1917;
+  transition: background-color 0.2s ease, width 0.2s ease;
+}
+
+.menu-line-top {
+  width: 20px;
+}
+
+.menu-line-bottom {
+  width: 13px;
+  margin-left: 7px;
+  margin-right: 0;
+}
+
+.theme-dark-orange .menu-line {
+  background-color: #f5f5f5;
+}
+
+/* ─── Standalone Sidebar Container ─── */
+.agent-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 270px;
+  height: 100%;
+  z-index: 100;
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s ease, background-color 0.3s ease;
+  visibility: hidden;
+  box-shadow: -3px 0 15px rgba(0, 0, 0, 0.03);
+  font-family: 'Tajawal', sans-serif;
+}
+
+body.agent-sidebar-open .agent-sidebar {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.theme-light-warm .agent-sidebar,
+.agent-sidebar.theme-light-warm {
+  background: #ffffff !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.theme-dark-orange .agent-sidebar,
+.agent-sidebar.theme-dark-orange {
+  background: #121212 !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: -3px 0 18px rgba(0, 0, 0, 0.25);
+}
+
+/* ─── Sidebar Overlay for Mobile ─── */
+.agent-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 12, 8, 0.45);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 95;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.agent-sidebar-open .agent-sidebar-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Navigation Row (Capsule Pill with Semi-Circular Ends) ─── */
+.agent-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 1.5px 8px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c1917;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.theme-dark-orange .agent-nav-row {
+  color: #f5f5f5;
+}
+
+.agent-nav-row:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1c1917;
+}
+
+.theme-dark-orange .agent-nav-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #f5f5f5;
+}
+
+.agent-nav-row.active {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #d97706 !important;
+}
+
+.theme-dark-orange .agent-nav-row.active {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #fbbf24 !important;
+}
+
+.agent-nav-row .nav-row-icon {
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.agent-nav-row:hover .nav-row-icon {
+  transform: scale(1.05);
+}
+
+/* ─── New Chat Pill ─── */
+.agent-new-chat-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 4px 8px 2px 8px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c1917;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.theme-dark-orange .agent-new-chat-pill {
+  color: #f5f5f5;
+}
+
+.agent-new-chat-pill:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.theme-dark-orange .agent-new-chat-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.agent-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #78716c;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.agent-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1c1917;
+}
+
+.theme-dark-orange .agent-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f5f5;
+}
+
+/* ─── Desktop Push Layout Transitions ─── */
+@media (min-width: 1024px) {
+  body.agent-sidebar-open .agent-page-container,
+  body.agent-sidebar-open .hodoori-page-container {
+    margin-right: 270px;
+    width: calc(100% - 270px);
+  }
+  
+  body.agent-sidebar-open #agent-sidebar-overlay {
+    display: none;
+    pointer-events: none;
+    opacity: 0;
+  }
+}
+
+/* ─── Universal Settings Modal (Clean Flat Design) ─── */
+.hodoori-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.hodoori-modal-backdrop.active {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.hodoori-settings-dialog {
+  width: 100%;
+  max-width: 500px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.97);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  direction: rtl;
+  font-family: 'Tajawal', sans-serif;
+}
+
+.hodoori-modal-backdrop.active .hodoori-settings-dialog {
+  transform: scale(1);
+}
+
+.theme-dark-orange .hodoori-settings-dialog {
+  background: #141416;
+  border-color: #27272a;
+  color: #f8fafc;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.settings-modal-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.theme-dark-orange .settings-modal-header {
+  border-bottom-color: #27272a;
+}
+
+.settings-modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+  max-height: 75vh;
+}
+
+.settings-section-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.theme-dark-orange .settings-label {
+  color: #f8fafc;
+}
+
+.settings-desc {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.theme-dark-orange .settings-desc {
+  color: #94a3b8;
+}
+
+/* Theme Segmented Control */
+.theme-segmented-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.theme-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-option-btn:hover {
+  border-color: #cbd5e1;
+}
+
+.theme-option-btn.active {
+  background: #ffffff;
+  border-color: #f59e0b;
+  color: #d97706;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+.theme-dark-orange .theme-option-btn {
+  background: #18181b;
+  border-color: #27272a;
+  color: #cbd5e1;
+}
+
+.theme-dark-orange .theme-option-btn.active {
+  background: #27272a;
+  border-color: #fbbf24;
+  color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24;
+}
+
+/* Radio Cards for End-of-Day Action */
+.eod-radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.eod-radio-card:hover {
+  border-color: #cbd5e1;
+}
+
+.eod-radio-card.active {
+  background: #ffffff;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+.theme-dark-orange .eod-radio-card {
+  background: #18181b;
+  border-color: #27272a;
+}
+
+.theme-dark-orange .eod-radio-card.active {
+  background: #222226;
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24;
+}
+
+.custom-radio-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.eod-radio-card.active .custom-radio-circle {
+  border-color: #f59e0b;
+}
+
+.theme-dark-orange .eod-radio-card.active .custom-radio-circle {
+  border-color: #fbbf24;
+}
+
+.custom-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.15s ease;
+}
+
+.eod-radio-card.active .custom-radio-inner {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.theme-dark-orange .custom-radio-inner {
+  background: #fbbf24;
+}
+
+.settings-modal-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.theme-dark-orange .settings-modal-footer {
+  border-top-color: #27272a;
+}
+
+.settings-save-btn {
+  background: #f59e0b;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.settings-save-btn:hover {
+  background: #d97706;
+}

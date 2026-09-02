@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>شجرة الساكورا ثلاثية الأبعاد بنمط الفوكسل - Voxel Sakura Tree</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Cinzel:wght@600;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- GSAP for Smooth 3D Morphing Animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <!-- QRCode Matrix Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+    <!-- Tone.js for Ambient Zen Soundscape -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Tajawal', sans-serif;
+            background-color: #121017;
+        }
+        #webgl-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            outline: none;
+        }
+        /* Custom Glassmorphism Styling */
+        .glass-panel {
+            background: rgba(22, 19, 31, 0.72);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 182, 193, 0.18);
+            box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45);
+        }
+        .glass-button {
+            background: rgba(255, 192, 203, 0.12);
+            border: 1px solid rgba(255, 192, 203, 0.25);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-button:hover {
+            background: rgba(255, 182, 193, 0.28);
+            border-color: rgba(255, 182, 193, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 105, 180, 0.25);
+        }
+        .glass-button.active {
+            background: linear-gradient(135deg, rgba(244, 114, 182, 0.4), rgba(219, 39, 119, 0.5));
+            border-color: #f472b6;
+            color: #ffffff;
+            box-shadow: 0 0 16px rgba(244, 114, 182, 0.45);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(244, 114, 182, 0.4);
+            border-radius: 9999px;
+        }
+        /* Glowing Text FX */
+        .glow-sakura {
+            text-shadow: 0 0 14px rgba(244, 114, 182, 0.65), 0 0 28px rgba(244, 114, 182, 0.3);
+        }
+        /* Floating HUD animation */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        .floating-badge {
+            animation: floatSlow 4s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full text-slate-100 overflow-hidden">
+
+    <!-- 3D WebGL Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Top Header Bar -->
+    <header class="absolute top-4 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
+        <!-- Title Badge -->
+        <div class="glass-panel px-5 py-3 rounded-2xl pointer-events-auto flex items-center space-x-3 space-x-reverse border border-pink-400/30">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-300 flex items-center justify-center shadow-lg shadow-pink-500/30 text-white font-bold text-lg">
+                🌸
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-bold text-white tracking-wide glow-sakura flex items-center gap-2">
+                    <span>شجرة الساكورا اليابانية</span>
+                    <span class="text-[10px] text-pink-300 font-mono px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-400/30">VOXEL 3D</span>
+                </h1>
+                <p class="text-xs text-pink-200/70">تصميم بونساي ماينكرافت واقعي • Three.js Engine</p>
+            </div>
+        </div>
+
+        <!-- Top Right Action Controls -->
+        <div class="glass-panel p-1.5 rounded-2xl pointer-events-auto flex items-center gap-2">
+            <!-- QR Morph Action Button -->
+            <button id="btn-qr-morph" title="تحويل الشجرة إلى رمز QR ثلاثي الأبعاد قابل للمسح" class="glass-button px-3 py-2 rounded-xl text-yellow-300 hover:text-white flex items-center gap-1.5 text-xs font-bold border border-yellow-400/40 bg-yellow-500/10 hover:bg-yellow-500/25 transition-all">
+                <span id="qr-btn-icon" class="text-sm">📱</span>
+                <span id="qr-btn-text">تحويل لـ QR</span>
+            </button>
+            <button id="btn-qr-url" title="تعديل الرابط المخصص للـ QR" class="glass-button p-2.5 rounded-xl text-yellow-200 hover:text-white flex items-center gap-1 text-xs font-medium">
+                <span>⚙️</span>
+                <span class="hidden sm:inline">الرابط</span>
+            </button>
+            <button id="btn-wave" title="إطلاق تموجات بحرية متتالية على الشجرة والجزيرة" class="glass-button p-2.5 rounded-xl text-cyan-200 hover:text-white flex items-center gap-1.5 text-xs font-medium border border-cyan-400/30">
+                <span>🌊</span>
+                <span class="hidden sm:inline">تموج</span>
+            </button>
+            <button id="btn-reset" title="إعادة بناء الشجرة بالكامل" class="glass-button p-2.5 rounded-xl text-pink-200 hover:text-white flex items-center gap-1.5 text-xs font-medium">
+                <span>🌱</span>
+                <span class="hidden sm:inline">إعادة بناء</span>
+            </button>
+            <button id="btn-audio" title="تشغيل / كتم نغمات الزن الهادئة" class="glass-button p-2.5 rounded-xl text-pink-200 hover:text-white flex items-center gap-1.5 text-xs font-medium">
+                <span id="audio-icon">🎵</span>
+                <span class="hidden sm:inline" id="audio-text">صوت الزن</span>
+            </button>
+            <button id="btn-auto-rotate" title="دوران تلقائي للكاميرا" class="glass-button p-2.5 rounded-xl text-pink-200 hover:text-white active flex items-center gap-1.5 text-xs font-medium">
+                <span>🔄</span>
+                <span class="hidden sm:inline">دوران</span>
+            </button>
+            <button id="btn-screenshot" title="التقاط صورة سينمائية" class="glass-button p-2.5 rounded-xl text-pink-200 hover:text-white flex items-center gap-1.5 text-xs font-medium">
+                <span>📷</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Bonsai Growth Stages Timeline Dock -->
+    <div id="growth-dock" class="absolute top-20 left-4 z-20 glass-panel p-3.5 rounded-2xl pointer-events-auto border border-pink-400/40 shadow-2xl flex flex-col gap-2.5 max-w-[290px] sm:max-w-xs transition-all duration-300">
+        <!-- Dock Header -->
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+                <span class="text-sm">🌱</span>
+                <span class="text-xs font-bold text-white tracking-wide">مراحل نمو الساكورا</span>
+            </div>
+            <button id="btn-auto-grow" title="تشغيل / إيقاف العرض التلقائي لنمو الشجرة" class="glass-button px-2.5 py-1 rounded-xl text-[11px] font-bold text-yellow-300 hover:text-white flex items-center gap-1 border border-yellow-400/40 bg-yellow-500/15 hover:bg-yellow-500/30 transition-all">
+                <span id="auto-grow-icon">▶️</span>
+                <span id="auto-grow-text">نمو سينمائي</span>
+            </button>
+        </div>
+
+        <!-- Stage Selector Buttons (5 Interactive Pills) -->
+        <div class="grid grid-cols-5 gap-1 bg-black/40 p-1 rounded-xl border border-pink-500/20">
+            <button class="stage-btn glass-button px-1 py-1.5 rounded-lg text-[10px] font-semibold text-center flex flex-col items-center gap-0.5 transition-all text-pink-200 hover:text-white" data-stage="1" title="المرحلة 1: البذرة والتربة المقدسة">
+                <span>🌰</span>
+                <span class="text-[9px]">بذرة</span>
+            </button>
+            <button class="stage-btn glass-button px-1 py-1.5 rounded-lg text-[10px] font-semibold text-center flex flex-col items-center gap-0.5 transition-all text-pink-200 hover:text-white" data-stage="2" title="المرحلة 2: البرعم الصاعد والجذور">
+                <span>🌱</span>
+                <span class="text-[9px]">برعم</span>
+            </button>
+            <button class="stage-btn glass-button px-1 py-1.5 rounded-lg text-[10px] font-semibold text-center flex flex-col items-center gap-0.5 transition-all text-pink-200 hover:text-white" data-stage="3" title="المرحلة 3: الشُجيرة المتفرعة">
+                <span>🌿</span>
+                <span class="text-[9px]">شُجيرة</span>
+            </button>
+            <button class="stage-btn glass-button active px-1 py-1.5 rounded-lg text-[10px] font-semibold text-center flex flex-col items-center gap-0.5 transition-all text-pink-200 hover:text-white" data-stage="4" title="المرحلة 4: الإزهار الكامل">
+                <span>🌸</span>
+                <span class="text-[9px]">إزهار</span>
+            </button>
+            <button class="stage-btn glass-button px-1 py-1.5 rounded-lg text-[10px] font-semibold text-center flex flex-col items-center gap-0.5 transition-all text-pink-200 hover:text-white" data-stage="5" title="المرحلة 5: الإزهار الأسطوري">
+                <span>✨</span>
+                <span class="text-[9px]">أسطوري</span>
+            </button>
+        </div>
+
+        <!-- Continuous Growth Slider -->
+        <div class="space-y-1">
+            <div class="flex justify-between items-center text-[10px] text-pink-300/80 font-mono">
+                <span>المرحلة الحالية:</span>
+                <span id="growth-stage-badge" class="font-bold text-pink-200">🌸 4. الإزهار الكامل</span>
+            </div>
+            <input id="growth-slider" type="range" min="1" max="5" step="0.01" value="4" 
+                class="w-full h-1.5 bg-pink-950/80 rounded-lg appearance-none cursor-pointer accent-pink-500 shadow-inner" />
+        </div>
+
+        <!-- Poetic Stage Description -->
+        <div class="text-[11px] text-pink-100/80 leading-relaxed bg-pink-900/20 p-2 rounded-xl border border-pink-400/15" id="stage-desc">
+            الشجرة في أبهى حلل النضج والإزهار الكامل بنمط الساكورا الياباني الكلاسيكي.
+        </div>
+    </div>
+
+    <!-- QR Mode Active Floating Banner -->
+    <div id="qr-active-banner" class="absolute top-20 left-1/2 -translate-x-1/2 z-30 glass-panel px-5 py-2.5 rounded-2xl border border-yellow-400/50 hidden pointer-events-auto flex-col items-center gap-1 shadow-2xl shadow-yellow-500/20 animate-bounce">
+        <div class="flex items-center gap-2 text-xs font-bold text-yellow-300">
+            <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping"></span>
+            <span>امسح الكود الآن بكاميرا هاتفك! 📸</span>
+        </div>
+        <div class="text-[11px] text-pink-200 font-mono truncate max-w-xs" id="qr-banner-url">https://google.com</div>
+    </div>
+
+    <!-- QR URL Customization Modal -->
+    <div id="qr-url-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md hidden pointer-events-auto">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full mx-4 border border-pink-400/40 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>🔗</span> رابط الـ QR Code المخصص
+                </h3>
+                <button id="btn-close-modal" class="text-pink-300 hover:text-white text-lg font-bold p-1">✕</button>
+            </div>
+            <p class="text-xs text-pink-200/80 leading-relaxed">
+                اكتب أي رابط تريده، وعند مسح رمز الـ QR بكاميرا الهاتف سينقلك إليه فوراً:
+            </p>
+            <div class="space-y-2.5">
+                <input id="input-qr-url" type="url" dir="ltr" value="https://google.com" placeholder="https://your-website.com" 
+                    class="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-pink-400/40 text-white text-sm focus:outline-none focus:border-pink-400 font-mono shadow-inner" />
+                
+                <!-- Quick URL presets -->
+                <div class="flex flex-wrap gap-1.5 pt-1">
+                    <button class="preset-url-btn text-[11px] px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/40 text-pink-200 border border-pink-500/30" data-url="https://google.com">Google</button>
+                    <button class="preset-url-btn text-[11px] px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/40 text-pink-200 border border-pink-500/30" data-url="https://youtube.com">YouTube</button>
+                    <button class="preset-url-btn text-[11px] px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/40 text-pink-200 border border-pink-500/30" data-url="https://instagram.com">Instagram</button>
+                    <button class="preset-url-btn text-[11px] px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/40 text-pink-200 border border-pink-500/30" data-url="https://wa.me/">WhatsApp</button>
+                </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button id="btn-save-url" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold shadow-lg shadow-pink-500/30 transition-all">
+                    تطبيق الرابط والتحويل لـ QR 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Bottom Controls / Presets -->
+    <aside class="absolute bottom-4 left-4 right-4 z-20 flex flex-col md:flex-row gap-3 items-center justify-between pointer-events-none">
+        
+        <!-- Environment / Atmosphere Presets -->
+        <div class="glass-panel p-2 rounded-2xl pointer-events-auto flex items-center gap-1.5 overflow-x-auto max-w-full">
+            <button class="env-btn glass-button active px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-white whitespace-nowrap" data-env="day">
+                <span>☀️</span> نهار مشمس
+            </button>
+            <button class="env-btn glass-button px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-pink-200 whitespace-nowrap" data-env="sunset">
+                <span>🌅</span> شفق الغروب
+            </button>
+            <button class="env-btn glass-button px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-indigo-200 whitespace-nowrap" data-env="night">
+                <span>🌙</span> ليلة قمرية
+            </button>
+            <button class="env-btn glass-button px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-200 whitespace-nowrap" data-env="bloom">
+                <span>🌸</span> عاصفة الأوراق
+            </button>
+        </div>
+
+        <!-- Camera Views Dock -->
+        <div class="glass-panel p-2 rounded-2xl pointer-events-auto flex items-center gap-1.5">
+            <span class="text-xs text-pink-300/80 px-2 font-medium hidden sm:inline">الزوايا:</span>
+            <button class="cam-btn glass-button active px-3 py-1.5 rounded-xl text-xs font-medium text-pink-100" data-cam="overview">كاملة</button>
+            <button class="cam-btn glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-pink-100" data-cam="canopy">الزهور</button>
+            <button class="cam-btn glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-pink-100" data-cam="roots">الجزيرة والجذور</button>
+            <button class="cam-btn glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-pink-100" data-cam="top">عمودية</button>
+        </div>
+
+        <!-- Info / Stats Floating Badge -->
+        <div id="block-info-toast" class="glass-panel px-4 py-2 rounded-xl pointer-events-auto text-xs text-pink-200/90 hidden flex-row items-center gap-2 border border-pink-400/30">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <span id="block-info-name">تموجات البحر ثلاثية الأبعاد</span>
+        </div>
+    </aside>
+
+    <!-- Interactive Tooltip Overlay -->
+    <div id="inspector-badge" class="absolute pointer-events-none z-30 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-black/80 backdrop-blur-md border border-pink-500/40 opacity-0 transition-opacity duration-200 -translate-x-1/2 -translate-y-full">
+        كتلة فوكسل
+    </div>
+
+    <!-- Quick Help & Gesture Guide -->
+    <div class="absolute top-20 right-4 z-10 glass-panel px-3.5 py-2.5 rounded-xl pointer-events-none hidden md:block text-[11px] text-pink-200/70 border border-pink-400/20 max-w-[220px] leading-relaxed">
+        💡 <strong class="text-pink-100">تحكم ثلاثي الأبعاد:</strong><br>
+        • <span class="text-yellow-300 font-bold">زر 📱 للتحويل لكود QR قابل للمسح!</span><br>
+        • <span class="text-cyan-300 font-bold">انقر على أي مكان أو مكعب لإطلاق أمواج البحر! 🌊</span><br>
+        • <span class="text-pink-300 font-bold">اسحب بالماوس لتدوير واستكشاف الشجرة! 🔄</span>
+    </div>
+
+    <script>
+        // --- 1. CORE CONSTANTS & PALETTES ---
+        const VOXEL_SIZE = 1.0;
+        
+        // Authentic Minecraft / Japanese Sakura Color Palette
+        const PALETTE = {
+            // Wood & Bark
+            TRUNK_DARK: 0x3d2014,      // Deep Dark Oak core
+            TRUNK_MID: 0x5a3220,       // Rich Cherry wood
+            TRUNK_LIGHT: 0x7a4833,     // Warm bark highlight
+            BRANCH_TIP: 0x8c5740,      // Stripped branch tip
+            
+            // Sakura Blossom Foliage (Layered Shades for 3D Depth)
+            LEAF_VIBRANT: 0xf472b6,    // Classic cherry blossom pink
+            LEAF_SOFT: 0xfbcfe8,       // Pastel light pink
+            LEAF_DEEP: 0xdb2777,       // Deep underside shadow rose
+            LEAF_WHITE: 0xfff0f5,      // Floral white highlight tips
+            LEAF_MAGENTA: 0xbe185d,    // Rare deep inner bloom
+            
+            // Sprout & Seedling
+            SEED_CORE: 0xd97706,       // Golden seed core
+            SPROUT_LEAF: 0x84cc16,     // Tender fresh baby sprout leaf
+            
+            // Terrain & Earth
+            GRASS_TOP: 0x4d7c0f,       // Vibrant Japanese garden moss
+            GRASS_SIDE: 0x3f6212,      // Rich grass gradient
+            DIRT: 0x452b1b,            // Deep dark fertile earth
+            DIRT_DARK: 0x2e1c12,       // Shadow stone earth
+            STONE: 0x64748b,           // Natural slate stone
+            STONE_MOSSY: 0x475569,     // Ancient garden rock
+            
+            // Japanese Water Pond & Koi Stream
+            WATER: 0x38bdf8,           // Clear crystal pond water
+            WATER_DEEP: 0x0284c7,      // Deep pool
+            
+            // Traditional Japanese Kasuga Lantern (Tōrō)
+            LANTERN_STONE: 0x334155,   // Dark sculpted slate
+            LANTERN_ROOF: 0x1e293b,    // Pagoda roof eaves
+            LANTERN_GLOW: 0xfef08a,    // Warm glowing washi paper screen
+            LANTERN_CORE: 0xffedd5,    // Radiant golden flame
+            
+            // Accents
+            PETAL_GROUND: 0xf472b6,    // Fallen petal carpet
+            FENCE_WOOD: 0x451a03       // Reddish cedar bamboo/fence
+        };
+
+        // Block Type Definitions with English & Arabic metadata
+        const BLOCK_TYPES = {
+            TRUNK: { name: 'جذع خشب الكرز الداكن', color: PALETTE.TRUNK_MID, roughness: 0.9 },
+            TRUNK_DARK: { name: 'قلب الجذع الخشبي', color: PALETTE.TRUNK_DARK, roughness: 0.95 },
+            TRUNK_LIGHT: { name: 'لحاء الكرز الطبيعي', color: PALETTE.TRUNK_LIGHT, roughness: 0.85 },
+            LEAF_VIBRANT: { name: 'أزهار الساكورا الوردية', color: PALETTE.LEAF_VIBRANT, roughness: 0.5 },
+            LEAF_SOFT: { name: 'أزهار الباستيل الناعمة', color: PALETTE.LEAF_SOFT, roughness: 0.5 },
+            LEAF_DEEP: { name: 'ظل الأزهار القرمزي', color: PALETTE.LEAF_DEEP, roughness: 0.6 },
+            LEAF_WHITE: { name: 'براعم الساكورا البيضاء', color: PALETTE.LEAF_WHITE, roughness: 0.4 },
+            SEED_CORE: { name: 'بذرة الساكورا الذهبية', color: PALETTE.SEED_CORE, roughness: 0.4, emissive: true },
+            SPROUT_LEAF: { name: 'أوراق البرعم الغضة', color: PALETTE.SPROUT_LEAF, roughness: 0.5 },
+            GRASS: { name: 'عشب حديقة الزن العلوي', color: PALETTE.GRASS_TOP, roughness: 0.8 },
+            GRASS_SIDE: { name: 'طبقة العشب الأخضر الثانية', color: PALETTE.GRASS_SIDE, roughness: 0.82 },
+            DIRT: { name: 'تربة الحديقة الخصبة', color: PALETTE.DIRT, roughness: 1.0 },
+            DIRT_DARK: { name: 'صخور التربة العميقة', color: PALETTE.DIRT_DARK, roughness: 0.95 },
+            STONE: { name: 'أحجار الحديقة الطبيعية', color: PALETTE.STONE, roughness: 0.9 },
+            STONE_MOSSY: { name: 'صخور الجزيرة المعتقة', color: PALETTE.STONE_MOSSY, roughness: 0.9 },
+            WATER: { name: 'بركة مياه نقية', color: PALETTE.WATER, roughness: 0.1, transparent: true, opacity: 0.75 },
+            LANTERN_STONE: { name: 'حجر الفانوس الياباني', color: PALETTE.LANTERN_STONE, roughness: 0.8 },
+            LANTERN_GLOW: { name: 'شعلة الفانوس الدافئة', color: PALETTE.LANTERN_GLOW, roughness: 0.2, emissive: true },
+            PETAL_GROUND: { name: 'بتلات الساكورا المتساقطة', color: PALETTE.PETAL_GROUND, roughness: 0.6 }
+        };
+
+        const canvas = document.getElementById('webgl-canvas');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x130e1d);
+        scene.fog = new THREE.FogExp2(0x130e1d, 0.015);
+
+        // Perspective Camera Setup
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(30, 20, 36);
+
+        // WebGL Renderer with High-Fidelity Tone Mapping & Soft Shadows
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            powerPreference: 'high-performance',
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+
+        // OrbitControls for 360-degree inspection
+        const controls = new THREE.OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.05; // Prevent flipping below ground
+        controls.minDistance = 8;
+        controls.maxDistance = 85;
+        controls.target.set(0, 4, 0);
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.8;
+
+        // Ambient Light
+        const ambientLight = new THREE.AmbientLight(0xffd1dc, 0.7);
+        scene.add(ambientLight);
+
+        // Hemisphere Light (Sky vs Ground bounce)
+        const hemiLight = new THREE.HemisphereLight(0xffe4e6, 0x1e1b2e, 0.45);
+        hemiLight.position.set(0, 50, 0);
+        scene.add(hemiLight);
+
+        // Main Sun / Directional Light casting crisp voxel shadows (Optimized 1024x1024)
+        const sunLight = new THREE.DirectionalLight(0xfff3d6, 1.4);
+        sunLight.position.set(24, 38, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 90;
+        const d = 24;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0003;
+        scene.add(sunLight);
+
+        // Soft Fill Rim Light (Highlights pink petals from opposite side)
+        const rimLight = new THREE.DirectionalLight(0xf472b6, 0.65);
+        rimLight.position.set(-20, 15, -20);
+        scene.add(rimLight);
+
+        // 3D Grid Map to store unique voxel blocks at (x, y, z)
+        const voxelWorld = new Map();
+
+        function getVoxelKey(x, y, z) {
+            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+        }
+
+        function setVoxel(x, y, z, typeKey, stageMin = 1, stageMax = 5) {
+            const rx = Math.round(x);
+            const ry = Math.round(y);
+            const rz = Math.round(z);
+            voxelWorld.set(getVoxelKey(rx, ry, rz), {
+                x: rx,
+                y: ry,
+                z: rz,
+                type: typeKey,
+                stageMin: stageMin,
+                stageMax: stageMax
+            });
+        }
+
+        function getVoxel(x, y, z) {
+            return voxelWorld.get(getVoxelKey(x, y, z));
+        }
+
+        function removeVoxel(x, y, z) {
+            voxelWorld.delete(getVoxelKey(x, y, z));
+        }
+
+        function buildTerrain() {
+            const islandRadius = 14.0;    // Lower wider tier radius
+            const upperTierRadius = 10.8; // Upper smaller tier radius
+            
+            for (let x = -17; x <= 17; x++) {
+                for (let z = -17; z <= 17; z++) {
+                    const distFromCenter = Math.sqrt(x * x + z * z);
+                    
+                    // Natural multi-octave organic perimeter contour for lower tier
+                    const edgeNoise = Math.sin(x * 0.35) * Math.cos(z * 0.35) * 2.0 + 
+                                     Math.sin(x * 0.75 + z * 0.55) * 0.9;
+                    if (distFromCenter + edgeNoise > islandRadius) continue;
+                    
+                    // Natural contour for upper tier (smaller radius)
+                    const upperEdgeNoise = Math.sin(x * 0.45) * Math.cos(z * 0.45) * 1.4;
+                    const hasUpperTier = (distFromCenter + upperEdgeNoise <= upperTierRadius);
+                    
+                    // Top elevation: 0 if within the upper smaller tier, -1 if in the lower terrace tier
+                    const elevation = hasUpperTier ? 0 : -1;
+                    
+                    // Deep underground tapered stalactite / floating mountain crags
+                    const normalizedDist = distFromCenter / islandRadius; // 0 to 1
+                    const maxDepth = 10.5;
+                    const depthTaper = Math.pow(Math.max(0, 1 - normalizedDist), 1.25);
+                    const bottomNoise = (
+                        Math.sin(x * 0.65 + z * 0.45) * 1.8 +
+                        Math.cos(x * 0.35 - z * 0.75) * 1.4 +
+                        Math.sin((x * x + z * z) * 0.06) * 1.2
+                    );
+                    const bottomY = -Math.max(2, Math.round(depthTaper * maxDepth + bottomNoise));
+                    
+                    for (let y = bottomY; y <= elevation; y++) {
+                        if (y === 0) {
+                            // Layer 1 (Upper smaller green tier)
+                            setVoxel(x, 0, z, 'GRASS', 1, 5);
+                        } else if (y === -1) {
+                            // Layer 2 (Lower wider green tier)
+                            setVoxel(x, -1, z, hasUpperTier ? 'GRASS_SIDE' : 'GRASS', 1, 5);
+                        } else if (y >= -3) {
+                            // Upper rich soil layer (y = -2, y = -3)
+                            setVoxel(x, y, z, 'DIRT', 1, 5);
+                        } else if (y >= -5) {
+                            // Mid soil / dark earth strata (y = -4, y = -5)
+                            setVoxel(x, y, z, Math.random() > 0.45 ? 'DIRT' : 'DIRT_DARK', 1, 5);
+                        } else if (y > bottomY + 2) {
+                            // Deep rocky underground strata
+                            const rockNoise = Math.sin(x * 1.1 + y * 0.9 + z * 1.1);
+                            if (rockNoise > 0.25) {
+                                setVoxel(x, y, z, 'STONE', 1, 5);
+                            } else if (rockNoise > -0.25) {
+                                setVoxel(x, y, z, 'STONE_MOSSY', 1, 5);
+                            } else {
+                                setVoxel(x, y, z, 'DIRT_DARK', 1, 5);
+                            }
+                        } else {
+                            // Hanging jagged crags & rock tips at the bottom of the island
+                            setVoxel(x, y, z, Math.random() > 0.35 ? 'STONE_MOSSY' : 'STONE', 1, 5);
+                        }
+                    }
+                }
+            }
+        }
+
+        function buildSeedAndSprout() {
+            // Stage 1 (Sacred Seed & First Baby Sprout)
+            // Golden Seed Pod nestled in the fertile soil
+            setVoxel(0, 1, 0, 'SEED_CORE', 1, 1);
+            setVoxel(0, 1, 1, 'DIRT_DARK', 1, 1);
+            setVoxel(1, 1, 0, 'DIRT_DARK', 1, 1);
+            
+            // Baby Green Sprout stem & tender leaves
+            setVoxel(0, 2, 0, 'SPROUT_LEAF', 1, 2);
+            setVoxel(0, 3, 0, 'SPROUT_LEAF', 1, 2);
+            setVoxel(-1, 3, 0, 'SPROUT_LEAF', 1, 2);
+            setVoxel(1, 3, 0, 'SPROUT_LEAF', 1, 2);
+            setVoxel(0, 4, 0, 'LEAF_SOFT', 1, 2);
+        }
+
+        function buildSakuraTrunk() {
+            // 1. Spreading Root Claws grasping into the soil (Stage 2+)
+            const roots = [
+                { path: [[0,1,0], [-1,1,0], [-2,1,-1], [-3,0,-1]] },
+                { path: [[0,1,0], [1,1,0], [2,1,1], [3,0,2]] },
+                { path: [[0,1,0], [0,1,1], [1,1,2], [1,0,3]] },
+                { path: [[0,1,0], [-1,1,-1], [-1,1,-2], [-2,0,-3]] }
+            ];
+            
+            roots.forEach(r => {
+                r.path.forEach(pt => {
+                    setVoxel(pt[0], pt[1] + 1, pt[2], 'TRUNK', 2, 5);
+                    setVoxel(pt[0], pt[1], pt[2], 'TRUNK_DARK', 2, 5);
+                });
+            });
+
+            // 2. Main Curved Trunk (Dynamic S-Curve typical of Japanese Bonsai)
+            // Stage 2 (Sapling): y = 2, 3, 4, 5
+            // Stage 3 (Branching Young Tree): y = 6, 7, 8, 9
+            // Stage 4 (Full Crown): y = 10, 11
+            const trunkSegments = [
+                { x: 0, y: 2, z: 0, w: 2, stage: 2 },
+                { x: 0, y: 3, z: 0, w: 2, stage: 2 },
+                { x: 1, y: 4, z: 0, w: 2, stage: 2 },
+                { x: 1, y: 5, z: 1, w: 2, stage: 2 },
+                { x: 2, y: 6, z: 1, w: 2, stage: 3 },
+                { x: 2, y: 7, z: 2, w: 2, stage: 3 },
+                { x: 2, y: 8, z: 2, w: 1, stage: 3 },
+                { x: 1, y: 9, z: 2, w: 1, stage: 3 },
+                { x: 1, y: 10, z: 1, w: 1, stage: 4 },
+                { x: 0, y: 11, z: 1, w: 1, stage: 4 }
+            ];
+
+            trunkSegments.forEach(seg => {
+                for (let dx = 0; dx < seg.w; dx++) {
+                    for (let dz = 0; dz < seg.w; dz++) {
+                        const isCore = (dx === 0 && dz === 0);
+                        setVoxel(seg.x + dx, seg.y, seg.z + dz, isCore ? 'TRUNK' : 'TRUNK_LIGHT', seg.stage, 5);
+                    }
+                }
+            });
+
+            // 3. Main Architectural Branches spreading outwards
+            // Branch A: Sweeping Low Right Branch (Over the stream) - Stage 3+
+            drawBranch([
+                [2, 7, 2], [3, 7, 3], [4, 7, 4], [5, 8, 4], [6, 8, 5], [7, 7, 6], [8, 6, 6]
+            ], 3);
+
+            // Branch B: Sweeping Left & Arching Upward - Stage 3+
+            drawBranch([
+                [1, 8, 1], [0, 8, 0], [-1, 9, -1], [-2, 9, -2], [-3, 10, -2], [-4, 10, -3], [-5, 9, -4]
+            ], 3);
+
+            // Branch C: Center Front Canopy Branch - Stage 3+
+            drawBranch([
+                [2, 8, 2], [2, 9, 3], [2, 10, 4], [1, 10, 5], [0, 10, 6]
+            ], 3);
+
+            // Branch D: High Crown Fork - Stage 4+
+            drawBranch([
+                [0, 11, 1], [-1, 12, 1], [-1, 13, 2], [0, 14, 2], [1, 14, 1]
+            ], 4);
+            drawBranch([
+                [0, 11, 1], [1, 12, 0], [2, 13, -1], [3, 13, -2], [4, 12, -3]
+            ], 4);
+        }
+
+        function drawBranch(points, stageMin = 3) {
+            for (let i = 0; i < points.length; i++) {
+                const pt = points[i];
+                setVoxel(pt[0], pt[1], pt[2], 'TRUNK', stageMin, 5);
+                if (i < points.length - 2) {
+                    // Slight thickness for proximal branch
+                    setVoxel(pt[0], pt[1] - 1, pt[2], 'TRUNK_DARK', stageMin, 5);
+                }
+            }
+        }
+
+        function createFoliageCloud(cx, cy, cz, rx, ry, rz, stageMin = 4, stageMax = 5) {
+            for (let x = -rx; x <= rx; x++) {
+                for (let y = -ry; y <= ry; y++) {
+                    for (let z = -rz; z <= rz; z++) {
+                        // Ellipsoidal cluster formula
+                        const normalizedDist = ((x * x) / (rx * rx)) + ((y * y) / (ry * ry)) + ((z * z) / (rz * rz));
+                        
+                        // Stepped Minecraft noise erosion
+                        const noise = (Math.sin(x * 1.7) + Math.cos(z * 1.5) + Math.sin(y * 2.1)) * 0.15;
+                        
+                        if (normalizedDist + noise <= 1.05) {
+                            const vx = cx + x;
+                            const vy = cy + y;
+                            const vz = cz + z;
+                            
+                            // Don't overwrite thick trunk wood
+                            const existing = getVoxel(vx, vy, vz);
+                            if (existing && (existing.type === 'TRUNK' || existing.type === 'TRUNK_DARK')) continue;
+
+                            // Natural Sakura Blossom Color Gradient (Sunlit top to shadowed bottom)
+                            let leafType = 'LEAF_VIBRANT';
+                            const heightRatio = (y + ry) / (2 * ry);
+
+                            if (heightRatio > 0.8) {
+                                leafType = Math.random() > 0.35 ? 'LEAF_WHITE' : 'LEAF_SOFT';
+                            } else if (heightRatio > 0.45) {
+                                leafType = Math.random() > 0.4 ? 'LEAF_VIBRANT' : 'LEAF_SOFT';
+                            } else {
+                                leafType = Math.random() > 0.5 ? 'LEAF_DEEP' : 'LEAF_VIBRANT';
+                            }
+
+                            setVoxel(vx, vy, vz, leafType, stageMin, stageMax);
+                        }
+                    }
+                }
+            }
+
+            // Hanging flower tendrils / dripping blossom clusters (Iconic Japanese Cherry Blossom style)
+            const tendrilCount = Math.floor(rx * rz * 0.4);
+            for (let t = 0; t < tendrilCount; t++) {
+                const tx = cx + Math.floor((Math.random() * 2 - 1) * (rx * 0.85));
+                const tz = cz + Math.floor((Math.random() * 2 - 1) * (rz * 0.85));
+                const bottomY = cy - ry;
+                
+                if (getVoxel(tx, bottomY + 1, tz)) {
+                    setVoxel(tx, bottomY, tz, 'LEAF_VIBRANT', stageMin, stageMax);
+                    if (Math.random() > 0.5) {
+                        setVoxel(tx, bottomY - 1, tz, 'LEAF_DEEP', stageMin, stageMax);
+                    }
+                }
+            }
+        }
+
+        function buildSakuraCanopy() {
+            // Stage 2 (Baby buds on young sapling):
+            createFoliageCloud(1, 5, 1, 2.0, 1.5, 2.0, 2, 2);
+            createFoliageCloud(2, 6, 1, 1.5, 1.2, 1.5, 2, 2);
+
+            // Stage 3 (Young Tree - Lower and Mid Clouds):
+            createFoliageCloud(7, 8, 6, 3.5, 2.2, 3.5, 3, 5);
+            createFoliageCloud(-5, 10, -3, 3.5, 2.2, 3.5, 3, 5);
+            createFoliageCloud(0, 9, 4, 2.8, 1.8, 2.8, 3, 5);
+
+            // Stage 4 (Full Bloom - High Crown & Comprehensive Bonsai Canopy):
+            createFoliageCloud(0, 15, 1, 5, 3.5, 5, 4, 5);
+            createFoliageCloud(1, 16, 2, 3.5, 2.5, 3.5, 4, 5);
+            createFoliageCloud(8, 7, 5, 3, 2, 3, 4, 5);
+            createFoliageCloud(-6, 10, -2, 3, 2, 3, 4, 5);
+            createFoliageCloud(0, 11, 6, 3.5, 2.2, 3.5, 4, 5);
+            createFoliageCloud(4, 13, -3, 4, 2.6, 4, 4, 5);
+            createFoliageCloud(-2, 13, 3, 3.5, 2.4, 3.5, 4, 5);
+
+            // Stage 5 (Mythic Bloom - Radiant Crown & Petal Carpets):
+            createFoliageCloud(0, 17, 1, 4.5, 2.5, 4.5, 5, 5);
+            createFoliageCloud(3, 15, 3, 3.5, 2.0, 3.5, 5, 5);
+            createFoliageCloud(-3, 14, -2, 3.5, 2.0, 3.5, 5, 5);
+
+            // Fallen Petal Carpets on the lawn for Stage 5:
+            const petalCoords = [
+                [2, 1, 2], [3, 1, 3], [1, 1, 4], [-2, 1, 2], [-3, 1, 1], [-1, 1, -2],
+                [4, 1, 1], [5, 1, 2], [-4, 1, -1], [2, 1, -3], [-2, 1, -3], [0, 1, 3]
+            ];
+            petalCoords.forEach(pt => {
+                setVoxel(pt[0], pt[1], pt[2], 'PETAL_GROUND', 5, 5);
+            });
+        }
+
+        const voxelMeshes = [];
+        let interactiveVoxelList = [];
+        let deletedBlocksCount = 0;
+
+        // Shared static scratch object to prevent Garbage Collection freezing
+        const _scratchWaveDummy = new THREE.Object3D();
+
+        // --- 🌊 Fluid Ocean Wave Ripple Simulation System (High Performance) ---
+        const activeRipples = [];
+        let needsWaveReset = false;
+
+        function triggerRipple(originX = 0, originZ = 0, strength = 1.35) {
+            // Cap at 2 ripples maximum to maintain solid 60 FPS on laptops
+            if (activeRipples.length >= 2) activeRipples.shift();
+            
+            activeRipples.push({
+                x: originX,
+                z: originZ,
+                startTime: clock.getElapsedTime(),
+                duration: 2.6,
+                amplitude: Math.min(strength, 1.6),
+                speed: 16.0,        // Wave propagation speed across voxels
+                frequency: 0.8,     // Spatial wave frequency
+                damping: 1.5        // Temporal harmonic damping
+            });
+            needsWaveReset = true;
+        }
+
+        function updateVoxelWaves(time) {
+            // Expire finished ripples
+            for (let i = activeRipples.length - 1; i >= 0; i--) {
+                if (time - activeRipples[i].startTime > activeRipples[i].duration) {
+                    activeRipples.splice(i, 1);
+                }
+            }
+
+            if (activeRipples.length === 0 && !needsWaveReset) return;
+
+            const isWaving = activeRipples.length > 0;
+            const ripCount = activeRipples.length;
+
+            for (let m = 0; m < voxelMeshes.length; m++) {
+                const mesh = voxelMeshes[m];
+                const voxels = mesh.userData.voxels;
+                if (!voxels) continue;
+                let meshUpdated = false;
+                const vLen = voxels.length;
+
+                for (let i = 0; i < vLen; i++) {
+                    const v = voxels[i];
+                    if (!v || v.deleted) continue;
+
+                    let totalOffsetY = 0;
+                    let totalRadOffset = 0;
+
+                    if (isWaving) {
+                        for (let r = 0; r < ripCount; r++) {
+                            const rip = activeRipples[r];
+                            const elapsed = time - rip.startTime;
+                            if (elapsed <= 0) continue;
+
+                            const dx = v.x - rip.x;
+                            const dz = v.z - rip.z;
+                            const distSq = dx * dx + dz * dz;
+                            const dist = Math.sqrt(distSq);
+
+                            // Wavefront circle expanding outwards
+                            const waveFront = elapsed * rip.speed;
+                            const distFromFront = dist - waveFront;
+
+                            // Fast rejection if voxel is far outside the active wave crest
+                            if (Math.abs(distFromFront) > 5.5) continue;
+
+                            // Gaussian pulse envelope + exponential time damping
+                            const envelope = Math.exp(-(distFromFront * distFromFront) * 0.055) * Math.exp(-elapsed * rip.damping);
+
+                            // Ocean harmonic oscillation
+                            const waveSin = Math.sin(dist * rip.frequency - elapsed * 12.0);
+                            
+                            // Vertical displacement
+                            totalOffsetY += waveSin * rip.amplitude * envelope;
+
+                            // Horizontal surge
+                            totalRadOffset += Math.cos(dist * rip.frequency - elapsed * 12.0) * (rip.amplitude * 0.18) * envelope;
+                        }
+                    }
+
+                    if (isWaving || mesh.userData.hasWaveOffset) {
+                        const distCenter = Math.max(0.2, Math.sqrt(v.x * v.x + v.z * v.z));
+                        const dirX = v.x / distCenter;
+                        const dirZ = v.z / distCenter;
+
+                        const curX = v.x + dirX * totalRadOffset;
+                        const curY = v.y + totalOffsetY;
+                        const curZ = v.z + dirZ * totalRadOffset;
+
+                        _scratchWaveDummy.position.set(curX, curY, curZ);
+
+                        // Organic fluid squish & stretch during wave swell
+                        if (isWaving && Math.abs(totalOffsetY) > 0.01) {
+                            const scaleY = 1.0 + totalOffsetY * 0.15;
+                            const scaleXZ = 1.0 - totalOffsetY * 0.075;
+                            _scratchWaveDummy.scale.set(
+                                scaleXZ < 0.4 ? 0.4 : (scaleXZ > 1.6 ? 1.6 : scaleXZ),
+                                scaleY < 0.4 ? 0.4 : (scaleY > 1.6 ? 1.6 : scaleY),
+                                scaleXZ < 0.4 ? 0.4 : (scaleXZ > 1.6 ? 1.6 : scaleXZ)
+                            );
+                        } else {
+                            _scratchWaveDummy.scale.set(1, 1, 1);
+                        }
+
+                        _scratchWaveDummy.updateMatrix();
+                        mesh.setMatrixAt(i, _scratchWaveDummy.matrix);
+                        meshUpdated = true;
+                    }
+                }
+
+                if (meshUpdated) {
+                    mesh.instanceMatrix.needsUpdate = true;
+                    mesh.userData.hasWaveOffset = isWaving;
+                }
+            }
+
+            needsWaveReset = isWaving;
+        }
+
+        // --- Block Break Particle / Debris Physics System ---
+        const debrisGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+        const debrisList = [];
+
+        function spawnBlockBreakParticles(x, y, z, color) {
+            const count = 12;
+            const mat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.6,
+                metalness: 0.1
+            });
+
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(debrisGeo, mat);
+                mesh.position.set(
+                    x + (Math.random() - 0.5) * 0.7,
+                    y + (Math.random() - 0.5) * 0.7,
+                    z + (Math.random() - 0.5) * 0.7
+                );
+                mesh.castShadow = true;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2.0 + Math.random() * 3.5;
+                const particle = {
+                    mesh: mesh,
+                    mat: mat,
+                    vx: Math.cos(angle) * speed * 0.05,
+                    vy: (2.5 + Math.random() * 4.0) * 0.05,
+                    vz: Math.sin(angle) * speed * 0.05,
+                    rotVx: (Math.random() - 0.5) * 0.3,
+                    rotVy: (Math.random() - 0.5) * 0.3,
+                    life: 1.0,
+                    decay: 0.025 + Math.random() * 0.025
+                };
+                
+                scene.add(mesh);
+                debrisList.push(particle);
+            }
+        }
+
+        function updateDebris() {
+            for (let i = debrisList.length - 1; i >= 0; i--) {
+                const p = debrisList[i];
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    if (p.mat) p.mat.dispose();
+                    debrisList.splice(i, 1);
+                    continue;
+                }
+                p.vy -= 0.012; // Gravity
+                p.mesh.position.x += p.vx;
+                p.mesh.position.y += p.vy;
+                p.mesh.position.z += p.vz;
+                p.mesh.rotation.x += p.rotVx;
+                p.mesh.rotation.y += p.rotVy;
+                const s = Math.max(0, p.life);
+                p.mesh.scale.set(s, s, s);
+            }
+        }
+
+        // --- 📱 QR Code Morphing System (Zero-Allocation High Performance) ---
+        let allMorphVoxels = [];
+        let isQRMode = false;
+        let isTransitioning = false;
+        let currentQRUrl = 'https://google.com';
+        const morphProgress = { value: 0 };
+
+        // Pre-allocated static scratch objects to eliminate Garbage Collection freezing
+        const _scratchMorphDummy = new THREE.Object3D();
+        const _scratchMorphColor = new THREE.Color();
+        const _scratchMorphScale = new THREE.Vector3();
+        const _scratchCamTarget = new THREE.Vector3();
+        const _scratchCamPos = new THREE.Vector3();
+        const _scratchCamUp = new THREE.Vector3();
+
+        const camTrack = {
+            target0: new THREE.Vector3(0, 4, 0),
+            target1: new THREE.Vector3(0, 0, 0),
+            up0: new THREE.Vector3(0, 1, 0),
+            up1: new THREE.Vector3(0, 0, -1),
+            r0: 42,
+            r1: 38,
+            phi0: 1.05,
+            phi1: 0.0001,
+            theta0: Math.PI / 4,
+            theta1: 0
+        };
+
+        function updateCamTrackFromCurrent() {
+            const currentPos = camera.position.clone();
+            const currentTarget = controls.target.clone();
+            const currentUp = camera.up.clone();
+
+            camTrack.target0.copy(currentTarget);
+            camTrack.up0.copy(currentUp);
+
+            const offset = currentPos.clone().sub(currentTarget);
+            const r = Math.max(12, offset.length());
+            camTrack.r0 = r;
+            camTrack.r1 = (window.innerWidth < 640) ? 46 : 38;
+
+            camTrack.phi0 = Math.acos(THREE.MathUtils.clamp(offset.y / r, -1, 1));
+            camTrack.phi1 = 0.0001;
+
+            const thetaCurrent = Math.atan2(offset.x, offset.z);
+            camTrack.theta0 = thetaCurrent;
+
+            let dTheta = 0 - thetaCurrent;
+            while (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+            while (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+            camTrack.theta1 = thetaCurrent + dTheta;
+        }
+
+        function getCinematicCameraState(t) {
+            const ease = gsap.parseEase('power2.inOut')(t);
+            _scratchCamTarget.lerpVectors(camTrack.target0, camTrack.target1, ease);
+            const theta = THREE.MathUtils.lerp(camTrack.theta0, camTrack.theta1, ease);
+            const phi = THREE.MathUtils.lerp(camTrack.phi0, camTrack.phi1, ease);
+            
+            const arcHeight = Math.sin(ease * Math.PI) * Math.max(6, camTrack.r0 * 0.2);
+            const r = THREE.MathUtils.lerp(camTrack.r0, camTrack.r1, ease) + arcHeight;
+            
+            const x = r * Math.sin(phi) * Math.sin(theta);
+            const y = r * Math.cos(phi);
+            const z = r * Math.sin(phi) * Math.cos(theta);
+            
+            _scratchCamPos.set(_scratchCamTarget.x + x, _scratchCamTarget.y + y, _scratchCamTarget.z + z);
+            _scratchCamUp.lerpVectors(camTrack.up0, camTrack.up1, ease).normalize();
+            
+            return { pos: _scratchCamPos, target: _scratchCamTarget, up: _scratchCamUp };
+        }
+
+        function mapVoxelsToQR(url) {
+            let matrix = [];
+            let qrSize = 25;
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(url || 'https://google.com');
+                qr.make();
+                qrSize = qr.getModuleCount();
+                for (let r = 0; r < qrSize; r++) {
+                    const row = [];
+                    for (let c = 0; c < qrSize; c++) {
+                        row.push(qr.isDark(r, c) ? 1 : 0);
+                    }
+                    matrix.push(row);
+                }
+            } catch (e) {
+                qrSize = 25;
+                matrix = Array(25).fill().map(() => Array(25).fill(1));
+            }
+
+            const halfSize = qrSize / 2;
+            const darkCells = [];
+            const isFinderCell = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= qrSize - 7) || (r >= qrSize - 7 && c < 7);
+
+            for (let r = 0; r < qrSize; r++) {
+                for (let c = 0; c < qrSize; c++) {
+                    if (matrix[r][c] === 1) {
+                        const qx = c - halfSize + 0.5;
+                        const qz = r - halfSize + 0.5;
+                        darkCells.push({
+                            pos: new THREE.Vector3(qx, 0.45, qz),
+                            isFinder: isFinderCell(r, c),
+                            dist: Math.sqrt(qx * qx + qz * qz)
+                        });
+                    }
+                }
+            }
+
+            // Finder patterns positioned first
+            darkCells.sort((a, b) => {
+                if (a.isFinder && !b.isFinder) return -1;
+                if (!a.isFinder && b.isFinder) return 1;
+                return a.dist - b.dist;
+            });
+
+            const treeVoxels = allMorphVoxels.filter(v => v.isTree);
+            const islandVoxels = allMorphVoxels.filter(v => !v.isTree);
+
+            // Sort tree voxels: Leaves first, then trunk
+            treeVoxels.sort((a, b) => {
+                const aIsLeaf = a.type.startsWith('LEAF');
+                const bIsLeaf = b.type.startsWith('LEAF');
+                if (aIsLeaf && !bIsLeaf) return -1;
+                if (!aIsLeaf && bIsLeaf) return 1;
+                return b.treePos.y - a.treePos.y;
+            });
+
+            const totalDark = darkCells.length;
+            for (let i = 0; i < treeVoxels.length; i++) {
+                const v = treeVoxels[i];
+                if (i < totalDark) {
+                    const cell = darkCells[i];
+                    v.qrPos.copy(cell.pos);
+                    v.qrScale.set(1.0, 0.92, 1.0);
+                    v.qrColor.set(PALETTE.LEAF_VIBRANT); // Pink Sakura Blossom color for the QR code pixels
+                    v.activeInQR = true;
+                    v.isFinder = cell.isFinder;
+                    v.stagger = cell.isFinder ? (i / totalDark) * 0.35 : 0.35 + (i / totalDark) * 0.55;
+                } else {
+                    // Extra voxels shrink away beneath the plate
+                    v.qrPos.set((Math.random() - 0.5) * qrSize * 0.8, -4.0, (Math.random() - 0.5) * qrSize * 0.8);
+                    v.qrScale.set(0.001, 0.001, 0.001);
+                    v.qrColor.set(PALETTE.LEAF_DEEP);
+                    v.activeInQR = false;
+                    v.stagger = 0.5 + Math.random() * 0.4;
+                }
+            }
+
+            // Quiet zone green backing plate from island voxels (100% full solid green square)
+            const quietPadding = Math.floor(qrSize / 2) + 2;
+            const quietSide = quietPadding * 2 + 1;
+            const totalQuietCells = quietSide * quietSide;
+
+            // Prioritize surface grass blocks for the green plate
+            islandVoxels.sort((a, b) => {
+                if (a.isSurface && !b.isSurface) return -1;
+                if (!a.isSurface && b.isSurface) return 1;
+                return b.treePos.y - a.treePos.y;
+            });
+
+            // Target rendered green color matching pure upper GRASS_TOP (material.color * instanceColor)
+            const targetGrassMat = new THREE.Color(PALETTE.GRASS_TOP);
+            const targetRenderedR = targetGrassMat.r * targetGrassMat.r;
+            const targetRenderedG = targetGrassMat.g * targetGrassMat.g;
+            const targetRenderedB = targetGrassMat.b * targetGrassMat.b;
+
+            for (let i = 0; i < islandVoxels.length; i++) {
+                const iv = islandVoxels[i];
+                if (i < totalQuietCells) {
+                    const gridX = (i % quietSide) - quietPadding;
+                    const gridZ = Math.floor(i / quietSide) - quietPadding;
+                    iv.qrPos.set(gridX, 0, gridZ);
+                    iv.qrScale.set(1.02, 0.9, 1.02);
+
+                    // Compensate for different underlying material colors (e.g. GRASS_SIDE at the lower island tier)
+                    // so the entire green backing plate renders in 100% perfectly uniform color top to bottom
+                    const matColor = (iv.mesh && iv.mesh.material && iv.mesh.material.color) ? iv.mesh.material.color : targetGrassMat;
+                    const compR = Math.min(1.0, targetRenderedR / Math.max(0.001, matColor.r));
+                    const compG = Math.min(1.0, targetRenderedG / Math.max(0.001, matColor.g));
+                    const compB = Math.min(1.0, targetRenderedB / Math.max(0.001, matColor.b));
+                    iv.qrColor.setRGB(compR, compG, compB);
+
+                    iv.activeInQR = true;
+                    iv.stagger = (i / totalQuietCells) * 0.35;
+                } else {
+                    // Deep subsurface rocks sink down far below view and blend with green
+                    iv.qrPos.set(iv.treePos.x, -25, iv.treePos.z);
+                    iv.qrScale.set(0.001, 0.001, 0.001);
+                    iv.qrColor.set(PALETTE.GRASS_TOP);
+                    iv.activeInQR = false;
+                    iv.stagger = 0.35 + Math.random() * 0.3;
+                }
+            }
+        }
+
+        function updateMeshesToMorph(t) {
+            if (isTransitioning || isQRMode) {
+                const camState = getCinematicCameraState(t);
+                camera.position.copy(camState.pos);
+                camera.up.copy(camState.up);
+                controls.target.copy(camState.target);
+                camera.lookAt(camState.target);
+            }
+
+            const total = allMorphVoxels.length;
+            for (let i = 0; i < total; i++) {
+                const v = allMorphVoxels[i];
+                
+                const startW = v.stagger * 0.45;
+                const endW = startW + 0.55;
+                const localT = THREE.MathUtils.clamp((t - startW) / (endW - startW), 0, 1);
+                const easeT = gsap.parseEase('power2.inOut')(localT);
+
+                const arc = Math.sin(easeT * Math.PI) * (v.activeInQR ? (v.isFinder ? 7.0 : 4.5) : -4.0);
+                const swirlAngle = Math.sin(easeT * Math.PI) * Math.PI * 1.5;
+
+                const curX = THREE.MathUtils.lerp(v.treePos.x, v.qrPos.x, easeT);
+                let curY = THREE.MathUtils.lerp(v.treePos.y, v.qrPos.y, easeT) + arc;
+                const curZ = THREE.MathUtils.lerp(v.treePos.z, v.qrPos.z, easeT);
+
+                _scratchMorphDummy.position.set(curX, curY, curZ);
+                
+                _scratchMorphScale.lerpVectors(v.treeScale, v.qrScale, easeT);
+                _scratchMorphDummy.scale.copy(_scratchMorphScale);
+                _scratchMorphDummy.rotation.set(0, swirlAngle, 0);
+                _scratchMorphDummy.updateMatrix();
+
+                v.mesh.setMatrixAt(v.index, _scratchMorphDummy.matrix);
+
+                _scratchMorphColor.copy(v.treeColor).lerp(v.qrColor, easeT);
+                v.mesh.setColorAt(v.index, _scratchMorphColor);
+            }
+
+            for (let m = 0; m < voxelMeshes.length; m++) {
+                const mesh = voxelMeshes[m];
+                mesh.instanceMatrix.needsUpdate = true;
+                if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            }
+
+            // Hide petals during QR mode
+            if (typeof petalInstancedMesh !== 'undefined') {
+                petalInstancedMesh.visible = (t < 0.35);
+            }
+        }
+
+        function toggleQRMode() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            isQRMode = !isQRMode;
+
+            const qrBtnIcon = document.getElementById('qr-btn-icon');
+            const qrBtnText = document.getElementById('qr-btn-text');
+            const qrActiveBanner = document.getElementById('qr-active-banner');
+            const qrBannerUrl = document.getElementById('qr-banner-url');
+            const duration = 2.0;
+
+            if (isQRMode) {
+                updateCamTrackFromCurrent();
+                controls.enabled = false;
+                controls.autoRotate = false;
+
+                qrBtnIcon.textContent = '🌲';
+                qrBtnText.textContent = 'عودة للشجرة';
+
+                qrBannerUrl.textContent = currentQRUrl;
+                qrActiveBanner.classList.remove('hidden');
+                qrActiveBanner.classList.add('flex');
+
+                playZenPluck('C5');
+
+                gsap.to(morphProgress, {
+                    value: 1,
+                    duration: duration,
+                    ease: 'power2.inOut',
+                    onUpdate: () => updateMeshesToMorph(morphProgress.value),
+                    onComplete: () => {
+                        isTransitioning = false;
+                    }
+                });
+            } else {
+                controls.enabled = false;
+
+                qrBtnIcon.textContent = '📱';
+                qrBtnText.textContent = 'تحويل لـ QR';
+
+                qrActiveBanner.classList.add('hidden');
+                qrActiveBanner.classList.remove('flex');
+
+                playZenPluck('G4');
+
+                gsap.to(morphProgress, {
+                    value: 0,
+                    duration: duration,
+                    ease: 'power2.inOut',
+                    onUpdate: () => updateMeshesToMorph(morphProgress.value),
+                    onComplete: () => {
+                        camera.up.set(0, 1, 0);
+                        controls.enabled = true;
+                        isTransitioning = false;
+                        updateCamTrackFromCurrent();
+                    }
+                });
+            }
+        }
+
+        // Hidden Voxel Culling: Only removes solid deep underground rock voxels below y < -2
+        function cullHiddenVoxels() {
+            const hiddenKeys = [];
+            voxelWorld.forEach((v, key) => {
+                if (v.y < -2) {
+                    const kTop = getVoxelKey(v.x, v.y + 1, v.z);
+                    const kBottom = getVoxelKey(v.x, v.y - 1, v.z);
+                    const kRight = getVoxelKey(v.x + 1, v.y, v.z);
+                    const kLeft = getVoxelKey(v.x - 1, v.y, v.z);
+                    const kFront = getVoxelKey(v.x, v.y, v.z + 1);
+                    const kBack = getVoxelKey(v.x, v.y, v.z - 1);
+
+                    if (
+                        voxelWorld.has(kTop) &&
+                        voxelWorld.has(kBottom) &&
+                        voxelWorld.has(kRight) &&
+                        voxelWorld.has(kLeft) &&
+                        voxelWorld.has(kFront) &&
+                        voxelWorld.has(kBack)
+                    ) {
+                        hiddenKeys.push(key);
+                    }
+                }
+            });
+
+            for (let i = 0; i < hiddenKeys.length; i++) {
+                voxelWorld.delete(hiddenKeys[i]);
+            }
+        }
+
+        function buildVoxelScene() {
+            // Clean up existing meshes when resetting
+            voxelMeshes.forEach(mesh => {
+                scene.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) mesh.material.dispose();
+            });
+            voxelMeshes.length = 0;
+            allMorphVoxels.length = 0;
+
+            // Clear existing debris particles and ripples
+            debrisList.forEach(p => {
+                scene.remove(p.mesh);
+                if (p.mat) p.mat.dispose();
+            });
+            debrisList.length = 0;
+            activeRipples.length = 0;
+            needsWaveReset = false;
+            deletedBlocksCount = 0;
+
+            // 1. Build procedural world data
+            voxelWorld.clear();
+            buildTerrain();
+            buildSeedAndSprout();
+            buildSakuraTrunk();
+            buildSakuraCanopy();
+            
+            // 2. Cull internal occluded voxels for maximum performance
+            cullHiddenVoxels();
+
+            // 3. Group voxels by block type for ultra-fast single-draw-call InstancedMesh rendering
+            const typeGroups = {};
+            voxelWorld.forEach((v) => {
+                if (!typeGroups[v.type]) typeGroups[v.type] = [];
+                typeGroups[v.type].push(v);
+            });
+
+            // Base Geometry: Chamfered Box for crisp Minecraft Voxel aesthetic
+            const boxGeo = new THREE.BoxGeometry(VOXEL_SIZE * 0.985, VOXEL_SIZE * 0.985, VOXEL_SIZE * 0.985);
+            const dummy = new THREE.Object3D();
+
+            Object.keys(typeGroups).forEach((typeKey) => {
+                const blockDef = BLOCK_TYPES[typeKey] || BLOCK_TYPES.TRUNK;
+                const voxels = typeGroups[typeKey];
+                const count = voxels.length;
+
+                // Material creation with custom physical properties
+                let mat;
+                if (blockDef.emissive) {
+                    mat = new THREE.MeshStandardMaterial({
+                        color: blockDef.color,
+                        emissive: blockDef.color,
+                        emissiveIntensity: 1.6,
+                        roughness: 0.2
+                    });
+                } else if (blockDef.transparent) {
+                    mat = new THREE.MeshPhysicalMaterial({
+                        color: blockDef.color,
+                        transmission: 0.6,
+                        opacity: blockDef.opacity || 0.8,
+                        transparent: true,
+                        roughness: 0.1,
+                        ior: 1.33
+                    });
+                } else {
+                    mat = new THREE.MeshStandardMaterial({
+                        color: blockDef.color,
+                        roughness: blockDef.roughness || 0.7,
+                        metalness: 0.05
+                    });
+                }
+
+                const instancedMesh = new THREE.InstancedMesh(boxGeo, mat, count);
+                instancedMesh.castShadow = !blockDef.transparent;
+                instancedMesh.receiveShadow = true;
+
+                // Set transforms and subtle voxel color variation (Minecraft shader look)
+                const baseColor = new THREE.Color(blockDef.color);
+                const tempColor = new THREE.Color();
+
+                for (let i = 0; i < count; i++) {
+                    const v = voxels[i];
+                    dummy.position.set(v.x, v.y, v.z);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+
+                    // Add organic lightness jitter to every voxel block
+                    const jitter = (Math.sin(v.x * 3.1 + v.y * 7.7 + v.z * 5.3) * 0.04);
+                    tempColor.copy(baseColor).offsetHSL(0, 0, jitter);
+                    instancedMesh.setColorAt(i, tempColor);
+
+                    // Track for QR Morphing & Growth Stages
+                    const isTreeVoxel = v.type.startsWith('LEAF') || v.type.startsWith('TRUNK') || v.type === 'SEED_CORE' || v.type === 'SPROUT_LEAF' || v.type === 'PETAL_GROUND';
+
+                    allMorphVoxels.push({
+                        mesh: instancedMesh,
+                        index: i,
+                        treePos: new THREE.Vector3(v.x, v.y, v.z),
+                        treeScale: new THREE.Vector3(1, 1, 1),
+                        treeColor: tempColor.clone(),
+                        qrPos: new THREE.Vector3(v.x, v.y, v.z),
+                        qrScale: new THREE.Vector3(1, 1, 1),
+                        qrColor: new THREE.Color(PALETTE.LEAF_VIBRANT),
+                        type: v.type,
+                        stageMin: v.stageMin || 1,
+                        stageMax: v.stageMax || 5,
+                        isTree: isTreeVoxel,
+                        isSurface: v.type === 'GRASS' || v.type === 'GRASS_SIDE',
+                        activeInQR: false,
+                        isFinder: false,
+                        stagger: 0
+                    });
+                }
+
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+                
+                // Store metadata for Raycasting interaction
+                instancedMesh.userData = { typeKey: typeKey, voxels: voxels };
+                scene.add(instancedMesh);
+                voxelMeshes.push(instancedMesh);
+            });
+
+            mapVoxelsToQR(currentQRUrl);
+            updateCamTrackFromCurrent();
+            setGrowthStage(currentGrowthStage, false, false);
+        }
+
+        // --- 🌿 Bonsai Growth Stages & Animation Controller ---
+        let currentGrowthStage = 4; // Default full bloom (Stage 4)
+        const growthProgress = { value: 4 };
+        let isAutoGrowing = false;
+        let autoGrowTween = null;
+
+        const STAGE_DETAILS = {
+            1: {
+                name: '1. البذرة والتربة المقدسة',
+                icon: '🌰',
+                desc: 'بذرة الساكورا المقدسة تبدأ بالتجذر في تربة الزن الخصبة مع برعم أخضر غض.',
+                note: 'C4',
+                camLook: { x: 0, y: 2, z: 0 },
+                camPos: { x: 14, y: 10, z: 16 }
+            },
+            2: {
+                name: '2. البرعم الصاعد والجذور',
+                icon: '🌱',
+                desc: 'جذور متينة تثبت الشجرة، وساق خشب الكرز ينطلق نحو السماء مع براعم وردية أولى.',
+                note: 'E4',
+                camLook: { x: 0, y: 3.5, z: 0 },
+                camPos: { x: 20, y: 14, z: 22 }
+            },
+            3: {
+                name: '3. الشُجيرة المتفرعة',
+                icon: '🌿',
+                desc: 'شُجيرة بونساي أنيقة تتفرع أفقياً وتبدأ بإنبات أزهار الساكورا الوردية.',
+                note: 'G4',
+                camLook: { x: 0, y: 5, z: 0 },
+                camPos: { x: 26, y: 18, z: 30 }
+            },
+            4: {
+                name: '4. الإزهار الكامل',
+                icon: '🌸',
+                desc: 'الشجرة في أبهى حلل النضج والإزهار الكامل بنمط الساكورا الياباني الكلاسيكي.',
+                note: 'C5',
+                camLook: { x: 0, y: 6, z: 0 },
+                camPos: { x: 30, y: 20, z: 36 }
+            },
+            5: {
+                name: '5. الإزهار الأسطوري',
+                icon: '✨',
+                desc: 'إزهار سحري متلألئ مع عاصفة بتلات وردية وذهبية وسجاد من الزهور يعم الجزيرة.',
+                note: 'G5',
+                camLook: { x: 0, y: 7, z: 0 },
+                camPos: { x: 32, y: 22, z: 38 }
+            }
+        };
+
+        const _scratchGrowthDummy = new THREE.Object3D();
+
+        function updateGrowthState(val) {
+            const currentVal = (typeof val === 'number') ? val : growthProgress.value;
+            
+            if (isQRMode || morphProgress.value > 0.05) return;
+
+            const total = allMorphVoxels.length;
+            for (let i = 0; i < total; i++) {
+                const v = allMorphVoxels[i];
+                if (!v) continue;
+
+                // Island ground voxels are always fully visible
+                if (!v.isTree && v.type !== 'PETAL_GROUND' && v.type !== 'SEED_CORE' && v.type !== 'SPROUT_LEAF') {
+                    continue;
+                }
+
+                // Calculate growth scale factor based on stage min & max
+                let scale = 0;
+                const minS = v.stageMin || 1;
+                const maxS = v.stageMax || 5;
+
+                if (currentVal >= minS && currentVal <= maxS) {
+                    const popIn = THREE.MathUtils.clamp((currentVal - (minS - 0.45)) / 0.45, 0, 1);
+                    const popOut = (maxS < 5) ? THREE.MathUtils.clamp(((maxS + 0.45) - currentVal) / 0.45, 0, 1) : 1;
+                    const factor = Math.min(popIn, popOut);
+                    scale = factor < 1.0 ? (factor * factor * (3 - 2 * factor)) : 1.0;
+                } else if (currentVal < minS) {
+                    const popIn = THREE.MathUtils.clamp((currentVal - (minS - 0.45)) / 0.45, 0, 1);
+                    scale = popIn * popIn * (3 - 2 * popIn);
+                } else {
+                    const popOut = THREE.MathUtils.clamp(((maxS + 0.45) - currentVal) / 0.45, 0, 1);
+                    scale = popOut * popOut * (3 - 2 * popOut);
+                }
+
+                v.treeScale.set(scale, scale, scale);
+                _scratchGrowthDummy.position.copy(v.treePos);
+                _scratchGrowthDummy.scale.copy(v.treeScale);
+                _scratchGrowthDummy.rotation.set(0, 0, 0);
+                _scratchGrowthDummy.updateMatrix();
+                v.mesh.setMatrixAt(v.index, _scratchGrowthDummy.matrix);
+            }
+
+            for (let m = 0; m < voxelMeshes.length; m++) {
+                voxelMeshes[m].instanceMatrix.needsUpdate = true;
+            }
+
+            // Adjust Petals visibility based on growth stage
+            if (typeof petalInstancedMesh !== 'undefined') {
+                petalInstancedMesh.visible = (currentVal >= 2.2);
+            }
+
+            // Mythic Aura Fireflies active in stage 5
+            if (typeof auraMesh !== 'undefined') {
+                auraMesh.visible = (currentVal >= 4.3);
+            }
+        }
+
+        function setGrowthStage(stageNum, smooth = true, updateCam = true) {
+            const target = THREE.MathUtils.clamp(stageNum, 1, 5);
+            currentGrowthStage = target;
+            const details = STAGE_DETAILS[Math.round(target)] || STAGE_DETAILS[4];
+
+            // Update UI
+            document.querySelectorAll('.stage-btn').forEach(btn => {
+                if (parseInt(btn.dataset.stage) === Math.round(target)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            const slider = document.getElementById('growth-slider');
+            if (slider) slider.value = target;
+
+            const badge = document.getElementById('growth-stage-badge');
+            if (badge) badge.textContent = `${details.icon} ${details.name}`;
+
+            const desc = document.getElementById('stage-desc');
+            if (desc) desc.textContent = details.desc;
+
+            // Zen sound
+            playZenPluck(details.note);
+
+            if (smooth) {
+                gsap.to(growthProgress, {
+                    value: target,
+                    duration: 1.1,
+                    ease: 'power2.out',
+                    onUpdate: () => updateGrowthState(growthProgress.value)
+                });
+
+                if (updateCam && !isQRMode) {
+                    gsap.to(camera.position, {
+                        x: details.camPos.x,
+                        y: details.camPos.y,
+                        z: details.camPos.z,
+                        duration: 1.3,
+                        ease: 'power2.out'
+                    });
+                    gsap.to(controls.target, {
+                        x: details.camLook.x,
+                        y: details.camLook.y,
+                        z: details.camLook.z,
+                        duration: 1.3,
+                        ease: 'power2.out',
+                        onUpdate: () => controls.update()
+                    });
+                }
+            } else {
+                growthProgress.value = target;
+                updateGrowthState(target);
+            }
+        }
+
+        function toggleAutoGrow() {
+            isAutoGrowing = !isAutoGrowing;
+            const btn = document.getElementById('btn-auto-grow');
+            const icon = document.getElementById('auto-grow-icon');
+            const text = document.getElementById('auto-grow-text');
+
+            if (isAutoGrowing) {
+                if (btn) btn.classList.add('active');
+                if (icon) icon.textContent = '⏸️';
+                if (text) text.textContent = 'إيقاف';
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 1.1;
+
+                if (growthProgress.value >= 4.9) {
+                    growthProgress.value = 1;
+                    setGrowthStage(1, false, false);
+                }
+
+                autoGrowTween = gsap.to(growthProgress, {
+                    value: 5,
+                    duration: 14.0,
+                    ease: 'none',
+                    onUpdate: () => {
+                        updateGrowthState(growthProgress.value);
+                        const sNum = Math.round(growthProgress.value);
+                        const slider = document.getElementById('growth-slider');
+                        if (slider) slider.value = growthProgress.value;
+                        const details = STAGE_DETAILS[sNum];
+                        if (details) {
+                            const badge = document.getElementById('growth-stage-badge');
+                            if (badge) badge.textContent = `${details.icon} ${details.name}`;
+                            const desc = document.getElementById('stage-desc');
+                            if (desc) desc.textContent = details.desc;
+                            document.querySelectorAll('.stage-btn').forEach(b => {
+                                if (parseInt(b.dataset.stage) === sNum) b.classList.add('active');
+                                else b.classList.remove('active');
+                            });
+                        }
+                    },
+                    onComplete: () => {
+                        isAutoGrowing = false;
+                        if (icon) icon.textContent = '▶️';
+                        if (text) text.textContent = 'نمو سينمائي';
+                        if (btn) btn.classList.remove('active');
+                        playZenPluck('G5');
+                    }
+                });
+            } else {
+                if (autoGrowTween) autoGrowTween.kill();
+                if (icon) icon.textContent = '▶️';
+                if (text) text.textContent = 'نمو سينمائي';
+                if (btn) btn.classList.remove('active');
+            }
+        }
+
+        // --- ✨ Mythic Golden & Pink Aura Fireflies System ---
+        const AURA_COUNT = 65;
+        const auraGeo = new THREE.SphereGeometry(0.12, 6, 6);
+        const auraMat = new THREE.MeshBasicMaterial({
+            color: 0xfef08a,
+            transparent: true,
+            opacity: 0.85
+        });
+        const auraMesh = new THREE.InstancedMesh(auraGeo, auraMat, AURA_COUNT);
+        const auraData = [];
+        const dummyAura = new THREE.Object3D();
+
+        for (let i = 0; i < AURA_COUNT; i++) {
+            auraData.push({
+                x: (Math.random() - 0.5) * 16,
+                y: 2 + Math.random() * 16,
+                z: (Math.random() - 0.5) * 16,
+                baseY: 2 + Math.random() * 16,
+                speedY: 0.015 + Math.random() * 0.02,
+                angle: Math.random() * Math.PI * 2,
+                radius: 3.5 + Math.random() * 7,
+                color: Math.random() > 0.5 ? 0xfef08a : 0xf472b6
+            });
+            const c = new THREE.Color(auraData[i].color);
+            auraMesh.setColorAt(i, c);
+        }
+        auraMesh.instanceColor.needsUpdate = true;
+        auraMesh.visible = false;
+        scene.add(auraMesh);
+
+        function updateAura(time) {
+            if (!auraMesh.visible) return;
+            for (let i = 0; i < AURA_COUNT; i++) {
+                const a = auraData[i];
+                a.angle += 0.015;
+                a.y += a.speedY;
+                if (a.y > 22) a.y = 2;
+
+                const curX = Math.cos(a.angle) * a.radius;
+                const curZ = Math.sin(a.angle) * a.radius;
+                const scale = 0.6 + Math.sin(time * 3 + i) * 0.4;
+
+                dummyAura.position.set(curX, a.y, curZ);
+                dummyAura.scale.set(scale, scale, scale);
+                dummyAura.updateMatrix();
+                auraMesh.setMatrixAt(i, dummyAura.matrix);
+            }
+            auraMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        const PETAL_COUNT = 420;
+        const petalGeo = new THREE.PlaneGeometry(0.35, 0.24);
+        const petalMat = new THREE.MeshStandardMaterial({
+            color: 0xffb7c5,
+            emissive: 0xf472b6,
+            emissiveIntensity: 0.15,
+            side: THREE.DoubleSide,
+            roughness: 0.4
+        });
+
+        const petalInstancedMesh = new THREE.InstancedMesh(petalGeo, petalMat, PETAL_COUNT);
+        const petalData = [];
+        const dummyPetal = new THREE.Object3D();
+
+        for (let i = 0; i < PETAL_COUNT; i++) {
+            const p = {
+                x: (Math.random() - 0.5) * 28,
+                y: 8 + Math.random() * 20,
+                z: (Math.random() - 0.5) * 28,
+                vx: 0.02 + Math.random() * 0.03,
+                vy: -0.025 - Math.random() * 0.035,
+                vz: (Math.random() - 0.5) * 0.02,
+                rotX: Math.random() * Math.PI * 2,
+                rotY: Math.random() * Math.PI * 2,
+                rotZ: Math.random() * Math.PI * 2,
+                vRotX: (Math.random() - 0.5) * 0.04,
+                vRotY: (Math.random() - 0.5) * 0.04,
+                scale: 0.6 + Math.random() * 0.7,
+                swayPhase: Math.random() * Math.PI * 2
+            };
+            petalData.push(p);
+
+            // Subtle color variety for petals
+            const pColor = new THREE.Color(Math.random() > 0.4 ? 0xf472b6 : 0xfce7f3);
+            petalInstancedMesh.setColorAt(i, pColor);
+        }
+        petalInstancedMesh.instanceColor.needsUpdate = true;
+        scene.add(petalInstancedMesh);
+
+        function updatePetals(time) {
+            for (let i = 0; i < PETAL_COUNT; i++) {
+                const p = petalData[i];
+                
+                // Wind turbulence & sinusoidal drifting
+                p.swayPhase += 0.03;
+                p.x += p.vx + Math.sin(p.swayPhase) * 0.025;
+                p.y += p.vy;
+                p.z += p.vz + Math.cos(p.swayPhase * 0.8) * 0.02;
+
+                p.rotX += p.vRotX;
+                p.rotY += p.vRotY;
+
+                // Respawn above the canopy when hitting garden ground
+                if (p.y < 0.2 || p.x > 18 || p.x < -18 || p.z > 18 || p.z < -18) {
+                    p.x = (Math.random() - 0.5) * 22;
+                    p.y = 16 + Math.random() * 10;
+                    p.z = (Math.random() - 0.5) * 22;
+                }
+
+                dummyPetal.position.set(p.x, p.y, p.z);
+                dummyPetal.rotation.set(p.rotX, p.rotY, p.rotZ);
+                dummyPetal.scale.setScalar(p.scale);
+                dummyPetal.updateMatrix();
+
+                petalInstancedMesh.setMatrixAt(i, dummyPetal.matrix);
+            }
+            petalInstancedMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        let audioInitialized = false;
+        let isAudioPlaying = false;
+        let kotoSynth, windNoise, windFilter, audioLoop;
+
+        const KOTO_SCALE = ['C4', 'D4', 'Eb4', 'G4', 'Ab4', 'C5', 'D5', 'Eb5', 'G5'];
+
+        async function initAudio() {
+            if (audioInitialized) return;
+            await Tone.start();
+            
+            // Koto / Bell Pluck Synthesizer
+            kotoSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: {
+                    attack: 0.005,
+                    decay: 1.4,
+                    sustain: 0.05,
+                    release: 1.6
+                }
+            }).toDestination();
+            
+            const reverb = new Tone.Reverb({ decay: 4.5, wet: 0.55 }).toDestination();
+            kotoSynth.connect(reverb);
+            kotoSynth.volume.value = -8;
+
+            // Ambient gentle breeze generator
+            windFilter = new Tone.Filter(350, 'lowpass').toDestination();
+            windNoise = new Tone.Noise('pink').connect(windFilter);
+            windNoise.volume.value = -28;
+
+            audioInitialized = true;
+        }
+
+        async function playZenPluck(note) {
+            try {
+                if (!audioInitialized) {
+                    await initAudio();
+                }
+                if (Tone && Tone.context && Tone.context.state !== 'running') {
+                    await Tone.context.resume();
+                }
+                const n = note || KOTO_SCALE[Math.floor(Math.random() * KOTO_SCALE.length)];
+                if (kotoSynth) {
+                    kotoSynth.triggerAttackRelease(n, '8n');
+                }
+            } catch (e) {}
+        }
+
+        async function toggleAudio() {
+            if (!audioInitialized) {
+                await initAudio();
+            }
+            isAudioPlaying = !isAudioPlaying;
+            
+            const btn = document.getElementById('btn-audio');
+            const icon = document.getElementById('audio-icon');
+            const text = document.getElementById('audio-text');
+
+            if (isAudioPlaying) {
+                windNoise.start();
+                btn.classList.add('active');
+                icon.textContent = '🔊';
+                text.textContent = 'صوت مفعّل';
+                // Trigger occasional soothing koto notes
+                audioLoop = setInterval(() => {
+                    if (isAudioPlaying && Math.random() > 0.4) {
+                        playZenPluck();
+                    }
+                }, 3200);
+                playZenPluck('C5');
+            } else {
+                windNoise.stop();
+                btn.classList.remove('active');
+                icon.textContent = '🎵';
+                text.textContent = 'صوت الزن';
+                if (audioLoop) clearInterval(audioLoop);
+            }
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const inspectorBadge = document.getElementById('inspector-badge');
+        const blockInfoToast = document.getElementById('block-info-toast');
+        const blockInfoName = document.getElementById('block-info-name');
+
+        function onPointerMove(e) {
+            if (isQRMode || morphProgress.value > 0.05) {
+                inspectorBadge.style.opacity = '0';
+                return;
+            }
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(voxelMeshes);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const instanceId = hit.instanceId;
+                const mesh = hit.object;
+                
+                if (mesh.userData && mesh.userData.voxels && mesh.userData.voxels[instanceId]) {
+                    const blockData = mesh.userData.voxels[instanceId];
+                    const def = BLOCK_TYPES[blockData.type];
+                    
+                    inspectorBadge.textContent = def ? def.name : 'كتلة فوكسل';
+                    inspectorBadge.style.left = `${e.clientX}px`;
+                    inspectorBadge.style.top = `${e.clientY - 12}px`;
+                    inspectorBadge.style.opacity = '1';
+                    return;
+                }
+            }
+            inspectorBadge.style.opacity = '0';
+        }
+
+        let pointerDownPos = { x: 0, y: 0, time: 0 };
+
+        function onPointerDown(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+            pointerDownPos = {
+                x: e.clientX,
+                y: e.clientY,
+                time: performance.now()
+            };
+        }
+
+        function onPointerUp(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#qr-url-modal')) return;
+            if (isQRMode || morphProgress.value > 0.05) return;
+            
+            const dx = e.clientX - pointerDownPos.x;
+            const dy = e.clientY - pointerDownPos.y;
+            const dist = Math.hypot(dx, dy);
+            const duration = performance.now() - pointerDownPos.time;
+
+            // Only trigger on quick tap/click, not when dragging/orbiting the camera
+            if (dist > 8 || duration > 450) return;
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(voxelMeshes);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const instanceId = hit.instanceId;
+                const mesh = hit.object;
+                
+                if (mesh.userData && mesh.userData.voxels && mesh.userData.voxels[instanceId]) {
+                    const blockData = mesh.userData.voxels[instanceId];
+                    const def = BLOCK_TYPES[blockData.type] || BLOCK_TYPES.TRUNK;
+                    
+                    // 1. Trigger Ocean Wave Ripple emanating from the clicked block (without deleting it)
+                    triggerRipple(blockData.x, blockData.z, 1.55);
+
+                    // 2. Show Floating Info Toast
+                    blockInfoName.textContent = `🌊 تموج بحري من كتلة: ${def.name}`;
+                    blockInfoToast.classList.remove('hidden');
+                    blockInfoToast.classList.add('flex');
+
+                    // 3. Hide inspector badge immediately
+                    inspectorBadge.style.opacity = '0';
+
+                    // 4. Trigger pitch-adjusted Zen sound
+                    const noteIndex = Math.min(KOTO_SCALE.length - 1, Math.max(0, Math.floor((blockData.y + 2) / 2.5)));
+                    playZenPluck(KOTO_SCALE[noteIndex]);
+                }
+            } else {
+                // User clicked on screen background / canvas -> trigger ripple from ground plane intersection or center
+                const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -2);
+                const intersectPt = new THREE.Vector3();
+                raycaster.ray.intersectPlane(groundPlane, intersectPt);
+                const originX = intersectPt ? intersectPt.x : 0;
+                const originZ = intersectPt ? intersectPt.z : 0;
+
+                triggerRipple(originX, originZ, 1.4);
+
+                blockInfoName.textContent = `🌊 تموج بحري عبر الشجرة والجزيرة!`;
+                blockInfoToast.classList.remove('hidden');
+                blockInfoToast.classList.add('flex');
+
+                playZenPluck('E4');
+            }
+        }
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('pointerup', onPointerUp);
+
+        const ENV_PRESETS = {
+            day: {
+                bg: 0x130e1d,
+                fog: 0x130e1d,
+                ambient: 0xffd1dc,
+                sunColor: 0xfff3d6,
+                sunIntensity: 1.4,
+                exposure: 1.15
+            },
+            sunset: {
+                bg: 0x2b0d1e,
+                fog: 0x2b0d1e,
+                ambient: 0xf43f5e,
+                sunColor: 0xfb923c,
+                sunIntensity: 1.8,
+                exposure: 1.25
+            },
+            night: {
+                bg: 0x05050f,
+                fog: 0x05050f,
+                ambient: 0x38bdf8,
+                sunColor: 0x818cf8,
+                sunIntensity: 0.35,
+                exposure: 1.4
+            },
+            bloom: {
+                bg: 0x2e1022,
+                fog: 0x2e1022,
+                ambient: 0xf472b6,
+                sunColor: 0xfbcfe8,
+                sunIntensity: 1.6,
+                exposure: 1.3
+            }
+        };
+
+        function setEnvironment(envKey) {
+            const p = ENV_PRESETS[envKey] || ENV_PRESETS.day;
+            
+            scene.background.setHex(p.bg);
+            scene.fog.color.setHex(p.fog);
+            ambientLight.color.setHex(p.ambient);
+            sunLight.color.setHex(p.sunColor);
+            sunLight.intensity = p.sunIntensity;
+            renderer.toneMappingExposure = p.exposure;
+
+            // Update UI buttons
+            document.querySelectorAll('.env-btn').forEach(b => {
+                if (b.dataset.env === envKey) {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+        }
+
+        // Camera viewpoint presets
+        function setCameraView(viewKey) {
+            let targetPos, targetLook;
+            switch(viewKey) {
+                case 'canopy':
+                    targetPos = { x: 14, y: 16, z: 14 };
+                    targetLook = { x: 0, y: 12, z: 0 };
+                    break;
+                case 'roots':
+                    targetPos = { x: 16, y: 2, z: 18 };
+                    targetLook = { x: 0, y: -2, z: 0 };
+                    break;
+                case 'top':
+                    targetPos = { x: 0, y: 40, z: 4 };
+                    targetLook = { x: 0, y: 4, z: 0 };
+                    break;
+                case 'overview':
+                default:
+                    targetPos = { x: 30, y: 20, z: 36 };
+                    targetLook = { x: 0, y: 4, z: 0 };
+                    break;
+            }
+
+            // Smoothly move camera
+            camera.position.set(targetPos.x, targetPos.y, targetPos.z);
+            controls.target.set(targetLook.x, targetLook.y, targetLook.z);
+            controls.update();
+
+            document.querySelectorAll('.cam-btn').forEach(b => {
+                if (b.dataset.cam === viewKey) {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+        }
+
+        // Dynamic Orbit Controls Camera Tracking
+        controls.addEventListener('change', () => {
+            if (!isTransitioning && !isQRMode && morphProgress.value < 0.02) {
+                updateCamTrackFromCurrent();
+            }
+        });
+
+        // QR Morph Button
+        const qrMorphBtn = document.getElementById('btn-qr-morph');
+        if (qrMorphBtn) {
+            qrMorphBtn.addEventListener('click', toggleQRMode);
+        }
+
+        // QR URL Modal Controls
+        const qrUrlModal = document.getElementById('qr-url-modal');
+        const inputQrUrl = document.getElementById('input-qr-url');
+        const btnQrUrl = document.getElementById('btn-qr-url');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+        const btnSaveUrl = document.getElementById('btn-save-url');
+
+        if (btnQrUrl) {
+            btnQrUrl.addEventListener('click', () => {
+                inputQrUrl.value = currentQRUrl;
+                qrUrlModal.classList.remove('hidden');
+                inputQrUrl.focus();
+            });
+        }
+
+        if (btnCloseModal) {
+            btnCloseModal.addEventListener('click', () => {
+                qrUrlModal.classList.add('hidden');
+            });
+        }
+
+        if (qrUrlModal) {
+            qrUrlModal.addEventListener('click', (e) => {
+                if (e.target === qrUrlModal) {
+                    qrUrlModal.classList.add('hidden');
+                }
+            });
+        }
+
+        document.querySelectorAll('.preset-url-btn').forEach(b => {
+            b.addEventListener('click', () => {
+                inputQrUrl.value = b.dataset.url;
+            });
+        });
+
+        if (btnSaveUrl) {
+            btnSaveUrl.addEventListener('click', () => {
+                const newUrl = inputQrUrl.value.trim() || 'https://google.com';
+                currentQRUrl = newUrl;
+                mapVoxelsToQR(currentQRUrl);
+                qrUrlModal.classList.add('hidden');
+                
+                blockInfoName.textContent = `🔗 تم ضبط رابط الـ QR: ${currentQRUrl}`;
+                blockInfoToast.classList.remove('hidden');
+                blockInfoToast.classList.add('flex');
+
+                if (!isQRMode) {
+                    toggleQRMode();
+                } else {
+                    updateMeshesToMorph(1);
+                    document.getElementById('qr-banner-url').textContent = currentQRUrl;
+                }
+            });
+        }
+
+        // Wave Ripple Button
+        const waveBtn = document.getElementById('btn-wave');
+        if (waveBtn) {
+            waveBtn.addEventListener('click', () => {
+                if (isQRMode) return;
+                triggerRipple(0, 0, 1.75);
+                blockInfoName.textContent = '🌊 تم إطلاق تموج بحري شامل!';
+                blockInfoToast.classList.remove('hidden');
+                blockInfoToast.classList.add('flex');
+                playZenPluck('G4');
+            });
+        }
+
+        // Reset / Rebuild Tree
+        const resetBtn = document.getElementById('btn-reset');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                if (isQRMode) toggleQRMode();
+                buildVoxelScene();
+                blockInfoName.textContent = '🌱 تمت إعادة بناء الشجرة بالكامل!';
+                blockInfoToast.classList.remove('hidden');
+                blockInfoToast.classList.add('flex');
+                playZenPluck('C5');
+            });
+        }
+
+        // Growth stage buttons click
+        document.querySelectorAll('.stage-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isQRMode) return;
+                const stage = parseInt(btn.dataset.stage);
+                if (isAutoGrowing) toggleAutoGrow();
+                setGrowthStage(stage, true, true);
+            });
+        });
+
+        // Growth slider input (real-time scrubbing)
+        const growthSlider = document.getElementById('growth-slider');
+        if (growthSlider) {
+            growthSlider.addEventListener('input', (e) => {
+                if (isQRMode) return;
+                if (isAutoGrowing) toggleAutoGrow();
+                const val = parseFloat(e.target.value);
+                growthProgress.value = val;
+                updateGrowthState(val);
+                const sNum = Math.round(val);
+                const details = STAGE_DETAILS[sNum];
+                if (details) {
+                    const badge = document.getElementById('growth-stage-badge');
+                    if (badge) badge.textContent = `${details.icon} ${details.name}`;
+                    const desc = document.getElementById('stage-desc');
+                    if (desc) desc.textContent = details.desc;
+                    document.querySelectorAll('.stage-btn').forEach(b => {
+                        if (parseInt(b.dataset.stage) === sNum) b.classList.add('active');
+                        else b.classList.remove('active');
+                    });
+                }
+            });
+        }
+
+        // Auto Grow Button toggle
+        const autoGrowBtn = document.getElementById('btn-auto-grow');
+        if (autoGrowBtn) {
+            autoGrowBtn.addEventListener('click', () => {
+                if (isQRMode) return;
+                toggleAutoGrow();
+            });
+        }
+
+        // Audio Toggle
+        document.getElementById('btn-audio').addEventListener('click', toggleAudio);
+
+        // Auto Rotate Toggle
+        const autoRotateBtn = document.getElementById('btn-auto-rotate');
+        autoRotateBtn.addEventListener('click', () => {
+            if (isQRMode) return;
+            controls.autoRotate = !controls.autoRotate;
+            autoRotateBtn.classList.toggle('active', controls.autoRotate);
+        });
+
+        // Screenshot capture
+        document.getElementById('btn-screenshot').addEventListener('click', () => {
+            renderer.render(scene, camera);
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = isQRMode ? 'voxel-sakura-tree-qr-code.png' : 'voxel-sakura-tree-minecraft.png';
+            link.href = dataURL;
+            link.click();
+        });
+
+        // Environment buttons
+        document.querySelectorAll('.env-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isQRMode) return;
+                setEnvironment(btn.dataset.env);
+            });
+        });
+
+        // Camera buttons
+        document.querySelectorAll('.cam-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isQRMode) return;
+                setCameraView(btn.dataset.cam);
+            });
+        });
+
+        // Responsive Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            if (isQRMode) {
+                camera.position.y = window.innerWidth < 640 ? 46 : 38;
+            }
+            updateCamTrackFromCurrent();
+        });
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            if (!isQRMode && morphProgress.value < 0.02) {
+                // 1. Sakura falling petals physics
+                updatePetals(elapsedTime);
+
+                // 2. Mythic Aura fireflies in stage 5
+                updateAura(elapsedTime);
+
+                // 3. Update debris particles on block destruction
+                updateDebris();
+
+                // 4. 🌊 Update Ocean Wave Ripple Simulation
+                updateVoxelWaves(elapsedTime);
+
+                // 5. Update Orbit Controls
+                controls.update();
+            }
+
+            // 6. Render 3D Scene
+            renderer.render(scene, camera);
+        }
+
+        // Initialize scene on window load
+        window.onload = () => {
+            buildVoxelScene();
+            animate();
+        };
+    </script>
+</body>
+</html>

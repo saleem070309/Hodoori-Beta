@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#faf7f2">
+    <title>المساعد الذكي | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#0d0d0d' : '#faf7f2';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Module Preloads for Instant React & BorderBeam Mounting -->
+    <link rel="modulepreload" href="https://esm.sh/react@18.3.1" />
+    <link rel="modulepreload" href="https://esm.sh/react-dom@18.3.1/client" />
+    <link rel="modulepreload" href="https://esm.sh/border-beam@1.3.0?deps=react@18.3.1" />
+
+    <!-- External Fonts & Utilities -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Google+Sans+Arabic:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- Core External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module">
+        import * as docx from 'https://cdn.jsdelivr.net/npm/docx@8.5.0/+esm';
+        window.docx = docx;
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- App & Component Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/component-sidebar.css?v=3.0" rel="stylesheet" />
+    <link href="styles/page-agent.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Reusable Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ AGENT MAIN VIEW (Supports Desktop Push Transition) ═══ -->
+    <main class="agent-page-container" id="agent-page-root">
+        <!-- ─── Messages Scroll Area ─── -->
+        <div id="agent-messages" class="flex-1 overflow-y-auto mx-auto w-full relative">
+            <!-- Blank State Greeting -->
+            <div class="assistant-blank-state" id="assistant-blank-state">
+                <div class="assistant-planet-logo-container">
+                    <img src="assets/AI-logo.png" class="assistant-planet-logo" alt="Logo" />
+                </div>
+                <h2 class="assistant-greeting-text" id="assistant-greeting-text">كيف أساعدك اليوم؟</h2>
+            </div>
+        </div>
+
+        <!-- ─── Floating Capsule Input Area ─── -->
+        <div class="assistant-bottom-area">
+            <!-- Attached File Preview -->
+            <div id="agent-file-preview-container" class="w-full max-w-[600px] rounded-[1.5rem] p-3 flex items-center justify-between gap-3 hidden border transition-all">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <img id="agent-file-preview-thumbnail" class="w-10 h-10 rounded-xl object-cover border hidden" />
+                    <span id="agent-file-preview-icon" class="text-gray-400 shrink-0 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="morphicon"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" data-morph-path="true"></path></svg>
+                    </span>
+                    <div class="flex flex-col min-w-0 flex-1 text-right">
+                        <span id="agent-file-preview-name" class="text-[10px] font-black truncate" style="direction: ltr; text-align: right;"></span>
+                        <span id="agent-file-preview-status" class="text-[9px] font-bold text-amber-500"></span>
+                    </div>
+                </div>
+                <button onclick="Agent.clearFileAttachment(event)" class="w-8 h-8 rounded-xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all cursor-pointer" title="إلغاء الملف">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="morphicon"><path d="M18 6 6 18M6 6l12 12" data-morph-path="true"></path></svg>
+                </button>
+            </div>
+
+            <!-- Official React BorderBeam Container -->
+            <div id="react-capsule-root" class="w-full max-w-[600px] flex justify-center relative">
+                <!-- Static Fallback while React loads -->
+                <div class="assistant-capsule-wrapper">
+                    <div class="assistant-input-capsule">
+                        <!-- Left Unified Action Button -->
+                        <div class="assistant-capsule-left-actions">
+                            <button id="agent-action-btn" class="assistant-capsule-action-btn state-idle" onclick="window.handleUnifiedCapsuleAction()" title="تحدث بصوتك" data-action-state="mic">
+                                <svg id="capsule-dynamic-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="morphicon morphicon-mic" data-icon="Mic"><path d="M12 19C12 20 12 21 12 22M19 10C19 10.6667 19 11.3333 19 12C19 15.866 15.866 19 12 19C8.134 19 5 15.866 5 12C5 11.3333 5 10.6667 5 10M12 2C13.6569 2 15 3.3431 15 5C15 7.3333 15 9.6667 15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 9.6667 9 7.3333 9 5C9 3.3431 10.3431 2 12 2Z" data-morph-path="true"></path></svg>
+                            </button>
+                        </div>
+
+                        <!-- Textarea -->
+                        <textarea id="agent-input" class="assistant-capsule-textarea" placeholder="اسأل حضوري..." rows="1" autocomplete="off" oninput="window.handleInputTyping(this)"></textarea>
+
+                        <!-- Right Attachment Button -->
+                        <button id="agent-send-btn" onclick="document.getElementById('agent-file-input').click()" class="assistant-capsule-right-btn" title="إرفاق ملف أو صورة">
+                            <svg id="capsule-right-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="morphicon" data-icon="Plus"><path d="M5 12h14M12 5v14" data-morph-path="true"></path></svg>
+                        </button>
+                        <input type="file" id="agent-file-input" class="hidden" onchange="Agent.handleFileUpload(this)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══ PROMPT LIBRARY MODAL SHEET ═══ -->
+    <div id="agent-prompt-library-modal" class="agent-modal-backdrop" onclick="window.closePromptLibrary(event)">
+        <div class="agent-modal-content agent-prompt-sheet" onclick="event.stopPropagation()">
+            <div class="agent-modal-header">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    </span>
+                    <div>
+                        <span class="text-base font-extrabold text-stone-900 dark:text-white block">مكتبة الأوامر المقترحة</span>
+                        <span class="text-[11px] text-stone-400 font-medium">اختر أي أمر للبدء والتنفيذ الفوري</span>
+                    </div>
+                </div>
+                <button type="button" class="agent-modal-close-btn" onclick="window.closePromptLibrary()" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            
+            <div class="agent-prompt-library-list">
+                <!-- Group 1: الحضور والتقارير -->
+                <div class="prompt-group">
+                    <div class="prompt-group-header">
+                        <span>📊 سجلات وتقارير الحضور</span>
+                    </div>
+                    <div class="prompt-chips-grid">
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('ما هي نسبة حضور وغياب الطلاب اليوم بالمدرسة؟')">
+                            <span>ما هي نسبة حضور وغياب الطلاب اليوم بالمدرسة؟</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('أعطني قائمة بالطلاب الأكثر غياباً خلال هذا الأسبوع')">
+                            <span>أعطني قائمة بالطلاب الأكثر غياباً خلال هذا الأسبوع</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('ولد لي تقريراً تحليلياً مفصلاً عن حضور اليوم جاهز للمشاركة')">
+                            <span>ولد لي تقريراً تحليلياً مفصلاً عن حضور اليوم</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Group 2: الكادر والمعلمون -->
+                <div class="prompt-group">
+                    <div class="prompt-group-header">
+                        <span>👨‍🏫 الكادر التعليمي والمعلمون</span>
+                    </div>
+                    <div class="prompt-chips-grid">
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('أريد ملخصاً عن حضور المعلمين وجدول الحصص لليوم')">
+                            <span>أريد ملخصاً عن حضور المعلمين وحصص اليوم</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('من هم المعلمون المكلفون بحصص الاحتياط اليوم؟')">
+                            <span>من هم المعلمون المكلفون بحصص الاحتياط اليوم؟</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Group 3: الفصول والبيانات -->
+                <div class="prompt-group">
+                    <div class="prompt-group-header">
+                        <span>🏫 الفصول والطلاب</span>
+                    </div>
+                    <div class="prompt-chips-grid">
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('ما هي الفصول الأعلى في نسبة الانضباط والحضور؟')">
+                            <span>ما هي الفصول الأعلى في نسبة الانضباط والحضور؟</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                        <button type="button" class="prompt-chip" onclick="window.selectPrompt('أريد تحليلاً شاملاً لحالة الطلاب المسجلين بالمدرسة')">
+                            <span>أريد تحليلاً شاملاً لحالة الطلاب المسجلين</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ CORE SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js?v=2.9.3"></script>
+    <script src="scripts/core-db.js?v=2.9.3"></script>
+    <script src="scripts/core-auth.js?v=2.9.3"></script>
+    <script src="scripts/core-ui.js?v=2.9.3"></script>
+    <script src="scripts/utils-notifications.js?v=2.9.3"></script>
+    <script src="scripts/utils-files.js?v=2.9.3"></script>
+    <script src="scripts/utils-gemini.js?v=2.9.3"></script>
+    <script src="scripts/utils-thinking-orbs.js?v=2.9.3"></script>
+    <script src="scripts/utils-morphicons.js?v=2.9.3"></script>
+    <script src="scripts/module-face-api.js?v=2.9.3"></script>
+    <script src="scripts/module-ai-prompt.js?v=2.9.3"></script>
+    <script src="scripts/module-ai-agent.js?v=2.9.3"></script>
+    <script src="scripts/module-telemetry.js?v=2.9.3"></script>
+
+    <!-- ═══ MODULAR COMPONENT & PAGE SCRIPTS ═══ -->
+    <script src="scripts/component-sidebar.js"></script>
+    <script src="scripts/page-agent.js"></script>
+</body>
+
+</html>

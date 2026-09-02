@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>تطبيق الكاميرا والتحضير الذكي بالوجه - حضوري</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Face-API Library & Core Modules -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <script src="scripts/module-telemetry.js" onerror="this.onerror=null;this.src='../scripts/module-telemetry.js';"></script>
+    <script src="scripts/utils-morphicons.js" onerror="this.onerror=null;this.src='../scripts/utils-morphicons.js';"></script>
+    <script src="scripts/core-db.js" onerror="this.onerror=null;this.src='../scripts/core-db.js';"></script>
+    <script src="scripts/core-auth.js" onerror="this.onerror=null;this.src='../scripts/core-auth.js';"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        :root {
+            --accent-orange: #f38b1c;
+            --accent-orange-active: #e27d11;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #38bdf8;
+            --pill-bg: rgba(18, 18, 18, 0.85);
+            --ui-rotation: 0deg;
+
+            /* Transitions.dev — Banner / Toast Stacking (Sonner Style) Variables */
+            --stack-open: 350ms;
+            --stack-close: 250ms;
+            --stack-rise: -32px;
+            --stack-blur: 3px;
+            --stack-scale: 0.96;
+            --stack-peek: 11px;
+            --stack-spread-gap: 8px;
+            --stack-depth-scale: 0.055;
+            --stack-depth-fade: 0.38;
+            --stack-ease: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .rotate-with-device,
+        .circle-btn svg,
+        .circle-btn .morphicon,
+        .mode-btn svg,
+        .top-nav-btn svg,
+        #videoMorphContainer,
+        #flipIconSvg {
+            transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+            transform-origin: center center !important;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            position: fixed;
+            inset: 0;
+        }
+
+        /* Screen Container */
+        .camera-app-viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: #000000;
+        }
+
+        /* Viewfinder Layer */
+        .camera-feed-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+            perspective: 1000px;
+            transform-style: preserve-3d;
+            background-color: #000000;
+        }
+
+        .camera-feed-layer.flipping {
+            animation: camera-flip-3d 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes camera-flip-3d {
+            0% {
+                transform: scale(1) rotateY(0deg);
+                filter: brightness(1) blur(0px);
+            }
+            50% {
+                transform: scale(0.9) rotateY(90deg);
+                filter: brightness(0.65) blur(3px);
+            }
+            100% {
+                transform: scale(1) rotateY(0deg);
+                filter: brightness(1) blur(0px);
+            }
+        }
+
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .fallback-preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        #overlayCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            display: block;
+        }
+
+        /* Top Bar (Glass effect) */
+        .top-solid-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 30;
+            background-color: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding-top: max(18px, env(safe-area-inset-top));
+            padding-bottom: 18px;
+            min-height: 64px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .top-solid-bar::after {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            left: 0;
+            right: 0;
+            height: 16px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.25) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .attendance-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            line-height: 1;
+            margin: 0;
+            padding-top: 2px;
+            z-index: 31;
+        }
+
+        .attendance-number {
+            color: var(--accent-orange);
+            font-weight: 900;
+            font-size: 21px;
+            margin: 0 2px;
+            display: inline-block;
+            direction: ltr;
+        }
+
+        .top-nav-btn {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 35;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .top-nav-btn:active {
+            opacity: 0.7;
+            transform: translateY(-50%) scale(0.9);
+        }
+
+        .top-nav-btn.btn-right {
+            right: max(16px, env(safe-area-inset-right));
+        }
+
+        .top-nav-btn.btn-left {
+            left: max(16px, env(safe-area-inset-left));
+        }
+
+        .top-nav-btn svg {
+            width: 24px;
+            height: 24px;
+            stroke-width: 2.2;
+            transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: center center;
+        }
+
+        /* Transitions.dev — Sonner-Style Stacking Toast Container */
+        .t-stack {
+            position: absolute;
+            top: calc(max(64px, env(safe-area-inset-top) + 48px) + 14px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 360px;
+            height: 46px;
+            z-index: 45;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+        }
+
+        .t-stack-banner {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            margin: 0 auto;
+            width: 100%;
+            transform-origin: 50% 0%;
+            filter: blur(0);
+            will-change: transform, opacity, filter;
+            transition:
+                transform var(--stack-open) var(--stack-ease),
+                opacity var(--stack-open) var(--stack-ease),
+                filter var(--stack-open) var(--stack-ease);
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .t-stack-banner[data-depth="0"] {
+            z-index: 3;
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .t-stack-banner[data-depth="1"] {
+            z-index: 2;
+            transform-origin: 50% 0%;
+            transform: translateY(calc(var(--stack-peek) * 1))
+                       scale(calc(1 - var(--stack-depth-scale)));
+            opacity: calc(1 - var(--stack-depth-fade));
+        }
+
+        .t-stack-banner[data-depth="2"] {
+            z-index: 1;
+            transform-origin: 50% 0%;
+            transform: translateY(calc(var(--stack-peek) * 2))
+                       scale(calc(1 - var(--stack-depth-scale) * 2));
+            opacity: calc(1 - var(--stack-depth-fade) * 1.6);
+        }
+
+        /* Spread: on hover or touch hold */
+        .t-stack.is-spread .t-stack-banner[data-depth="1"],
+        .t-stack.is-spread .t-stack-banner[data-depth="2"] { 
+            opacity: 1; 
+            filter: blur(0);
+        }
+        .t-stack.is-spread .t-stack-banner[data-depth="1"] {
+            transform: translateY(calc((100% + var(--stack-spread-gap)) * 1)) scale(1);
+        }
+        .t-stack.is-spread .t-stack-banner[data-depth="2"] {
+            transform: translateY(calc((100% + var(--stack-spread-gap)) * 2)) scale(1);
+        }
+
+        .t-stack-banner.is-enter {
+            transition: none;
+            transform: translateY(var(--stack-rise)) scale(var(--stack-scale));
+            opacity: 0;
+            filter: blur(var(--stack-blur));
+        }
+
+        .t-stack-banner.is-leaving {
+            z-index: 0;
+            transform-origin: 50% 0%;
+            transform: translateY(calc(var(--stack-peek) * 3))
+                       scale(calc(1 - var(--stack-depth-scale) * 3));
+            opacity: 0;
+            filter: blur(var(--stack-blur));
+            transition:
+                transform var(--stack-close) var(--stack-ease),
+                opacity var(--stack-close) var(--stack-ease),
+                filter var(--stack-close) var(--stack-ease);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .t-stack-banner { transition: none !important; transform: none !important; filter: none !important; }
+        }
+
+        .camera-toast {
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: #ffffff;
+            font-size: 13.5px;
+            font-weight: 700;
+            padding: 9px 18px;
+            border-radius: 9999px;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        .camera-toast.toast-success {
+            border-color: rgba(34, 197, 94, 0.45);
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.25);
+        }
+
+        .camera-toast.toast-warning {
+            border-color: rgba(239, 68, 68, 0.45);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25);
+        }
+
+        .camera-toast.toast-info {
+            border-color: rgba(56, 189, 248, 0.45);
+            box-shadow: 0 4px 20px rgba(56, 189, 248, 0.25);
+        }
+
+        /* Elegant Minimalist AI Status Pill (Dynamic Island style) */
+        .ai-status-pill {
+            position: absolute;
+            top: calc(max(64px, env(safe-area-inset-top) + 48px) + 14px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px) scale(0.95);
+            background: rgba(18, 18, 18, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 7px 16px;
+            border-radius: 9999px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+        }
+
+        .ai-status-pill.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .ai-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-orange);
+            box-shadow: 0 0 10px var(--accent-orange);
+            animation: ai-pulse 1.2s infinite ease-in-out;
+        }
+
+        .ai-status-pill.live .ai-status-dot {
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        @keyframes ai-pulse {
+            0%, 100% { transform: scale(0.85); opacity: 0.6; }
+            50% { transform: scale(1.25); opacity: 1; }
+        }
+
+        /* Bottom Controls Container */
+        .bottom-section {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Mode Switch Pill */
+        .mode-toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            background: var(--pill-bg);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-radius: 9999px;
+            padding: 4px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 32;
+            direction: ltr;
+        }
+
+        .mode-pill-glider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: var(--accent-orange);
+            box-shadow: 0 2px 10px rgba(243, 139, 28, 0.55);
+            z-index: 1;
+            pointer-events: none;
+            transform-origin: center center;
+            transform: translateX(42px);
+        }
+
+        .mode-toggle-pill.to-single .mode-pill-glider {
+            animation: light-jelly-to-single 0.28s cubic-bezier(0.34, 1.45, 0.45, 1) forwards;
+        }
+
+        .mode-toggle-pill.to-group .mode-pill-glider {
+            animation: light-jelly-to-group 0.28s cubic-bezier(0.34, 1.45, 0.45, 1) forwards;
+        }
+
+        @keyframes light-jelly-to-single {
+            0% { transform: translateX(42px) scale(1, 1); }
+            40% { transform: translateX(18px) scale(1.18, 0.88); }
+            75% { transform: translateX(-3px) scale(0.94, 1.06); }
+            100% { transform: translateX(0px) scale(1, 1); }
+        }
+
+        @keyframes light-jelly-to-group {
+            0% { transform: translateX(0px) scale(1, 1); }
+            40% { transform: translateX(24px) scale(1.18, 0.88); }
+            75% { transform: translateX(45px) scale(0.94, 1.06); }
+            100% { transform: translateX(42px) scale(1, 1); }
+        }
+
+        .mode-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.2s ease, opacity 0.25s ease;
+        }
+
+        .mode-btn svg {
+            width: 23px;
+            height: 23px;
+            fill: currentColor;
+            transition: transform 0.35s cubic-bezier(0.34, 1.6, 0.45, 1);
+        }
+
+        .mode-btn:active svg {
+            transform: scale(0.85);
+        }
+
+        .mode-btn:not(.active) {
+            opacity: 0.85;
+        }
+
+        .mode-btn.active {
+            opacity: 1;
+        }
+
+        .mode-btn.active svg {
+            transform: scale(1.06);
+        }
+
+        /* Bottom Controls Box */
+        .bottom-controls-box {
+            width: 100%;
+            position: relative;
+            background-color: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding-top: 14px;
+            padding-bottom: max(26px, env(safe-area-inset-bottom) + 14px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bottom-controls-box::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .action-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 36px;
+            width: 100%;
+            max-width: 360px;
+        }
+
+        /* Side Circular Action Button */
+        .circle-btn {
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            border: none;
+            outline: none;
+            background-color: var(--accent-orange);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.28s ease, box-shadow 0.28s ease;
+            flex-shrink: 0;
+        }
+
+        .circle-btn:active {
+            transform: scale(0.92);
+            background-color: var(--accent-orange-active);
+        }
+
+        .circle-btn svg, .circle-btn .morphicon {
+            width: 30px;
+            height: 30px;
+            display: block;
+            color: #ffffff;
+        }
+
+        /* Red recording active state */
+        .circle-btn.recording-active {
+            background-color: #ef4444 !important;
+            animation: pulse-red-record 1.3s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+
+        @keyframes pulse-red-record {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 4px 18px rgba(0, 0, 0, 0.45);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 4px 22px rgba(239, 68, 68, 0.6);
+            }
+        }
+
+        /* Shutter Trigger Button */
+        .shutter-outer {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            border: 3.5px solid var(--accent-orange);
+            background: transparent;
+            outline: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
+        }
+
+        .shutter-core {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: var(--accent-orange);
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.25), 0 2px 10px rgba(0, 0, 0, 0.35);
+        }
+
+        .shutter-outer:active {
+            transform: scale(0.92);
+        }
+
+        .shutter-outer:active .shutter-core {
+            transform: scale(0.92);
+            background-color: var(--accent-orange-active);
+        }
+
+        /* Flash screen animation */
+        .screen-flash {
+            position: absolute;
+            inset: 0;
+            background: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+            transition: opacity 0.2s ease-out;
+        }
+
+        .screen-flash.visible {
+            opacity: 0.85;
+            transition: opacity 0.05s ease-in;
+        }
+
+        #flipIconSvg {
+            transition: transform 0.45s cubic-bezier(0.34, 1.5, 0.45, 1);
+            transform-origin: center center;
+        }
+
+        @media (max-width: 360px) {
+            .attendance-title { font-size: 18px; }
+            .attendance-number { font-size: 19px; }
+            .action-row { gap: 24px; }
+            .circle-btn { width: 58px; height: 58px; }
+            .shutter-outer { width: 78px; height: 78px; }
+            .shutter-core { width: 60px; height: 60px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="camera-app-viewport" id="appViewport">
+        <!-- Camera / Live Viewport Layer -->
+        <div class="camera-feed-layer">
+            <video id="cameraVideo" autoplay playsinline webkit-playsinline muted></video>
+            <img id="fallbackImg" src="assets/reference_preview.png" onerror="this.src='../assets/reference_preview.png'" class="fallback-preview-img" alt="معاينة الكاميرا" style="display: none;">
+            <canvas id="overlayCanvas"></canvas>
+        </div>
+
+        <!-- Shutter Flash Overlay -->
+        <div id="screenFlash" class="screen-flash"></div>
+
+        <!-- Sonner-Style Transitions.dev Stacking Toast Container -->
+        <div id="toastContainer" class="t-stack" aria-live="polite"></div>
+
+        <!-- Minimalist Glass AI Status Pill -->
+        <div id="aiStatusPill" class="ai-status-pill" aria-live="polite">
+            <div class="ai-status-dot"></div>
+            <span id="aiStatusText">جاري التحليل...</span>
+        </div>
+
+        <!-- Top Solid Bar (Glass effect) -->
+        <header class="top-solid-bar">
+            <!-- Right: Attach Image Button (زر الصورة) -->
+            <button id="attachImageBtn" class="top-nav-btn btn-right" onclick="handleAttachImage()" title="إرفاق صورة" aria-label="إرفاق صورة">
+                <svg class="rotate-with-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+            </button>
+            <input type="file" id="imageFileInput" accept="image/*" style="display: none;" onchange="handleImageFileSelected(event)">
+
+            <!-- Center: Attendance Title Counter -->
+            <h1 class="attendance-title">
+                <span>تم تسجيل حضور</span>
+                <span id="attendanceCount" class="attendance-number">0/0</span>
+                <span>طالب</span>
+            </h1>
+
+            <!-- Left: Close Button (زر الإغلاق) -->
+            <button id="closeCameraBtn" class="top-nav-btn btn-left" onclick="handleCloseCamera()" title="إغلاق" aria-label="إغلاق">
+                <svg class="rotate-with-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+            </button>
+        </header>
+
+        <!-- Bottom Section -->
+        <div class="bottom-section">
+            <!-- Mode Toggle Pill (زر التبديل شخص / أشخاص) -->
+            <div id="modePillContainer" class="mode-toggle-pill to-group" role="tablist">
+                <!-- Sliding Jelly Glider Indicator -->
+                <div id="modePillGlider" class="mode-pill-glider"></div>
+
+                <!-- Single Mode (شخص واحد - سريع بدون تقسيم) -->
+                <button id="singleModeBtn" class="mode-btn" onclick="setMode('single')" title="طالب واحد (فحص سريع)" aria-label="طالب واحد">
+                    <svg class="rotate-with-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                </button>
+
+                <!-- Group Mode (أشخاص - تقسيم هرمي 9 قطاعات) -->
+                <button id="groupModeBtn" class="mode-btn active" onclick="setMode('group')" title="مجموعة طلاب (التقسيم الهرمي)" aria-label="مجموعة طلاب">
+                    <svg class="rotate-with-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Bottom Controls Box -->
+            <div class="bottom-controls-box">
+                <div class="action-row">
+                    <!-- Right: Live Real-Time Record/Stream Button (زر التسجيل اللحظي) -->
+                    <button id="videoActionBtn" class="circle-btn" onclick="toggleVideoMode()" title="تسجيل وتحليل مباشر لحظي" aria-label="تسجيل مباشر">
+                        <div id="videoMorphContainer" class="flex items-center justify-center rotate-with-device"></div>
+                    </button>
+
+                    <!-- Center: Normal Capture Shutter Button (زر الالتقاط العادي) -->
+                    <button id="shutterTriggerBtn" class="shutter-outer" onclick="handleCapture()" title="التقاط" aria-label="التقاط">
+                        <div class="shutter-core"></div>
+                    </button>
+
+                    <!-- Left: Camera Flip Button (زر تبديل الكاميرا) -->
+                    <button id="flipActionBtn" class="circle-btn" onclick="handleFlipCamera()" title="تبديل الكاميرا" aria-label="تبديل الكاميرا">
+                        <svg id="flipIconSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m17 2 4 4-4 4" />
+                            <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                            <path d="m7 22-4-4 4-4" />
+                            <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+
+        // =========================================================================
+        // 1. Definition of 9 Hierarchical Slices (from دمج_المحرك_والتقسيم.html)
+        // =========================================================================
+        const SLICE_DEFINITIONS = [
+            { id: 1, name: "أعلى يسار", layer: 1, type: "2x2", xR: 0, yR: 0, wR: 0.5, hR: 0.5 },
+            { id: 2, name: "أعلى يمين", layer: 1, type: "2x2", xR: 0.5, yR: 0, wR: 0.5, hR: 0.5 },
+            { id: 3, name: "أسفل يسار", layer: 1, type: "2x2", xR: 0, yR: 0.5, wR: 0.5, hR: 0.5 },
+            { id: 4, name: "أسفل يمين", layer: 1, type: "2x2", xR: 0.5, yR: 0.5, wR: 0.5, hR: 0.5 },
+            { id: 5, name: "أعلى منتصف", layer: 2, type: "3x3", xR: 1/3, yR: 0, wR: 1/3, hR: 1/3 },
+            { id: 6, name: "يسار منتصف", layer: 2, type: "3x3", xR: 0, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 7, name: "المركز (الوسط)", layer: 2, type: "3x3", xR: 1/3, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 8, name: "يمين منتصف", layer: 2, type: "3x3", xR: 2/3, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 9, name: "أسفل منتصف", layer: 2, type: "3x3", xR: 1/3, yR: 2/3, wR: 1/3, hR: 1/3 }
+        ];
+
+        // =========================================================================
+        // 2. High-Performance Mobile-Optimized Face Recognition Engine
+        // =========================================================================
+        const Engine = {
+            isLoaded: false,
+            isLoading: false,
+            minConfidence: 0.30,
+            matchThreshold: 0.55,
+            staticInputSize: isMobileDevice ? 512 : 1024,
+            liveInputSize: isMobileDevice ? 224 : 320,
+            paddingRatio: 0.20,
+            iouThreshold: 0.38,
+            enableAlignment: true,
+            enableSlicing: true,
+
+            localModelsPaths: ['models', './models', '../models', '/models'],
+            cdnModelsUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+
+            async init() {
+                if (this.isLoaded) return true;
+                if (this.isLoading) return;
+                this.isLoading = true;
+
+                try {
+                    if (typeof faceapi !== 'undefined' && faceapi.tf) {
+                        try {
+                            await faceapi.tf.setBackend('webgl');
+                            await faceapi.tf.ready();
+                            if (!isMobileDevice) {
+                                try { faceapi.tf.env().set('WEBGL_PACK', true); } catch (_) {}
+                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true); } catch (_) {}
+                            } else {
+                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', false); } catch (_) {}
+                                try { faceapi.tf.env().set('WEBGL_PACK', false); } catch (_) {}
+                                try { faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0); } catch (_) {}
+                            }
+                        } catch (_) {
+                            try { await faceapi.tf.setBackend('cpu'); } catch (_) {}
+                        }
+                    }
+
+                    let loaded = false;
+                    for (const path of this.localModelsPaths) {
+                        try {
+                            await Promise.all([
+                                faceapi.nets.ssdMobilenetv1.loadFromUri(path),
+                                faceapi.nets.faceLandmark68Net.loadFromUri(path),
+                                faceapi.nets.faceRecognitionNet.loadFromUri(path)
+                            ]);
+                            loaded = true;
+                            console.log("Hodoori: Face models loaded locally from:", path);
+                            break;
+                        } catch (err) {}
+                    }
+
+                    if (!loaded) {
+                        console.log("Hodoori: Loading Face models from CDN fallback...");
+                        await Promise.all([
+                            faceapi.nets.ssdMobilenetv1.loadFromUri(this.cdnModelsUrl),
+                            faceapi.nets.faceLandmark68Net.loadFromUri(this.cdnModelsUrl),
+                            faceapi.nets.faceRecognitionNet.loadFromUri(this.cdnModelsUrl)
+                        ]);
+                    }
+
+                    this.isLoaded = true;
+                    this.isLoading = false;
+                    return true;
+                } catch (e) {
+                    console.error("Face AI Model Load Error:", e);
+                    this.isLoading = false;
+                    showToast('تنبيه: تعذر تحميل نماذج الذكاء الاصطناعي', 'warning');
+                    return false;
+                }
+            },
+
+            createSliceCanvas(sourceImg, sliceDef) {
+                const imgW = sourceImg.naturalWidth || sourceImg.videoWidth || sourceImg.width;
+                const imgH = sourceImg.naturalHeight || sourceImg.videoHeight || sourceImg.height;
+
+                const cropX = Math.round(sliceDef.xR * imgW);
+                const cropY = Math.round(sliceDef.yR * imgH);
+                const cropW = Math.round(sliceDef.wR * imgW);
+                const cropH = Math.round(sliceDef.hR * imgH);
+
+                const c = document.createElement('canvas');
+                c.width = cropW;
+                c.height = cropH;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(sourceImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+                return { canvas: c, cropX, cropY, cropW, cropH, sliceDef };
+            },
+
+            cropAndAlignFace(sourceImg, box, landmarks = null, padRatio = 0.20) {
+                const imgW = sourceImg.naturalWidth || sourceImg.videoWidth || sourceImg.width;
+                const imgH = sourceImg.naturalHeight || sourceImg.videoHeight || sourceImg.height;
+
+                const padX = box.width * padRatio;
+                const padY = box.height * padRatio;
+
+                const startX = Math.max(0, Math.round(box.x - padX));
+                const startY = Math.max(0, Math.round(box.y - padY));
+                const endX = Math.min(imgW, Math.round(box.x + box.width + padX));
+                const endY = Math.min(imgH, Math.round(box.y + box.height + padY));
+
+                const width = endX - startX;
+                const height = endY - startY;
+
+                if (width <= 0 || height <= 0) return null;
+
+                const c = document.createElement('canvas');
+                c.width = width;
+                c.height = height;
+                const ctx = c.getContext('2d');
+
+                let angle = 0;
+                if (this.enableAlignment && landmarks && landmarks.length >= 68) {
+                    const leftEye = {
+                        x: (landmarks[36].x + landmarks[39].x) / 2,
+                        y: (landmarks[36].y + landmarks[39].y) / 2
+                    };
+                    const rightEye = {
+                        x: (landmarks[42].x + landmarks[47].x) / 2,
+                        y: (landmarks[42].y + landmarks[47].y) / 2
+                    };
+
+                    const dy = rightEye.y - leftEye.y;
+                    const dx = rightEye.x - leftEye.x;
+                    const rawAngle = Math.atan2(dy, dx);
+                    if (Math.abs(rawAngle) < Math.PI / 4.5) {
+                        angle = rawAngle;
+                    }
+                }
+
+                if (angle !== 0) {
+                    const boxCenterX = box.x + box.width / 2;
+                    const boxCenterY = box.y + box.height / 2;
+
+                    ctx.save();
+                    ctx.translate(width / 2, height / 2);
+                    ctx.rotate(-angle);
+                    ctx.drawImage(sourceImg, -boxCenterX, -boxCenterY);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(sourceImg, startX, startY, width, height, 0, 0, width, height);
+                }
+
+                return {
+                    canvas: c,
+                    width,
+                    height,
+                    x: startX,
+                    y: startY
+                };
+            },
+
+            calculateIoU(boxA, boxB) {
+                const xA = Math.max(boxA.x, boxB.x);
+                const yA = Math.max(boxA.y, boxB.y);
+                const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
+                const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
+
+                const interW = Math.max(0, xB - xA);
+                const interH = Math.max(0, yB - yA);
+                const interArea = interW * interH;
+
+                const areaA = boxA.width * boxA.height;
+                const areaB = boxB.width * boxB.height;
+                const unionArea = areaA + areaB - interArea;
+
+                if (unionArea <= 0) return 0;
+                return interArea / unionArea;
+            },
+
+            applyNonMaximumSuppression(detections, iouThreshold = 0.38) {
+                if (!detections || detections.length === 0) return [];
+
+                const sorted = [...detections].sort((a, b) => b.score - a.score);
+                const selected = [];
+
+                for (let i = 0; i < sorted.length; i++) {
+                    const current = sorted[i];
+                    let isDuplicate = false;
+
+                    for (let existing of selected) {
+                        const iou = this.calculateIoU(current.box, existing.box);
+                        const currentCenterX = current.box.x + current.box.width / 2;
+                        const currentCenterY = current.box.y + current.box.height / 2;
+                        const isCenterInside = (
+                            currentCenterX >= existing.box.x &&
+                            currentCenterX <= existing.box.x + existing.box.width &&
+                            currentCenterY >= existing.box.y &&
+                            currentCenterY <= existing.box.y + existing.box.height
+                        );
+
+                        if (iou > iouThreshold || isCenterInside) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+
+                    if (!isDuplicate) selected.push(current);
+                }
+
+                return selected;
+            },
+
+            async processHierarchicalDetection(sourceImg, enableSlicing = true) {
+                if (!this.isLoaded) await this.init();
+
+                const rawW = sourceImg.naturalWidth || sourceImg.videoWidth || sourceImg.width;
+                const rawH = sourceImg.naturalHeight || sourceImg.videoHeight || sourceImg.height;
+                const MAX_DIM = isMobileDevice ? 1280 : 2048;
+
+                let workingSource = sourceImg;
+                let scaleRatio = 1.0;
+
+                if (rawW > MAX_DIM || rawH > MAX_DIM) {
+                    scaleRatio = MAX_DIM / Math.max(rawW, rawH);
+                    const scaledC = document.createElement('canvas');
+                    scaledC.width = Math.round(rawW * scaleRatio);
+                    scaledC.height = Math.round(rawH * scaleRatio);
+                    const sCtx = scaledC.getContext('2d');
+                    sCtx.drawImage(sourceImg, 0, 0, scaledC.width, scaledC.height);
+                    workingSource = scaledC;
+                }
+
+                const allRawDetections = [];
+                const detectOptions = new faceapi.SsdMobilenetv1Options({ 
+                    minConfidence: this.minConfidence, 
+                    inputSize: this.staticInputSize,
+                    maxResults: 100
+                });
+
+                // 1. Slicing pass (if enabled)
+                if (enableSlicing) {
+                    const slices = SLICE_DEFINITIONS.map(def => this.createSliceCanvas(workingSource, def));
+                    for (let s of slices) {
+                        try {
+                            const detections = await faceapi.detectAllFaces(s.canvas, detectOptions).withFaceLandmarks();
+                            if (detections && detections.length > 0) {
+                                for (let d of detections) {
+                                    allRawDetections.push({
+                                        score: d.detection.score,
+                                        box: {
+                                            x: (d.detection.box.x + s.cropX) / scaleRatio,
+                                            y: (d.detection.box.y + s.cropY) / scaleRatio,
+                                            width: d.detection.box.width / scaleRatio,
+                                            height: d.detection.box.height / scaleRatio
+                                        },
+                                        landmarks: d.landmarks.positions.map(pt => ({
+                                            x: (pt.x + s.cropX) / scaleRatio,
+                                            y: (pt.y + s.cropY) / scaleRatio
+                                        })),
+                                        sourceSlice: s.sliceDef.name
+                                    });
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                }
+
+                // 2. Full image pass
+                try {
+                    const fullDetections = await faceapi.detectAllFaces(workingSource, detectOptions).withFaceLandmarks();
+                    if (fullDetections && fullDetections.length > 0) {
+                        for (let d of fullDetections) {
+                            allRawDetections.push({
+                                score: d.detection.score,
+                                box: {
+                                    x: d.detection.box.x / scaleRatio,
+                                    y: d.detection.box.y / scaleRatio,
+                                    width: d.detection.box.width / scaleRatio,
+                                    height: d.detection.box.height / scaleRatio
+                                },
+                                landmarks: d.landmarks.positions.map(pt => ({
+                                    x: pt.x / scaleRatio,
+                                    y: pt.y / scaleRatio
+                                })),
+                                sourceSlice: "الصورة الكاملة"
+                            });
+                        }
+                    }
+                } catch (_) {}
+
+                // 3. Multi-Angle Fallback for phone vertical photos
+                if (allRawDetections.length === 0) {
+                    const angles = [90, 270, 180];
+                    for (const angle of angles) {
+                        try {
+                            const rotCanvas = document.createElement('canvas');
+                            const w = workingSource.width || workingSource.naturalWidth;
+                            const h = workingSource.height || workingSource.naturalHeight;
+                            if (angle === 90 || angle === 270) {
+                                rotCanvas.width = h;
+                                rotCanvas.height = w;
+                            } else {
+                                rotCanvas.width = w;
+                                rotCanvas.height = h;
+                            }
+                            const rCtx = rotCanvas.getContext('2d');
+                            rCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+                            rCtx.rotate((angle * Math.PI) / 180);
+                            rCtx.drawImage(workingSource, -w / 2, -h / 2);
+
+                            const rotDetections = await faceapi.detectAllFaces(rotCanvas, detectOptions).withFaceLandmarks();
+                            if (rotDetections && rotDetections.length > 0) {
+                                for (let d of rotDetections) {
+                                    allRawDetections.push({
+                                        score: d.detection.score,
+                                        box: {
+                                            x: d.detection.box.x / scaleRatio,
+                                            y: d.detection.box.y / scaleRatio,
+                                            width: d.detection.box.width / scaleRatio,
+                                            height: d.detection.box.height / scaleRatio
+                                        },
+                                        landmarks: d.landmarks.positions.map(pt => ({
+                                            x: pt.x / scaleRatio,
+                                            y: pt.y / scaleRatio
+                                        })),
+                                        sourceSlice: `rotated_${angle}`
+                                    });
+                                }
+                                break;
+                            }
+                        } catch (_) {}
+                    }
+                }
+
+                const finalBoxes = this.applyNonMaximumSuppression(allRawDetections, this.iouThreshold);
+                const croppedFaces = [];
+
+                for (let i = 0; i < finalBoxes.length; i++) {
+                    if (i > 0 && i % 3 === 0) await new Promise(r => setTimeout(r, 0));
+                    const faceItem = finalBoxes[i];
+                    const cropInfo = this.cropAndAlignFace(sourceImg, faceItem.box, faceItem.landmarks, this.paddingRatio);
+
+                    if (cropInfo) {
+                        let descriptor = null;
+                        try {
+                            const cropDetection = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15, inputSize: 224 }))
+                                .withFaceLandmarks()
+                                .withFaceDescriptor();
+
+                            if (cropDetection && cropDetection.descriptor) {
+                                descriptor = Array.from(cropDetection.descriptor);
+                            } else {
+                                const fallback = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                                if (fallback) descriptor = Array.from(fallback);
+                            }
+                        } catch (_) {}
+
+                        croppedFaces.push({
+                            id: i + 1,
+                            box: faceItem.box,
+                            landmarks: faceItem.landmarks,
+                            score: faceItem.score,
+                            descriptor,
+                            crop: cropInfo
+                        });
+                    }
+                }
+
+                return croppedFaces;
+            },
+
+            findBestStudentMatch(queryDescriptor, studentsList, maxThreshold = 0.55) {
+                if (!queryDescriptor || !studentsList || studentsList.length === 0) return null;
+
+                let bestMatch = null;
+                let minDistance = maxThreshold;
+
+                studentsList.forEach(student => {
+                    let descriptors = [];
+                    if (student.descriptors) {
+                        descriptors = typeof student.descriptors === 'string' ? JSON.parse(student.descriptors) : student.descriptors;
+                    } else if (student.descriptor) {
+                        descriptors = [typeof student.descriptor === 'string' ? JSON.parse(student.descriptor) : student.descriptor];
+                    }
+
+                    descriptors.forEach(savedDesc => {
+                        if (savedDesc && (savedDesc.length === 128 || (Array.isArray(savedDesc) && savedDesc.length > 0))) {
+                            const distance = faceapi.euclideanDistance(queryDescriptor, savedDesc);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (distance / 0.7)) * 100)));
+                                bestMatch = {
+                                    student,
+                                    distance,
+                                    confidencePercent
+                                };
+                            }
+                        }
+                    });
+                });
+
+                return bestMatch;
+            }
+        };
+
+        // =========================================================================
+        // 3. Application State & Variables
+        // =========================================================================
+        let currentFacingMode = 'environment';
+        let activeStream = null;
+        let isVideoModeActive = false;
+        let isProcessingCapture = false;
+        let currentMode = 'group';
+        let unfreezeTimeout = null;
+
+        // Class & Attendance state
+        let activeClassId = null;
+        let currentClass = null;
+        let students = [];
+        let attendance = {};
+        let lastNotifiedStudents = {};
+        let lastUnknownNotified = 0;
+
+        // DOM Elements
+        const videoElement = document.getElementById('cameraVideo');
+        const fallbackElement = document.getElementById('fallbackImg');
+        const canvasElement = document.getElementById('overlayCanvas');
+        const flashElement = document.getElementById('screenFlash');
+        const toastContainer = document.getElementById('toastContainer');
+        const pillContainer = document.getElementById('modePillContainer');
+        const singleBtn = document.getElementById('singleModeBtn');
+        const groupBtn = document.getElementById('groupModeBtn');
+        const flipIcon = document.getElementById('flipIconSvg');
+        const videoBtn = document.getElementById('videoActionBtn');
+        const attendanceCounter = document.getElementById('attendanceCount');
+
+        // =========================================================================
+        // 4. Data Loading & Session Initialization
+        // =========================================================================
+        async function initAppData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            activeClassId = urlParams.get('classId') || sessionStorage.getItem('hodoori_active_class_id');
+
+            try {
+                if (typeof DB !== 'undefined') {
+                    await DB.init();
+                    
+                    if (activeClassId) {
+                        const classes = await DB.getClasses();
+                        currentClass = classes.find(c => c.id === activeClassId);
+                        students = await DB.getStudents(activeClassId);
+                    } else {
+                        const classes = await DB.getClasses();
+                        if (classes && classes.length > 0) {
+                            currentClass = classes[0];
+                            activeClassId = currentClass.id;
+                            students = await DB.getStudents(activeClassId);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("Database initialization warning:", err);
+            }
+
+            if (!students || students.length === 0) {
+                students = [
+                    { id: 'std_1', name: 'أحمد محمد الغامدي', academicId: '44101' },
+                    { id: 'std_2', name: 'سارة خالد العتيبي', academicId: '44102' },
+                    { id: 'std_3', name: 'عمر ياسر الزهراني', academicId: '44103' },
+                    { id: 'std_4', name: 'فاطمة علي القحطاني', academicId: '44104' },
+                    { id: 'std_5', name: 'عبدالله فهد الدوسري', academicId: '44105' }
+                ];
+            }
+
+            attendance = {};
+            const savedAttendance = sessionStorage.getItem('hodoori_active_attendance');
+            if (savedAttendance) {
+                try {
+                    attendance = JSON.parse(savedAttendance);
+                } catch (_) {}
+            }
+
+            students.forEach(s => {
+                if (!attendance[s.id]) {
+                    attendance[s.id] = 'absent';
+                }
+            });
+
+            updateAttendanceCounterUI();
+        }
+
+        function updateAttendanceCounterUI() {
+            const total = students.length;
+            const present = Object.values(attendance).filter(v => v === 'present').length;
+            attendanceCounter.textContent = `${present}/${total}`;
+        }
+
+        function saveAttendanceState() {
+            if (activeClassId) {
+                sessionStorage.setItem('hodoori_active_class_id', activeClassId);
+            }
+            sessionStorage.setItem('hodoori_active_attendance', JSON.stringify(attendance));
+
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage({
+                        type: 'HODOORI_ATTENDANCE_UPDATE',
+                        classId: activeClassId,
+                        attendance: attendance
+                    }, '*');
+                } catch (_) {}
+            }
+        }
+
+        // =========================================================================
+        // 5. Transitions.dev Sonner-Style Toast Stacking System
+        // =========================================================================
+        if (toastContainer) {
+            let spreadTimeout = null;
+            const enableSpread = () => {
+                if (spreadTimeout) clearTimeout(spreadTimeout);
+                toastContainer.classList.add('is-spread');
+            };
+            const disableSpread = () => {
+                spreadTimeout = setTimeout(() => {
+                    toastContainer.classList.remove('is-spread');
+                }, 200);
+            };
+
+            toastContainer.addEventListener('mouseenter', enableSpread);
+            toastContainer.addEventListener('mouseleave', disableSpread);
+            toastContainer.addEventListener('touchstart', enableSpread, { passive: true });
+            document.addEventListener('touchstart', (e) => {
+                if (!toastContainer.contains(e.target)) {
+                    toastContainer.classList.remove('is-spread');
+                }
+            }, { passive: true });
+        }
+
+        function showToast(message, type = 'info', duration = 3500) {
+            if (!toastContainer) return;
+
+            // Step every older banner's data-depth one back
+            const existingBanners = Array.from(toastContainer.querySelectorAll('.t-stack-banner:not(.is-leaving)'));
+            
+            existingBanners.forEach(banner => {
+                const depth = parseInt(banner.getAttribute('data-depth') || '0', 10);
+                const newDepth = depth + 1;
+                if (newDepth > 2) {
+                    banner.classList.add('is-leaving');
+                    banner.removeAttribute('data-depth');
+                    setTimeout(() => banner.remove(), 260);
+                } else {
+                    banner.setAttribute('data-depth', newDepth.toString());
+                }
+            });
+
+            // Create new incoming banner with .is-enter + data-depth="0"
+            const banner = document.createElement('div');
+            banner.className = `t-stack-banner camera-toast toast-${type} is-enter`;
+            banner.setAttribute('data-depth', '0');
+
+            let iconSvg = '';
+            if (type === 'success') {
+                iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            } else if (type === 'warning') {
+                iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+            } else {
+                iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+            }
+
+            banner.innerHTML = `${iconSvg}<span>${message}</span>`;
+
+            // Click to dismiss
+            banner.addEventListener('click', () => {
+                dismissToastBanner(banner);
+            });
+
+            toastContainer.appendChild(banner);
+
+            // Force reflow
+            void banner.offsetHeight;
+
+            // Remove .is-enter in the same task
+            banner.classList.remove('is-enter');
+
+            // Set dismissal timer
+            banner._dismissTimer = setTimeout(() => {
+                dismissToastBanner(banner);
+            }, duration);
+        }
+
+        function dismissToastBanner(banner) {
+            if (!banner || banner.classList.contains('is-leaving')) return;
+            if (banner._dismissTimer) clearTimeout(banner._dismissTimer);
+
+            banner.classList.add('is-leaving');
+            banner.removeAttribute('data-depth');
+
+            setTimeout(() => {
+                banner.remove();
+                const remaining = Array.from(toastContainer.querySelectorAll('.t-stack-banner:not(.is-leaving)'));
+                remaining.forEach((b, idx) => {
+                    if (idx <= 2) {
+                        b.setAttribute('data-depth', idx.toString());
+                    } else {
+                        b.classList.add('is-leaving');
+                        b.removeAttribute('data-depth');
+                        setTimeout(() => b.remove(), 260);
+                    }
+                });
+            }, 260);
+        }
+
+        function showAiStatus(text, isLive = false) {
+            const pill = document.getElementById('aiStatusPill');
+            const label = document.getElementById('aiStatusText');
+            if (label) label.textContent = text;
+            if (pill) {
+                if (isLive) pill.classList.add('live');
+                else pill.classList.remove('live');
+                pill.classList.add('active');
+            }
+        }
+
+        function hideAiStatus() {
+            const pill = document.getElementById('aiStatusPill');
+            if (pill) pill.classList.remove('active', 'live');
+        }
+
+        // =========================================================================
+        // 6. Camera MediaStream Control (Mobile Adaptive Constraints)
+        // =========================================================================
+        async function initCameraStream() {
+            if (activeStream) {
+                try {
+                    activeStream.getTracks().forEach(track => track.stop());
+                } catch (e) {}
+            }
+
+            let stream = null;
+            if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                const constraintsList = [
+                    {
+                        video: {
+                            facingMode: { ideal: currentFacingMode },
+                            width: { ideal: isMobileDevice ? 1280 : 1920 },
+                            height: { ideal: isMobileDevice ? 720 : 1080 }
+                        },
+                        audio: false
+                    },
+                    {
+                        video: {
+                            facingMode: currentFacingMode,
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        },
+                        audio: false
+                    },
+                    {
+                        video: { facingMode: { ideal: currentFacingMode } },
+                        audio: false
+                    },
+                    {
+                        video: true,
+                        audio: false
+                    }
+                ];
+
+                for (const constraints of constraintsList) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        if (stream) break;
+                    } catch (err) {
+                        console.info("Camera fallback attempt...", constraints, err);
+                    }
+                }
+            }
+
+            if (stream) {
+                activeStream = stream;
+                videoElement.muted = true;
+                videoElement.defaultMuted = true;
+                videoElement.setAttribute('playsinline', 'true');
+                videoElement.setAttribute('webkit-playsinline', 'true');
+                videoElement.setAttribute('autoplay', 'true');
+                videoElement.srcObject = stream;
+                videoElement.style.display = 'block';
+                fallbackElement.style.display = 'none';
+
+                await new Promise((resolve) => {
+                    if (videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
+                        resolve();
+                    } else {
+                        const onReady = () => {
+                            videoElement.removeEventListener('loadedmetadata', onReady);
+                            videoElement.removeEventListener('playing', onReady);
+                            resolve();
+                        };
+                        videoElement.addEventListener('loadedmetadata', onReady);
+                        videoElement.addEventListener('playing', onReady);
+                        setTimeout(resolve, 1200);
+                    }
+                });
+
+                try {
+                    await videoElement.play();
+                } catch (playErr) {
+                    console.warn('Video play error:', playErr);
+                }
+
+                if (currentFacingMode === 'user') {
+                    videoElement.style.transform = 'scaleX(-1)';
+                } else {
+                    videoElement.style.transform = 'scaleX(1)';
+                }
+
+                adjustCanvasDimensions();
+            } else {
+                fallbackElement.style.display = 'block';
+                videoElement.style.display = 'none';
+                showToast('تعذر فتح الكاميرا المباشرة، تم تفعيل وضع المعاينة', 'warning');
+            }
+        }
+
+        function adjustCanvasDimensions() {
+            const w = videoElement.videoWidth || window.innerWidth;
+            const h = videoElement.videoHeight || window.innerHeight;
+            canvasElement.width = w;
+            canvasElement.height = h;
+        }
+
+        // =========================================================================
+        // 7. Button 1: Mode Switch (Single vs Group - 9 Slices)
+        // =========================================================================
+        function setMode(selectedMode) {
+            if (selectedMode === currentMode) return;
+            currentMode = selectedMode;
+
+            if (selectedMode === 'single') {
+                pillContainer.classList.remove('to-group');
+                pillContainer.classList.add('to-single');
+                singleBtn.classList.add('active');
+                groupBtn.classList.remove('active');
+                Engine.enableSlicing = false;
+                showToast('نمط طالب واحد: فحص سريع على كامل الصورة', 'info', 2200);
+            } else {
+                pillContainer.classList.remove('to-single');
+                pillContainer.classList.add('to-group');
+                groupBtn.classList.add('active');
+                singleBtn.classList.remove('active');
+                Engine.enableSlicing = true;
+                showToast('نمط مجموعة طلاب: تفعيل التقسيم الهرمي (9 قطاعات)', 'info', 2200);
+            }
+        }
+
+        // =========================================================================
+        // 8. Button 2: Center Normal Shutter Capture (تجميد + علامات خضراء/حمراء)
+        // =========================================================================
+        async function handleCapture() {
+            if (isProcessingCapture) return;
+            isProcessingCapture = true;
+
+            if (unfreezeTimeout) {
+                clearTimeout(unfreezeTimeout);
+                unfreezeTimeout = null;
+            }
+
+            flashElement.classList.add('visible');
+            setTimeout(() => flashElement.classList.remove('visible'), 120);
+            if (navigator.vibrate) navigator.vibrate(45);
+
+            showAiStatus(currentMode === 'group' ? 'جاري فحص قطاعات الصورة ومطابقة الوجوه...' : 'جاري التحقق من هوية الطالب...');
+
+            try {
+                if (!Engine.isLoaded) await Engine.init();
+
+                const snapCanvas = document.createElement('canvas');
+                let srcW = videoElement.videoWidth || 1280;
+                let srcH = videoElement.videoHeight || 720;
+                
+                const isImageMode = fallbackElement.style.display !== 'none';
+                const sourceMedia = isImageMode ? fallbackElement : videoElement;
+
+                if (isImageMode) {
+                    srcW = fallbackElement.naturalWidth || 1280;
+                    srcH = fallbackElement.naturalHeight || 720;
+                }
+
+                snapCanvas.width = srcW;
+                snapCanvas.height = srcH;
+                const snapCtx = snapCanvas.getContext('2d');
+
+                if (!isImageMode && currentFacingMode === 'user') {
+                    snapCtx.translate(srcW, 0);
+                    snapCtx.scale(-1, 1);
+                }
+                snapCtx.drawImage(sourceMedia, 0, 0, srcW, srcH);
+
+                if (!isImageMode) {
+                    videoElement.pause();
+                }
+
+                canvasElement.width = srcW;
+                canvasElement.height = srcH;
+                const ctx = canvasElement.getContext('2d');
+                ctx.clearRect(0, 0, srcW, srcH);
+
+                const detectedFaces = await Engine.processHierarchicalDetection(snapCanvas, currentMode === 'group');
+
+                let newlyRecordedCount = 0;
+                let alreadyRecordedCount = 0;
+                let unknownCount = 0;
+
+                detectedFaces.forEach(face => {
+                    let matchResult = null;
+                    if (face.descriptor) {
+                        matchResult = Engine.findBestStudentMatch(face.descriptor, students, 0.55);
+                    }
+
+                    if (matchResult && matchResult.student) {
+                        const student = matchResult.student;
+                        const isAlreadyPresent = (attendance[student.id] === 'present');
+                        
+                        if (!isAlreadyPresent) {
+                            attendance[student.id] = 'present';
+                            newlyRecordedCount++;
+                        } else {
+                            alreadyRecordedCount++;
+                        }
+
+                        drawFaceHud(ctx, face.box, '#22c55e', `✓ ${student.name}`, matchResult.confidencePercent);
+                    } else {
+                        unknownCount++;
+                        drawFaceHud(ctx, face.box, '#ef4444', 'غير معروف', Math.round(face.score * 100));
+                    }
+                });
+
+                updateAttendanceCounterUI();
+                saveAttendanceState();
+
+                if (detectedFaces.length === 0) {
+                    showToast('لم يتم كشف أي وجوه في الصورة الملتقطة', 'warning');
+                } else if (newlyRecordedCount > 0) {
+                    showToast(`تم تسجيل حضور ${newlyRecordedCount} طالب بنجاح!`, 'success');
+                } else if (alreadyRecordedCount > 0) {
+                    showToast(`تم التعرف على ${alreadyRecordedCount} طالب (مسجلين مسبقاً)`, 'info');
+                } else {
+                    showToast(`تم كشف ${unknownCount} وجه (لم تطابق طلاب الصف)`, 'warning');
+                }
+
+            } catch (err) {
+                console.error("Capture Analysis Error:", err);
+                showToast('حدث خطأ أثناء تحليل الصورة', 'warning');
+            } finally {
+                hideAiStatus();
+                isProcessingCapture = false;
+
+                unfreezeTimeout = setTimeout(() => {
+                    resumeLiveCamera();
+                }, 3500);
+            }
+        }
+
+        function resumeLiveCamera() {
+            const ctx = canvasElement.getContext('2d');
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            if (fallbackElement.style.display === 'none' && videoElement.srcObject) {
+                videoElement.play().catch(() => {});
+            }
+        }
+
+        document.getElementById('appViewport').addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            if (unfreezeTimeout) {
+                clearTimeout(unfreezeTimeout);
+                unfreezeTimeout = null;
+                resumeLiveCamera();
+            }
+        });
+
+        // Draw Perfectly Centered HUD Corner Brackets & Badge
+        function drawFaceHud(ctx, box, color, label, percent = null) {
+            const { x, y, width, height } = box;
+            const cornerLen = Math.min(width, height) * 0.22;
+            const lineWidth = Math.max(2.5, Math.min(4.5, ctx.canvas.width / 500));
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Top-Left Corner
+            ctx.beginPath();
+            ctx.moveTo(x, y + cornerLen);
+            ctx.lineTo(x, y);
+            ctx.lineTo(x + cornerLen, y);
+            ctx.stroke();
+
+            // Top-Right Corner
+            ctx.beginPath();
+            ctx.moveTo(x + width - cornerLen, y);
+            ctx.lineTo(x + width, y);
+            ctx.lineTo(x + width, y + cornerLen);
+            ctx.stroke();
+
+            // Bottom-Right Corner
+            ctx.beginPath();
+            ctx.moveTo(x + width, y + height - cornerLen);
+            ctx.lineTo(x + width, y + height);
+            ctx.lineTo(x + width - cornerLen, y + height);
+            ctx.stroke();
+
+            // Bottom-Left Corner
+            ctx.beginPath();
+            ctx.moveTo(x + cornerLen, y + height);
+            ctx.lineTo(x, y + height);
+            ctx.lineTo(x, y + height - cornerLen);
+            ctx.stroke();
+
+            // Centered Student Name Badge Pill
+            if (label) {
+                const fullText = percent ? `${label} (${percent}%)` : label;
+                const fontSize = Math.max(13, Math.min(19, Math.round(width * 0.14)));
+                ctx.font = `bold ${fontSize}px 'Tajawal', sans-serif`;
+                
+                const textMetrics = ctx.measureText(fullText);
+                const padX = 12;
+                const padY = 5;
+                const badgeH = fontSize + padY * 2;
+                const badgeW = textMetrics.width + padX * 2;
+
+                // Position centered horizontally right above the face bounding box
+                const badgeX = Math.max(8, Math.min(ctx.canvas.width - badgeW - 8, x + (width - badgeW) / 2));
+                const badgeY = (y - badgeH - 8 < 8) ? y + 8 : y - badgeH - 8;
+
+                // Subtle shadow & pill fill
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = color === '#22c55e' ? 'rgba(34, 197, 94, 0.96)' : 'rgba(239, 68, 68, 0.96)';
+                
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+                }
+                ctx.shadowBlur = 0;
+
+                // Perfectly centered text
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(fullText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1);
+            }
+
+            ctx.restore();
+        }
+
+        // =========================================================================
+        // 9. Button 3: Ultra-Smooth Real-Time Live Streaming Loop (No Freezing, No Leaks)
+        // =========================================================================
+        let liveLoopRunning = false;
+        let isLiveFrameBusy = false;
+        let liveCanvas = null;
+
+        async function toggleVideoMode() {
+            isVideoModeActive = !isVideoModeActive;
+
+            if (isVideoModeActive) {
+                videoBtn.classList.add('recording-active');
+                if (window.Morphicons) {
+                    Morphicons.morph('#videoMorphContainer svg', 'Circle', 'bouncy');
+                }
+                showAiStatus('التحليل اللحظي المباشر قيد التشغيل', true);
+                showToast('تم تفعيل التحليل اللحظي المباشر عبر الكاميرا', 'success');
+
+                if (!activeStream) {
+                    await initCameraStream();
+                }
+                
+                if (!Engine.isLoaded) {
+                    await Engine.init();
+                }
+
+                liveLoopRunning = true;
+                runLiveStreamRecognitionLoop();
+            } else {
+                liveLoopRunning = false;
+                hideAiStatus();
+                videoBtn.classList.remove('recording-active');
+                if (window.Morphicons) {
+                    Morphicons.morph('#videoMorphContainer svg', 'Aperture', 'bouncy');
+                }
+                showToast('تم إيقاف التحليل اللحظي', 'info');
+            }
+        }
+
+        async function runLiveStreamRecognitionLoop() {
+            if (!liveLoopRunning || !isVideoModeActive) return;
+
+            if (!isLiveFrameBusy && videoElement.readyState >= 2 && !videoElement.paused && videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+                isLiveFrameBusy = true;
+                try {
+                    // Create/reuse small offscreen canvas (288px-352px) to make extraction ultra-fast and prevent memory bloat
+                    if (!liveCanvas) {
+                        liveCanvas = document.createElement('canvas');
+                        liveCanvas.width = isMobileDevice ? 288 : 352;
+                        liveCanvas.height = Math.round(liveCanvas.width * (videoElement.videoHeight / videoElement.videoWidth));
+                    }
+                    const lCtx = liveCanvas.getContext('2d', { willReadFrequently: true });
+                    lCtx.drawImage(videoElement, 0, 0, liveCanvas.width, liveCanvas.height);
+
+                    const options = new faceapi.SsdMobilenetv1Options({
+                        minConfidence: 0.40,
+                        inputSize: isMobileDevice ? 224 : 320,
+                        maxResults: 4
+                    });
+
+                    // Fast detection pass
+                    const detections = await faceapi.detectAllFaces(liveCanvas, options)
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+
+                    const now = Date.now();
+
+                    if (detections && detections.length > 0) {
+                        for (const d of detections) {
+                            if (!d.descriptor) continue;
+                            const descriptor = Array.from(d.descriptor);
+                            const match = Engine.findBestStudentMatch(descriptor, students, 0.55);
+
+                            if (match && match.student) {
+                                const student = match.student;
+                                const lastNotified = lastNotifiedStudents[student.id] || 0;
+
+                                if (attendance[student.id] !== 'present') {
+                                    attendance[student.id] = 'present';
+                                    lastNotifiedStudents[student.id] = now;
+                                    updateAttendanceCounterUI();
+                                    saveAttendanceState();
+                                    showToast(`تم تسجيل حضور: ${student.name}`, 'success', 2800);
+                                } else if (now - lastNotified > 4000) {
+                                    lastNotifiedStudents[student.id] = now;
+                                    showToast(`الطالب ${student.name} مسجل بالفعل`, 'info', 2400);
+                                }
+                            } else if (d.detection.score >= 0.50 && (now - lastUnknownNotified > 4000)) {
+                                lastUnknownNotified = now;
+                                showToast('لم يتم التعرف على الطالب', 'warning', 2400);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Live stream frame notice:", err);
+                } finally {
+                    isLiveFrameBusy = false;
+                }
+            }
+
+            if (liveLoopRunning && isVideoModeActive) {
+                const nextDelay = isMobileDevice ? 85 : 45;
+                setTimeout(() => {
+                    requestAnimationFrame(runLiveStreamRecognitionLoop);
+                }, nextDelay);
+            }
+        }
+
+        // =========================================================================
+        // 10. Button 4: Left Flip Camera Button (تبديل الكاميرا الأمامية/الخلفية)
+        // =========================================================================
+        let flipRotation = 0;
+
+        async function handleFlipCamera() {
+            flipRotation += 180;
+            if (flipIcon) {
+                flipIcon.style.transform = `rotate(${flipRotation + currentUiAngle}deg)`;
+            }
+
+            const feedLayer = document.querySelector('.camera-feed-layer');
+            if (feedLayer) {
+                feedLayer.classList.remove('flipping');
+                void feedLayer.offsetWidth;
+                feedLayer.classList.add('flipping');
+            }
+
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            await initCameraStream();
+            showToast(currentFacingMode === 'user' ? 'الكاميرا الأمامية' : 'الكاميرا الخلفية', 'info', 1500);
+        }
+
+        // =========================================================================
+        // 11. Button 5: Top Right Attach Custom Image (رفع صورة مخصصة وتحليلها)
+        // =========================================================================
+        function handleAttachImage() {
+            const input = document.getElementById('imageFileInput');
+            if (input) input.click();
+        }
+
+        function handleImageFileSelected(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                if (activeStream) {
+                    try { activeStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+                }
+                videoElement.style.display = 'none';
+                fallbackElement.src = e.target.result;
+                fallbackElement.style.display = 'block';
+
+                fallbackElement.onload = () => {
+                    handleCapture();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // =========================================================================
+        // 12. Button 6: Top Left Close Camera Button (العودة لصفحة المعلم)
+        // =========================================================================
+        function handleCloseCamera() {
+            if (activeStream) {
+                try { activeStream.getTracks().forEach(track => track.stop()); } catch (e) {}
+            }
+            liveLoopRunning = false;
+            saveAttendanceState();
+
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage({
+                        type: 'HODOORI_CAMERA_CLOSE',
+                        classId: activeClassId,
+                        attendance: attendance
+                    }, '*');
+                    return;
+                } catch (_) {}
+            }
+
+            if (window.history.length > 1) {
+                window.location.href = 'dashboard-teacher.html';
+            } else {
+                window.location.href = 'dashboard-teacher.html';
+            }
+        }
+
+        // Handle messages from parent frame
+        window.addEventListener('message', (e) => {
+            if (!e.data) return;
+            if (e.data.type === 'STOP_CAMERA') {
+                if (activeStream) {
+                    try { activeStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+                    activeStream = null;
+                }
+                liveLoopRunning = false;
+                hideAiStatus();
+            } else if (e.data.type === 'START_CAMERA') {
+                if (!activeStream) {
+                    initCameraStream();
+                }
+            }
+        });
+
+        // =========================================================================
+        // 13. UI Rotation with Gyroscope & Accelerometer
+        // =========================================================================
+        let currentUiAngle = 0;
+
+        function setUiRotation(targetRot) {
+            if (currentUiAngle === targetRot) return;
+            currentUiAngle = targetRot;
+            document.documentElement.style.setProperty('--ui-rotation', `${targetRot}deg`);
+
+            const rotatableIcons = document.querySelectorAll('#singleModeBtn svg, #groupModeBtn svg, #videoMorphContainer, #videoMorphContainer svg, .top-nav-btn svg');
+            rotatableIcons.forEach(el => {
+                if (el) el.style.transform = `rotate(${targetRot}deg)`;
+            });
+
+            if (flipIcon) {
+                flipIcon.style.transform = `rotate(${flipRotation + targetRot}deg)`;
+            }
+        }
+
+        function updateScreenOrientation(forcedAngle) {
+            if (typeof forcedAngle === 'number') {
+                setUiRotation(forcedAngle);
+                return;
+            }
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const screenAngle = (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number')
+                ? window.screen.orientation.angle
+                : (typeof window.orientation === 'number' ? window.orientation : null);
+
+            if (screenAngle === 90 || screenAngle === -270) {
+                setUiRotation(90);
+            } else if (screenAngle === 270 || screenAngle === -90) {
+                setUiRotation(-90);
+            } else if (screenAngle === 180) {
+                setUiRotation(180);
+            } else if (isLandscape) {
+                setUiRotation(90);
+            } else {
+                setUiRotation(0);
+            }
+        }
+
+        if (window.screen && window.screen.orientation) {
+            window.screen.orientation.addEventListener('change', () => updateScreenOrientation());
+        }
+        window.addEventListener('orientationchange', () => updateScreenOrientation());
+        window.addEventListener('resize', () => {
+            updateScreenOrientation();
+            adjustCanvasDimensions();
+        });
+
+        // =========================================================================
+        // 14. Initialization on DOM Load
+        // =========================================================================
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initAppData();
+            await initCameraStream();
+            updateScreenOrientation();
+
+            if (window.Morphicons) {
+                Morphicons.render('#videoMorphContainer', 'Aperture', 30, 'text-white', 2.3);
+            }
+
+            Engine.init().catch(() => {});
+        });
+    </script>
+</body>
+</html>

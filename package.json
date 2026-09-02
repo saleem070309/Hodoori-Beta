@@ -1,0 +1,38 @@
+{
+  "name": "hodoori-beta",
+  "version": "1.0.0",
+  "description": "نظام حضوري الذكي لإدارة الحضور والغياب والذكاء الاصطناعي للمؤسسات التعليمية",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "node tests/test_core_db.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saleem070309/Hodoori-Beta.git"
+  },
+  "keywords": [
+    "hodoori",
+    "attendance",
+    "education",
+    "ai-agent",
+    "face-api"
+  ],
+  "author": "Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)",
+  "license": "Proprietary",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/saleem070309/Hodoori-Beta/issues"
+  },
+  "homepage": "https://github.com/saleem070309/Hodoori-Beta#readme",
+  "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
+    "border-beam": "^1.3.0",
+    "lucide": "^1.33.0",
+    "morphicons": "^1.7.0",
+    "thinking-orbs": "^0.3.1",
+    "torph": "^0.1.0"
+  }
+}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>لوحة المتابعة والتحليلات | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- Chart.js & XLSX -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/component-sidebar.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-analytics.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN DASHBOARD CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Minimal Header ─── -->
+        <header class="flex items-center justify-between mb-5 pr-11 -mt-1">
+            <div class="flex flex-col justify-center">
+                <h1 class="text-[19px] font-black text-stone-900 dark:text-white leading-tight">لوحة المتابعة اليومية</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block -mt-0.5" id="analytics-school-name">مدرسة حضوري</span>
+            </div>
+        </header>
+
+        <!-- ─── 1. TOP KPI ROW (4 INTEGRATED SEGMENTS) ─── -->
+        <section class="kpi-segmented-card mb-4">
+            <!-- 1. إجمالي طلاب المدرسة -->
+            <div class="kpi-segment">
+                <span class="kpi-title">اجمالي طلاب المدرسة</span>
+                <span class="kpi-val" id="kpi-total-students">--</span>
+                <span class="kpi-sub">طالب مسجل</span>
+            </div>
+
+            <!-- 2. إجمالي حضوري -->
+            <div class="kpi-segment">
+                <span class="kpi-title">اجمالي حضوري</span>
+                <span class="kpi-val text-emerald-600 dark:text-emerald-400" id="kpi-present-count">--</span>
+                <span class="kpi-sub">حاضر اليوم</span>
+            </div>
+
+            <!-- 3. إجمالي غياب -->
+            <div class="kpi-segment">
+                <span class="kpi-title">اجمالي غياب</span>
+                <span class="kpi-val text-rose-600 dark:text-rose-400" id="kpi-absent-count">--</span>
+                <span class="kpi-sub">غائب اليوم</span>
+            </div>
+
+            <!-- 4. نسبة الحضور -->
+            <div class="kpi-segment">
+                <span class="kpi-title">نسبة الحضور</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-attendance-rate">--%</span>
+                <span class="kpi-sub">النسبة الإجمالية</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. MIDDLE ROW (2 WIDE CARDS) ─── -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <!-- Right Card: نسبة حضور طلاب الشعب الدراسية -->
+            <div class="hodoori-card flex flex-col">
+                <h2 class="card-main-title">نسبة حضور طلاب الشعب الدراسية</h2>
+                <div class="relative h-[250px] w-full flex-1">
+                    <canvas id="chart-classes-breakdown"></canvas>
+                </div>
+            </div>
+
+            <!-- Left Card: نسبة حضور آخر 7 أيام دوام -->
+            <div class="hodoori-card flex flex-col">
+                <h2 class="card-main-title">نسبة حضور آخر 7 أيام دوام (مستثنى منها العطل)</h2>
+                <div class="relative h-[250px] w-full flex-1">
+                    <canvas id="chart-attendance-trend"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── 3. BOTTOM ROW (2 WIDE CARDS) ─── -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Right Card: الصفوف التي لم تسلم التقارير -->
+            <div class="hodoori-card flex flex-col min-h-[220px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="card-main-title mb-0">الصفوف التي لم تسلم التقارير</h2>
+                    <span class="text-xs font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md" id="pending-classes-badge">0 شعب</span>
+                </div>
+                <div id="pending-classes-list" class="flex-1 overflow-y-auto max-h-[220px] pr-1">
+                    <div class="text-center py-8 text-xs font-bold text-stone-500">جاري التحميل...</div>
+                </div>
+            </div>
+
+            <!-- Left Card: الصفوف التي سلمت -->
+            <div class="hodoori-card flex flex-col min-h-[220px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="card-main-title mb-0">الصفوف التي سلمت</h2>
+                    <span class="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md" id="submitted-classes-badge">0 شعب</span>
+                </div>
+                <div id="submitted-classes-list" class="flex-1 overflow-y-auto max-h-[220px] pr-1">
+                    <div class="text-center py-8 text-xs font-bold text-stone-500">جاري التحميل...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ CORE SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+
+    <!-- ═══ MODULAR COMPONENT & CONTROLLER ═══ -->
+    <script src="scripts/component-sidebar.js"></script>
+    <script src="scripts/dashboard-analytics.js"></script>
+</body>
+
+</html>
