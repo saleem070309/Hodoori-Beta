@@ -1505,29 +1505,21 @@
         }
 
         function findMatchingDeviceId(facing) {
-            if (!availableVideoDevices || availableVideoDevices.length < 2) return null;
+            if (!availableVideoDevices || availableVideoDevices.length === 0) return null;
             const isUser = facing === 'user';
             
-            // 1. Check device labels
+            // Only use explicit labels, never guess by index
             for (const dev of availableVideoDevices) {
                 const label = (dev.label || '').toLowerCase();
-                if (isUser) {
-                    if (label.includes('front') || label.includes('user') || label.includes('selfie') || label.includes('face') || label.includes('avant') || label.includes('vorne')) {
-                        return dev.deviceId;
-                    }
-                } else {
-                    if (label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('arrière') || label.includes('hinten')) {
-                        return dev.deviceId;
-                    }
+                if (!label) continue;
+                if (isUser && (label.includes('front') || label.includes('user') || label.includes('selfie') || label.includes('face'))) {
+                    return dev.deviceId;
+                }
+                if (!isUser && (label.includes('back') || label.includes('rear') || label.includes('environment'))) {
+                    return dev.deviceId;
                 }
             }
-
-            // 2. If labels are empty or ambiguous, alternate based on index if multiple cameras
-            if (isUser) {
-                return availableVideoDevices[availableVideoDevices.length - 1].deviceId;
-            } else {
-                return availableVideoDevices[0].deviceId;
-            }
+            return null;
         }
 
         // =========================================================================
@@ -1553,7 +1545,7 @@
             }
 
             // Yield briefly to ensure mobile OS camera pipeline is fully closed
-            await new Promise(r => setTimeout(r, 60));
+            await new Promise(r => setTimeout(r, 80));
 
             await updateAvailableVideoDevices();
             const targetDeviceId = findMatchingDeviceId(currentFacingMode);
@@ -1566,66 +1558,20 @@
 
                 const constraintsList = [];
 
-                // Attempt 1: Target Device ID (exact physical lens)
+                // 1. If explicit device label identified, try with deviceId
                 if (targetDeviceId) {
                     constraintsList.push({
                         video: {
-                            deviceId: { exact: targetDeviceId },
+                            deviceId: { ideal: targetDeviceId },
+                            facingMode: { ideal: currentFacingMode },
                             width: { ideal: idealW },
                             height: { ideal: idealH }
                         },
                         audio: false
                     });
-                    constraintsList.push({
-                        video: { deviceId: { exact: targetDeviceId } },
-                        audio: false
-                    });
                 }
 
-                // Attempt 2: Strict Exact Facing Mode (Forces mobile browser to switch front/back lens)
-                constraintsList.push({
-                    video: {
-                        facingMode: { exact: currentFacingMode },
-                        width: { ideal: idealW },
-                        height: { ideal: idealH }
-                    },
-                    audio: false
-                });
-
-                constraintsList.push({
-                    video: {
-                        facingMode: { exact: currentFacingMode },
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    },
-                    audio: false
-                });
-
-                constraintsList.push({
-                    video: {
-                        facingMode: { exact: currentFacingMode }
-                    },
-                    audio: false
-                });
-
-                // Attempt 3: Direct String Facing Mode
-                constraintsList.push({
-                    video: {
-                        facingMode: currentFacingMode,
-                        width: { ideal: idealW },
-                        height: { ideal: idealH }
-                    },
-                    audio: false
-                });
-
-                constraintsList.push({
-                    video: {
-                        facingMode: currentFacingMode
-                    },
-                    audio: false
-                });
-
-                // Attempt 4: Ideal Facing Mode
+                // 2. Ideal facing mode with high resolution (standard mobile compatibility)
                 constraintsList.push({
                     video: {
                         facingMode: { ideal: currentFacingMode },
@@ -1635,6 +1581,27 @@
                     audio: false
                 });
 
+                // 3. Direct facing mode string
+                constraintsList.push({
+                    video: {
+                        facingMode: currentFacingMode,
+                        width: { ideal: idealW },
+                        height: { ideal: idealH }
+                    },
+                    audio: false
+                });
+
+                // 4. Safe medium resolution
+                constraintsList.push({
+                    video: {
+                        facingMode: { ideal: currentFacingMode },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
+                });
+
+                // 5. Basic facing mode
                 constraintsList.push({
                     video: {
                         facingMode: { ideal: currentFacingMode }
@@ -1642,7 +1609,7 @@
                     audio: false
                 });
 
-                // Attempt 5: Fallback generic
+                // 6. Generic video fallback
                 constraintsList.push({
                     video: true,
                     audio: false
@@ -1653,7 +1620,7 @@
                         stream = await navigator.mediaDevices.getUserMedia(constraints);
                         if (stream) break;
                     } catch (err) {
-                        // Continue to next fallback
+                        console.warn("Camera fallback attempt...", err);
                     }
                 }
             }
