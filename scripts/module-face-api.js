@@ -715,7 +715,7 @@ const FaceDetection = {
     /**
      * Match a single query descriptor against student records
      */
-    findBestMatch(queryDescriptor, students, maxThreshold = 0.55) {
+    findBestMatch(queryDescriptor, students, maxThreshold = 0.54) {
         if (!queryDescriptor || !students || students.length === 0) return null;
 
         // Check Descriptor Cache for instant match
@@ -762,7 +762,7 @@ const FaceDetection = {
     /**
      * Match all detected faces against student roster
      */
-    matchAllFaces(detectedFaces, students, maxThreshold = 0.55) {
+    matchAllFaces(detectedFaces, students, maxThreshold = 0.54) {
         const matches = [];
         const unmatched = [];
 

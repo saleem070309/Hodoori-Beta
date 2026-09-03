@@ -1571,7 +1571,7 @@
                 const unknownBoxes = [];
 
                 (detectionResult.faces || []).forEach(face => {
-                    const match = FaceDetection.findBestMatch(face.descriptor, students, 0.55);
+                    const match = FaceDetection.findBestMatch(face.descriptor, students, 0.54);
                     if (match) {
                         confirmedStudents.push(match);
                         drawFaceCircle(ctx, face.box, '#22c55e', match.name);
@@ -1772,7 +1772,7 @@
 
             let matchCount = 0;
             result.faces.forEach(face => {
-                const match = FaceDetection.findBestMatch(face.descriptor, students, 0.55);
+                const match = FaceDetection.findBestMatch(face.descriptor, students, 0.54);
                 if (match) {
                     matchCount++;
                     markStudentPresent(match, img, face.box);

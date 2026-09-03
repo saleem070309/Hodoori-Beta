@@ -824,8 +824,8 @@
         const Engine = {
             isLoaded: false,
             isLoading: false,
-            minConfidence: 0.30,
-            matchThreshold: 0.55,
+            minConfidence: 0.62,
+            matchThreshold: 0.54,
             liveInputSize: isMobileDevice ? 160 : 224,
             paddingRatio: 0.20,
             iouThreshold: 0.45,
@@ -1232,7 +1232,7 @@
                 return croppedFaces;
             },
 
-            findBestStudentMatch(queryDescriptor, studentsList, maxThreshold = 0.55) {
+            findBestStudentMatch(queryDescriptor, studentsList, maxThreshold = 0.54) {
                 if (!queryDescriptor || !studentsList || studentsList.length === 0) return null;
 
                 let bestMatch = null;
@@ -1773,7 +1773,7 @@
                 detectedFaces.forEach(face => {
                     let matchResult = null;
                     if (face.descriptor) {
-                        matchResult = Engine.findBestStudentMatch(face.descriptor, students, 0.55);
+                        matchResult = Engine.findBestStudentMatch(face.descriptor, students, Engine.matchThreshold);
                     }
 
                     if (matchResult && matchResult.student) {
@@ -1989,7 +1989,7 @@
                         for (const d of detections) {
                             if (!d.descriptor) continue;
                             const descriptor = Array.from(d.descriptor);
-                            const match = Engine.findBestStudentMatch(descriptor, students, 0.55);
+                            const match = Engine.findBestStudentMatch(descriptor, students, Engine.matchThreshold);
 
                             if (match && match.student) {
                                 const student = match.student;
