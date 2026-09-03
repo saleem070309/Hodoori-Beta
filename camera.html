@@ -857,8 +857,8 @@
                     if (typeof faceapi !== 'undefined' && faceapi.tf) {
                         try {
                             const tf = faceapi.tf;
-                            tf.env().set('WEBGL_PACK', true);
                             tf.env().set('WEBGL_FORCE_F16_TEXTURES', false);
+                            tf.env().set('WEBGL_PACK', true);
 
                             if (tf.findBackend('webgl')) {
                                 await tf.setBackend('webgl');
@@ -1085,10 +1085,10 @@
                 }
 
                 const allRawDetections = [];
-                const isMobile = isMobileDevice;
-                const detectOptions = isMobile
-                    ? new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.20 })
-                    : new faceapi.SsdMobilenetv1Options({ minConfidence: this.minConfidence, maxResults: 100 });
+                const detectOptions = new faceapi.SsdMobilenetv1Options({ 
+                    minConfidence: this.minConfidence, 
+                    maxResults: 100
+                });
 
                 // 1. كشف الصناديق فقط على الشرائح
                 if (enableSlicing) {
@@ -1136,30 +1136,6 @@
                         }
                     }
                 } catch (_) {}
-
-                // Fallback: SSD pass on mobile if TinyFaceDetector found 0 faces
-                if (isMobile && allRawDetections.length === 0) {
-                    try {
-                        const ssdOpts = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.20, maxResults: 20 });
-                        const fallbackDetections = await faceapi.detectAllFaces(workingSource, ssdOpts);
-                        if (fallbackDetections && fallbackDetections.length > 0) {
-                            for (let d of fallbackDetections) {
-                                const rawBox = d.box || (d.detection ? d.detection.box : d);
-                                const score = d.score || (d.detection ? d.detection.score : 0.85);
-                                allRawDetections.push({
-                                    score: score,
-                                    box: {
-                                        x: rawBox.x / scaleRatio,
-                                        y: rawBox.y / scaleRatio,
-                                        width: rawBox.width / scaleRatio,
-                                        height: rawBox.height / scaleRatio
-                                    },
-                                    sourceSlice: "SSD البديل"
-                                });
-                            }
-                        }
-                    } catch (_) {}
-                }
 
                 // 3. التدوير في حال عدم العثور على وجوه
                 if (allRawDetections.length === 0) {
@@ -1723,9 +1699,11 @@
                     console.warn('Video play error:', playErr);
                 }
 
-                const transformStyle = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-                videoElement.style.transform = transformStyle;
-                canvasElement.style.transform = transformStyle;
+                if (currentFacingMode === 'user') {
+                    videoElement.style.transform = 'scaleX(-1)';
+                } else {
+                    videoElement.style.transform = 'scaleX(1)';
+                }
 
                 adjustCanvasDimensions();
                 await updateAvailableVideoDevices();
@@ -1803,6 +1781,11 @@
                 snapCanvas.width = srcW;
                 snapCanvas.height = srcH;
                 const snapCtx = snapCanvas.getContext('2d');
+
+                if (!isImageMode && currentFacingMode === 'user') {
+                    snapCtx.translate(srcW, 0);
+                    snapCtx.scale(-1, 1);
+                }
                 snapCtx.drawImage(sourceMedia, 0, 0, srcW, srcH);
 
                 if (!isImageMode) {
@@ -2000,8 +1983,9 @@
                 liveLoopRunning = false;
                 hideAiStatus();
                 videoBtn.classList.remove('recording-active');
-                const ctx = canvasElement.getContext('2d');
-                ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                if (window.Morphicons) {
+                    Morphicons.morph('#videoMorphContainer svg', 'Aperture', 'bouncy');
+                }
                 showToast('تم إيقاف التحليل اللحظي', 'info');
             }
         }
@@ -2021,46 +2005,28 @@
                     const lCtx = liveCanvas.getContext('2d', { willReadFrequently: true });
                     lCtx.drawImage(videoElement, 0, 0, liveCanvas.width, liveCanvas.height);
 
-                    // High-speed lightweight detector specifically tuned for real-time mobile loops
-                    const options = new faceapi.TinyFaceDetectorOptions({
+                    const options = new faceapi.SsdMobilenetv1Options({
+                        minConfidence: 0.40,
                         inputSize: isMobileDevice ? 224 : 320,
-                        scoreThreshold: 0.20
+                        maxResults: 4
                     });
 
-                    // Fast detection pass with landmarks and descriptors
+                    // Fast detection pass
                     const detections = await faceapi.detectAllFaces(liveCanvas, options)
                         .withFaceLandmarks()
                         .withFaceDescriptors();
 
                     const now = Date.now();
-                    const ctx = canvasElement.getContext('2d');
-                    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
                     if (detections && detections.length > 0) {
-                        const scaleX = canvasElement.width / liveCanvas.width;
-                        const scaleY = canvasElement.height / liveCanvas.height;
-
                         for (const d of detections) {
-                            const rawBox = d.detection ? d.detection.box : d.box;
-                            const box = {
-                                x: rawBox.x * scaleX,
-                                y: rawBox.y * scaleY,
-                                width: rawBox.width * scaleX,
-                                height: rawBox.height * scaleY
-                            };
-
-                            let match = null;
-                            if (d.descriptor) {
-                                const descriptor = Array.from(d.descriptor);
-                                match = Engine.findBestStudentMatch(descriptor, students, 0.55);
-                            }
+                            if (!d.descriptor) continue;
+                            const descriptor = Array.from(d.descriptor);
+                            const match = Engine.findBestStudentMatch(descriptor, students, 0.55);
 
                             if (match && match.student) {
                                 const student = match.student;
                                 const lastNotified = lastNotifiedStudents[student.id] || 0;
-
-                                // Draw live green HUD box on the student's face
-                                drawFaceHud(ctx, box, '#22c55e', `✓ ${student.name}`, match.confidencePercent);
 
                                 if (attendance[student.id] !== 'present') {
                                     attendance[student.id] = 'present';
@@ -2072,15 +2038,9 @@
                                     lastNotifiedStudents[student.id] = now;
                                     showToast(`الطالب ${student.name} مسجل بالفعل`, 'info', 2400);
                                 }
-                            } else {
-                                const scorePct = Math.round((d.detection ? d.detection.score : 0.8) * 100);
-                                // Draw live red HUD box on unregistered / unrecognized face
-                                drawFaceHud(ctx, box, '#ef4444', 'غير معروف', scorePct);
-
-                                if (d.detection && d.detection.score >= 0.40 && (now - lastUnknownNotified > 4000)) {
-                                    lastUnknownNotified = now;
-                                    showToast('لم يتم التعرف على الطالب', 'warning', 2400);
-                                }
+                            } else if (d.detection.score >= 0.50 && (now - lastUnknownNotified > 4000)) {
+                                lastUnknownNotified = now;
+                                showToast('لم يتم التعرف على الطالب', 'warning', 2400);
                             }
                         }
                     }
@@ -2092,7 +2052,7 @@
             }
 
             if (liveLoopRunning && isVideoModeActive) {
-                const nextDelay = isMobileDevice ? 80 : 40;
+                const nextDelay = isMobileDevice ? 85 : 45;
                 setTimeout(() => {
                     requestAnimationFrame(runLiveStreamRecognitionLoop);
                 }, nextDelay);

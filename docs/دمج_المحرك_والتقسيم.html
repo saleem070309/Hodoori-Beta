@@ -723,7 +723,7 @@
                     if (faceapi.tf) {
                         try {
                             const tf = faceapi.tf;
-                            tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                            tf.env().set('WEBGL_FORCE_F16_TEXTURES', false);
                             tf.env().set('WEBGL_PACK', true);
 
                             if (tf.findBackend('webgl')) {
