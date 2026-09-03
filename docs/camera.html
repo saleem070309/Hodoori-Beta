@@ -1491,51 +1491,169 @@
             if (pill) pill.classList.remove('active', 'live');
         }
 
+        let availableVideoDevices = [];
+
+        async function updateAvailableVideoDevices() {
+            if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    availableVideoDevices = devices.filter(d => d.kind === 'videoinput');
+                } catch (e) {
+                    console.info("Could not enumerate video devices:", e);
+                }
+            }
+        }
+
+        function findMatchingDeviceId(facing) {
+            if (!availableVideoDevices || availableVideoDevices.length < 2) return null;
+            const isUser = facing === 'user';
+            
+            // 1. Check device labels
+            for (const dev of availableVideoDevices) {
+                const label = (dev.label || '').toLowerCase();
+                if (isUser) {
+                    if (label.includes('front') || label.includes('user') || label.includes('selfie') || label.includes('face') || label.includes('avant') || label.includes('vorne')) {
+                        return dev.deviceId;
+                    }
+                } else {
+                    if (label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('arrière') || label.includes('hinten')) {
+                        return dev.deviceId;
+                    }
+                }
+            }
+
+            // 2. If labels are empty or ambiguous, alternate based on index if multiple cameras
+            if (isUser) {
+                return availableVideoDevices[availableVideoDevices.length - 1].deviceId;
+            } else {
+                return availableVideoDevices[0].deviceId;
+            }
+        }
+
         // =========================================================================
         // 6. Camera MediaStream Control (Mobile Adaptive Constraints)
         // =========================================================================
         async function initCameraStream() {
+            // 1. Release active camera hardware lock completely
             if (activeStream) {
                 try {
-                    activeStream.getTracks().forEach(track => track.stop());
+                    activeStream.getTracks().forEach(track => {
+                        track.stop();
+                        track.enabled = false;
+                    });
                 } catch (e) {}
+                activeStream = null;
             }
+
+            if (videoElement) {
+                try {
+                    videoElement.pause();
+                    videoElement.srcObject = null;
+                } catch (_) {}
+            }
+
+            // Yield briefly to ensure mobile OS camera pipeline is fully closed
+            await new Promise(r => setTimeout(r, 60));
+
+            await updateAvailableVideoDevices();
+            const targetDeviceId = findMatchingDeviceId(currentFacingMode);
 
             let stream = null;
             if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-                const constraintsList = [
-                    {
+                const isMobile = isMobileDevice;
+                const idealW = isMobile ? 1280 : 1920;
+                const idealH = isMobile ? 720 : 1080;
+
+                const constraintsList = [];
+
+                // Attempt 1: Target Device ID (exact physical lens)
+                if (targetDeviceId) {
+                    constraintsList.push({
                         video: {
-                            facingMode: { ideal: currentFacingMode },
-                            width: { ideal: isMobileDevice ? 1280 : 1920 },
-                            height: { ideal: isMobileDevice ? 720 : 1080 }
+                            deviceId: { exact: targetDeviceId },
+                            width: { ideal: idealW },
+                            height: { ideal: idealH }
                         },
                         audio: false
-                    },
-                    {
-                        video: {
-                            facingMode: currentFacingMode,
-                            width: { ideal: 640 },
-                            height: { ideal: 480 }
-                        },
+                    });
+                    constraintsList.push({
+                        video: { deviceId: { exact: targetDeviceId } },
                         audio: false
+                    });
+                }
+
+                // Attempt 2: Strict Exact Facing Mode (Forces mobile browser to switch front/back lens)
+                constraintsList.push({
+                    video: {
+                        facingMode: { exact: currentFacingMode },
+                        width: { ideal: idealW },
+                        height: { ideal: idealH }
                     },
-                    {
-                        video: { facingMode: { ideal: currentFacingMode } },
-                        audio: false
+                    audio: false
+                });
+
+                constraintsList.push({
+                    video: {
+                        facingMode: { exact: currentFacingMode },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     },
-                    {
-                        video: true,
-                        audio: false
-                    }
-                ];
+                    audio: false
+                });
+
+                constraintsList.push({
+                    video: {
+                        facingMode: { exact: currentFacingMode }
+                    },
+                    audio: false
+                });
+
+                // Attempt 3: Direct String Facing Mode
+                constraintsList.push({
+                    video: {
+                        facingMode: currentFacingMode,
+                        width: { ideal: idealW },
+                        height: { ideal: idealH }
+                    },
+                    audio: false
+                });
+
+                constraintsList.push({
+                    video: {
+                        facingMode: currentFacingMode
+                    },
+                    audio: false
+                });
+
+                // Attempt 4: Ideal Facing Mode
+                constraintsList.push({
+                    video: {
+                        facingMode: { ideal: currentFacingMode },
+                        width: { ideal: idealW },
+                        height: { ideal: idealH }
+                    },
+                    audio: false
+                });
+
+                constraintsList.push({
+                    video: {
+                        facingMode: { ideal: currentFacingMode }
+                    },
+                    audio: false
+                });
+
+                // Attempt 5: Fallback generic
+                constraintsList.push({
+                    video: true,
+                    audio: false
+                });
 
                 for (const constraints of constraintsList) {
                     try {
                         stream = await navigator.mediaDevices.getUserMedia(constraints);
                         if (stream) break;
                     } catch (err) {
-                        console.info("Camera fallback attempt...", constraints, err);
+                        // Continue to next fallback
                     }
                 }
             }
@@ -1550,6 +1668,15 @@
                 videoElement.srcObject = stream;
                 videoElement.style.display = 'block';
                 fallbackElement.style.display = 'none';
+
+                // Detect actual facing mode from track
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack && typeof videoTrack.getSettings === 'function') {
+                    const settings = videoTrack.getSettings();
+                    if (settings.facingMode) {
+                        currentFacingMode = settings.facingMode;
+                    }
+                }
 
                 await new Promise((resolve) => {
                     if (videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
@@ -1579,6 +1706,7 @@
                 }
 
                 adjustCanvasDimensions();
+                await updateAvailableVideoDevices();
             } else {
                 fallbackElement.style.display = 'block';
                 videoElement.style.display = 'none';
@@ -1935,23 +2063,37 @@
         // 10. Button 4: Left Flip Camera Button (تبديل الكاميرا الأمامية/الخلفية)
         // =========================================================================
         let flipRotation = 0;
+        let isFlippingCamera = false;
 
         async function handleFlipCamera() {
-            flipRotation += 180;
-            if (flipIcon) {
-                flipIcon.style.transform = `rotate(${flipRotation + currentUiAngle}deg)`;
-            }
+            if (isFlippingCamera) return;
+            isFlippingCamera = true;
+            const flipBtn = document.getElementById('flipActionBtn');
+            if (flipBtn) flipBtn.style.pointerEvents = 'none';
 
-            const feedLayer = document.querySelector('.camera-feed-layer');
-            if (feedLayer) {
-                feedLayer.classList.remove('flipping');
-                void feedLayer.offsetWidth;
-                feedLayer.classList.add('flipping');
-            }
+            try {
+                flipRotation += 180;
+                if (flipIcon) {
+                    flipIcon.style.transform = `rotate(${flipRotation + currentUiAngle}deg)`;
+                }
 
-            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
-            await initCameraStream();
-            showToast(currentFacingMode === 'user' ? 'الكاميرا الأمامية' : 'الكاميرا الخلفية', 'info', 1500);
+                const feedLayer = document.querySelector('.camera-feed-layer');
+                if (feedLayer) {
+                    feedLayer.classList.remove('flipping');
+                    void feedLayer.offsetWidth;
+                    feedLayer.classList.add('flipping');
+                }
+
+                currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+                await initCameraStream();
+                showToast(currentFacingMode === 'user' ? 'الكاميرا الأمامية' : 'الكاميرا الخلفية', 'info', 1500);
+            } catch (err) {
+                console.error("Flip camera error:", err);
+                showToast('تعذر تبديل الكاميرا', 'warning', 2000);
+            } finally {
+                isFlippingCamera = false;
+                if (flipBtn) flipBtn.style.pointerEvents = '';
+            }
         }
 
         // =========================================================================
