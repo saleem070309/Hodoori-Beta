@@ -1922,6 +1922,17 @@
                     UI.toast('تم إيقاف وضع تحسين الأداء', 'info');
                 }
             }
+
+            // Sync with active camera iframe if open
+            try {
+                const cameraFrame = document.getElementById('cameraAppFrame');
+                if (cameraFrame && cameraFrame.contentWindow) {
+                    cameraFrame.contentWindow.postMessage({
+                        type: 'HODOORI_SET_PERF_MODE',
+                        enabled: !!enabled
+                    }, '*');
+                }
+            } catch (_) {}
         }
 
         // Apply saved performance preference immediately

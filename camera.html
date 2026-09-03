@@ -667,6 +667,34 @@
             .shutter-outer { width: 78px; height: 78px; }
             .shutter-core { width: 60px; height: 60px; }
         }
+
+        /* وضع تحسين الأداء وتخفيف الواجهة في الكاميرا (Performance Mode) */
+        body.perf-boost-mode *,
+        body.perf-boost-mode *::before,
+        body.perf-boost-mode *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            filter: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+        body.perf-boost-mode .top-solid-bar {
+            background-color: rgba(0, 0, 0, 0.85) !important;
+        }
+
+        body.perf-boost-mode .bottom-section {
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 75%, transparent 100%) !important;
+        }
+
+        body.perf-boost-mode .mode-toggle-pill,
+        body.perf-boost-mode .ai-status-pill,
+        body.perf-boost-mode .camera-toast {
+            background-color: rgba(20, 20, 20, 0.95) !important;
+        }
     </style>
 </head>
 <body>
@@ -2052,9 +2080,34 @@
         });
 
         // =========================================================================
+        // 13.5 Performance Boost Mode Sync
+        // =========================================================================
+        function applyPerformanceModePreference() {
+            try {
+                if (localStorage.getItem('hodoori_perf_mode') === 'true') {
+                    document.body.classList.add('perf-boost-mode');
+                } else {
+                    document.body.classList.remove('perf-boost-mode');
+                }
+            } catch (_) {}
+        }
+        applyPerformanceModePreference();
+
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'HODOORI_SET_PERF_MODE') {
+                if (event.data.enabled) {
+                    document.body.classList.add('perf-boost-mode');
+                } else {
+                    document.body.classList.remove('perf-boost-mode');
+                }
+            }
+        });
+
+        // =========================================================================
         // 14. Initialization on DOM Load
         // =========================================================================
         window.addEventListener('DOMContentLoaded', async () => {
+            applyPerformanceModePreference();
             await initAppData();
             await initCameraStream();
             updateScreenOrientation();
