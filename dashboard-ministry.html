@@ -502,7 +502,7 @@
     <!-- Modals -->
     <div id="modalOverlay" class="fixed inset-0 liquid-glass-overlay z-50 hidden flex items-center justify-center p-4">
         <!-- Add / Edit School Modal -->
-        <div id="schoolModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden">
+        <div id="schoolModal" class="liquid-glass-modal w-full max-w-md p-6 rounded-3xl hidden max-h-[85vh] overflow-y-auto liquid-glass-scrollbar">
             <h2 id="schoolModalTitle" class="text-xl font-black mb-6">إضافة مدرسة جديدة</h2>
             <form onsubmit="handleSaveSchool(event)" class="space-y-4">
                 <input type="hidden" id="editingSchoolId" value="">

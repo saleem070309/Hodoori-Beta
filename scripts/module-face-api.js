@@ -18,7 +18,8 @@ const FaceDetection = {
     // Model source locations (local first, CDN fallback)
     MODELS_LOCAL_PATHS: ['models', './models', '../models', '/models'],
     MODELS_CDN_URL: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
-    MODELS_FALLBACK_CDN: 'https://justadudewhohacks.github.io/face-api.js/models',
+    MODELS_FALLBACK_CDN: 'https://vladmandic.github.io/face-api/model',
+    MODELS_UNPKG_CDN: 'https://unpkg.com/@vladmandic/face-api/model',
     activeModelPath: null,
 
     // Engine settings
@@ -67,31 +68,30 @@ const FaceDetection = {
         if (faceapi.tf) {
             try {
                 const tf = faceapi.tf;
-                if (tf.getBackend() !== 'webgl' && tf.findBackend('webgl')) {
-                    await tf.setBackend('webgl');
-                }
-                await tf.ready();
+                // Force GPU optimizations (Mali, Adreno, Apple GPU)
+                tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                tf.env().set('WEBGL_PACK', true);
 
-                if (tf.getBackend() === 'webgl') {
-                    if (!this.isMobile) {
-                        try { tf.env().set('WEBGL_PACK', true); } catch (_) {}
-                        try { tf.env().set('WEBGL_FORCE_F16_TEXTURES', true); } catch (_) {}
-                    } else {
-                        // Crucial for Mobile GPUs (Adreno, Mali, Apple GPU):
-                        // Disable half-float texture forcing to prevent NaN prediction corruption and shader crashes
-                        try { tf.env().set('WEBGL_FORCE_F16_TEXTURES', false); } catch (_) {}
-                        try { tf.env().set('WEBGL_PACK', false); } catch (_) {}
-                        try { tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0); } catch (_) {}
-                    }
+                if (tf.findBackend('webgl')) {
+                    await tf.setBackend('webgl');
+                    await tf.ready();
+                } else if (tf.findBackend('wasm')) {
+                    await tf.setBackend('wasm');
+                    await tf.ready();
                 }
             } catch (err) {
-                console.warn("WebGL optimization notice, falling back to default backend:", err);
-                try { await faceapi.tf.setBackend('cpu'); } catch (_) {}
+                console.warn("WebGL optimization notice, falling back to WASM if available:", err);
+                try {
+                    if (faceapi.tf.findBackend('wasm')) {
+                        await faceapi.tf.setBackend('wasm');
+                        await faceapi.tf.ready();
+                    }
+                } catch (_) {}
             }
         }
 
         // 2. Multi-Tier Model Loading (Local -> Primary CDN -> Secondary Fallback)
-        const candidatePaths = [...this.MODELS_LOCAL_PATHS, this.MODELS_CDN_URL, this.MODELS_FALLBACK_CDN];
+        const candidatePaths = [...this.MODELS_LOCAL_PATHS, this.MODELS_CDN_URL, this.MODELS_FALLBACK_CDN, this.MODELS_UNPKG_CDN];
         let loaded = false;
 
         for (const path of candidatePaths) {
@@ -178,16 +178,19 @@ const FaceDetection = {
     /**
      * Start live camera detection loop
      */
-    async start(useTiny = false, autoLock = true) {
+    async start(useTiny = true, autoLock = true) {
         if (!this.isModelsLoaded) await this.init();
         this.isActive = true;
         this.autoLock = autoLock;
+        this.useTiny = useTiny;
+        this.isProcessingLoop = false;
         this.stableStartTime = null;
         this.predictLoop();
     },
 
     stop() {
         this.isActive = false;
+        this.isProcessingLoop = false;
         this.currentDetection = null;
         if (this.ctx && this.canvas) {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -195,33 +198,31 @@ const FaceDetection = {
     },
 
     /**
-     * High-speed live camera prediction loop (Mobile & Desktop optimized)
+     * High-speed live camera prediction loop (Mobile & Desktop optimized - 30-60 FPS)
      */
     async predictLoop() {
         if (!this.isActive) return;
 
-        if (this.video && this.video.readyState >= 2 && !this.video.paused && this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+        if (!this.isProcessingLoop && this.video && this.video.readyState >= 2 && !this.video.paused && this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+            this.isProcessingLoop = true;
             try {
                 if (this.canvas && (this.canvas.width !== this.video.videoWidth || this.canvas.height !== this.video.videoHeight)) {
                     this.canvas.width = this.video.videoWidth;
                     this.canvas.height = this.video.videoHeight;
                 }
 
-                const options = new faceapi.SsdMobilenetv1Options({ 
-                    minConfidence: 0.38, 
-                    inputSize: this.isMobile ? 320 : 416,
-                    maxResults: 6 
-                });
+                const options = this.useTiny !== false
+                    ? new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 })
+                    : new faceapi.SsdMobilenetv1Options({ minConfidence: 0.38, inputSize: 224, maxResults: 1 });
 
-                const detection = await faceapi.detectSingleFace(this.video, options)
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
+                // كشف سريع مباشر بدون استخراج بصمة ثقيلة في كل إطار
+                const detection = await faceapi.detectSingleFace(this.video, options);
 
                 this.currentDetection = detection;
 
                 if (detection) {
                     if (this.autoLock) {
-                        this.checkStability(detection);
+                        await this.checkStability(detection);
                     }
                 } else {
                     this.stableStartTime = null;
@@ -231,26 +232,36 @@ const FaceDetection = {
                 }
             } catch (err) {
                 console.warn("Face detection frame notice:", err);
+            } finally {
+                this.isProcessingLoop = false;
             }
         }
 
         if (this.isActive) {
-            const throttleTime = this.isMobile ? (this.isLowEnd ? 140 : 90) : 45;
-            setTimeout(() => {
-                if (this.isActive) requestAnimationFrame(() => this.predictLoop());
-            }, throttleTime);
+            requestAnimationFrame(() => this.predictLoop());
         }
     },
 
-    checkStability(detection) {
+    async checkStability(detection) {
         if (!this.stableStartTime) {
             this.stableStartTime = performance.now();
         }
 
         if (performance.now() - this.stableStartTime >= this.REQUIRED_STABILITY_MS) {
             this.isActive = false;
-            const descriptor = Array.from(detection.descriptor);
-            if (this.onCapture) this.onCapture(descriptor, detection);
+            try {
+                // استخراج البصمة فقط عند ثبات الوجه وتأكيد القفل
+                const fullDetection = await faceapi.detectSingleFace(this.video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                const descriptor = fullDetection && fullDetection.descriptor ? Array.from(fullDetection.descriptor) : null;
+                if (this.onCapture && descriptor) {
+                    this.onCapture(descriptor, fullDetection);
+                }
+            } catch (e) {
+                console.warn("Stability capture error:", e);
+            }
         }
     },
 
@@ -283,19 +294,28 @@ const FaceDetection = {
                 }
             }
 
-            const boxCenterX = box.x + box.width / 2;
-            const boxCenterY = box.y + box.height / 2;
-            const cropSide = Math.max(box.width, box.height) * 1.35;
-            const scale = targetSize / cropSide;
+            const padRatio = 0.20;
+            const padX = box.width * padRatio;
+            const padY = box.height * padRatio;
+            const imgW = sourceImage.naturalWidth || sourceImage.videoWidth || sourceImage.width;
+            const imgH = sourceImage.naturalHeight || sourceImage.videoHeight || sourceImage.height;
 
-            chipCtx.save();
-            chipCtx.translate(targetSize / 2, targetSize / 2);
-            chipCtx.rotate(-angle);
-            chipCtx.scale(scale, scale);
-            chipCtx.translate(-boxCenterX, -boxCenterY);
+            const startX = Math.max(0, Math.round(box.x - padX));
+            const startY = Math.max(0, Math.round(box.y - padY));
+            const endX = Math.min(imgW, Math.round(box.x + box.width + padX));
+            const endY = Math.min(imgH, Math.round(box.y + box.height + padY));
+            const srcW = endX - startX;
+            const srcH = endY - startY;
 
-            chipCtx.drawImage(sourceImage, 0, 0);
-            chipCtx.restore();
+            if (angle !== 0) {
+                chipCtx.save();
+                chipCtx.translate(targetSize / 2, targetSize / 2);
+                chipCtx.rotate(-angle);
+                chipCtx.drawImage(sourceImage, startX, startY, srcW, srcH, -targetSize / 2, -targetSize / 2, targetSize, targetSize);
+                chipCtx.restore();
+            } else {
+                chipCtx.drawImage(sourceImage, startX, startY, srcW, srcH, 0, 0, targetSize, targetSize);
+            }
 
             return chipCanvas;
         } catch (e) {
@@ -351,28 +371,23 @@ const FaceDetection = {
         let allRawDetections = [];
         const ssdOptions = new faceapi.SsdMobilenetv1Options({
             minConfidence: scoreThreshold,
-            inputSize: this.isMobile ? 512 : 1024,
             maxResults: maxResults
         });
 
         // 2. Full image pass
         try {
-            const fullPassDetections = await faceapi.detectAllFaces(processedSource, ssdOptions).withFaceLandmarks();
+            const fullPassDetections = await faceapi.detectAllFaces(processedSource, ssdOptions);
             fullPassDetections.forEach(det => {
+                const rawBox = det.box || (det.detection ? det.detection.box : det);
+                const score = det.score || (det.detection ? det.detection.score : 0.9);
                 allRawDetections.push({
                     box: {
-                        x: det.detection.box.x / scaleRatio,
-                        y: det.detection.box.y / scaleRatio,
-                        width: det.detection.box.width / scaleRatio,
-                        height: det.detection.box.height / scaleRatio
+                        x: rawBox.x / scaleRatio,
+                        y: rawBox.y / scaleRatio,
+                        width: rawBox.width / scaleRatio,
+                        height: rawBox.height / scaleRatio
                     },
-                    score: det.detection.score,
-                    landmarks: {
-                        positions: det.landmarks.positions.map(p => ({
-                            x: p.x / scaleRatio,
-                            y: p.y / scaleRatio
-                        }))
-                    },
+                    score: score,
                     sourceSlice: 'full_image'
                 });
             });
@@ -398,25 +413,19 @@ const FaceDetection = {
                     rCtx.rotate((angle * Math.PI) / 180);
                     rCtx.drawImage(processedSource, -imgWidth / 2, -imgHeight / 2);
 
-                    const rotDetections = await faceapi.detectAllFaces(rotCanvas, ssdOptions).withFaceLandmarks();
+                    const rotDetections = await faceapi.detectAllFaces(rotCanvas, ssdOptions);
                     if (rotDetections && rotDetections.length > 0) {
-                        // Found rotated faces! Re-map coordinates back to original frame
                         rotDetections.forEach(det => {
-                            // Translate rotated box back
+                            const rawBox = det.box || (det.detection ? det.detection.box : det);
+                            const score = det.score || (det.detection ? det.detection.score : 0.9);
                             allRawDetections.push({
                                 box: {
-                                    x: det.detection.box.x / scaleRatio,
-                                    y: det.detection.box.y / scaleRatio,
-                                    width: det.detection.box.width / scaleRatio,
-                                    height: det.detection.box.height / scaleRatio
+                                    x: rawBox.x / scaleRatio,
+                                    y: rawBox.y / scaleRatio,
+                                    width: rawBox.width / scaleRatio,
+                                    height: rawBox.height / scaleRatio
                                 },
-                                score: det.detection.score,
-                                landmarks: {
-                                    positions: det.landmarks.positions.map(p => ({
-                                        x: p.x / scaleRatio,
-                                        y: p.y / scaleRatio
-                                    }))
-                                },
+                                score: score,
                                 sourceSlice: `rotated_${angle}`
                             });
                         });
@@ -466,22 +475,18 @@ const FaceDetection = {
                 const batch = sliceCanvases.slice(i, i + (this.isMobile ? 2 : 3));
                 await Promise.all(batch.map(async (slice) => {
                     try {
-                        const sliceDetections = await faceapi.detectAllFaces(slice.canvas, ssdOptions).withFaceLandmarks();
+                        const sliceDetections = await faceapi.detectAllFaces(slice.canvas, ssdOptions);
                         sliceDetections.forEach(det => {
-                            const globalX = (det.detection.box.x + slice.offsetX) / scaleRatio;
-                            const globalY = (det.detection.box.y + slice.offsetY) / scaleRatio;
-                            const globalWidth = det.detection.box.width / scaleRatio;
-                            const globalHeight = det.detection.box.height / scaleRatio;
-
-                            const globalPositions = det.landmarks.positions.map(p => ({
-                                x: (p.x + slice.offsetX) / scaleRatio,
-                                y: (p.y + slice.offsetY) / scaleRatio
-                            }));
+                            const rawBox = det.box || (det.detection ? det.detection.box : det);
+                            const score = det.score || (det.detection ? det.detection.score : 0.9);
+                            const globalX = (rawBox.x + slice.offsetX) / scaleRatio;
+                            const globalY = (rawBox.y + slice.offsetY) / scaleRatio;
+                            const globalWidth = rawBox.width / scaleRatio;
+                            const globalHeight = rawBox.height / scaleRatio;
 
                             allRawDetections.push({
                                 box: { x: globalX, y: globalY, width: globalWidth, height: globalHeight },
-                                score: det.detection.score,
-                                landmarks: { positions: globalPositions },
+                                score: score,
                                 sourceSlice: `slice_${slice.sliceIndex}`
                             });
                         });
@@ -502,15 +507,38 @@ const FaceDetection = {
                 await new Promise(r => setTimeout(r, 0)); // Micro-yield
             }
             const item = uniqueDetections[i];
-            const chipCanvas = this.cropAndAlignFace(sourceImage, item.box, item.landmarks, 150);
+            const chipCanvas = this.cropAndAlignFace(sourceImage, item.box, null, 150);
             
             let descriptor = null;
+            let landmarks = null;
+
             if (computeDescriptors) {
                 try {
-                    const descObj = await faceapi.computeFaceDescriptor(chipCanvas);
-                    if (descObj) descriptor = Array.from(descObj);
+                    const descObj = await faceapi.detectSingleFace(chipCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+
+                    if (descObj && descObj.descriptor) {
+                        descriptor = Array.from(descObj.descriptor);
+                        if (descObj.landmarks) landmarks = descObj.landmarks;
+                    } else {
+                        const ssdObj = await faceapi.detectSingleFace(chipCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.10 }))
+                            .withFaceLandmarks()
+                            .withFaceDescriptor();
+                        if (ssdObj && ssdObj.descriptor) {
+                            descriptor = Array.from(ssdObj.descriptor);
+                            if (ssdObj.landmarks) landmarks = ssdObj.landmarks;
+                        }
+                    }
                 } catch (e) {
                     console.warn("Descriptor computation fallback:", e);
+                }
+
+                if (!descriptor) {
+                    try {
+                        const direct = await faceapi.computeFaceDescriptor(chipCanvas);
+                        if (direct) descriptor = Array.from(direct);
+                    } catch (_) {}
                 }
             }
 
@@ -518,7 +546,7 @@ const FaceDetection = {
                 index: i + 1,
                 box: item.box,
                 score: item.score,
-                landmarks: item.landmarks,
+                landmarks: landmarks,
                 chipCanvas: chipCanvas,
                 descriptor: descriptor,
                 sourceSlice: item.sourceSlice
@@ -539,9 +567,39 @@ const FaceDetection = {
         return this.detectFaces(sourceImage, options);
     },
 
-    _applyNMS(boxes, iouThresh) {
+    _calculateOverlap(boxA, boxB) {
+        const xA = Math.max(boxA.x, boxB.x);
+        const yA = Math.max(boxA.y, boxB.y);
+        const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
+        const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
+
+        const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+        if (interArea === 0) return { iou: 0, ioMin: 0 };
+
+        const boxAArea = boxA.width * boxA.height;
+        const boxBArea = boxB.width * boxB.height;
+        const unionArea = boxAArea + boxBArea - interArea;
+        const minArea = Math.min(boxAArea, boxBArea);
+
+        const iou = unionArea > 0 ? interArea / unionArea : 0;
+        const ioMin = minArea > 0 ? interArea / minArea : 0;
+        return { iou, ioMin };
+    },
+
+    _calculateIoU(boxA, boxB) {
+        return this._calculateOverlap(boxA, boxB).iou;
+    },
+
+    _applyNMS(boxes, iouThresh = 0.35, ioMinThresh = 0.60) {
         if (!boxes || boxes.length === 0) return [];
-        const sorted = [...boxes].sort((a, b) => b.score - a.score);
+        const sorted = [...boxes].sort((a, b) => {
+            const areaA = a.box.width * a.box.height;
+            const areaB = b.box.width * b.box.height;
+            if (Math.abs(b.score - a.score) > 0.20) {
+                return b.score - a.score;
+            }
+            return areaB - areaA;
+        });
         const selected = [];
 
         for (let i = 0; i < sorted.length; i++) {
@@ -550,8 +608,8 @@ const FaceDetection = {
 
             for (let j = 0; j < selected.length; j++) {
                 const chosen = selected[j];
-                const iou = this._calculateIoU(current.box, chosen.box);
-                if (iou > iouThresh) {
+                const { iou, ioMin } = this._calculateOverlap(current.box, chosen.box);
+                if (iou > iouThresh || ioMin > ioMinThresh) {
                     keep = false;
                     break;
                 }
@@ -562,20 +620,6 @@ const FaceDetection = {
             }
         }
         return selected;
-    },
-
-    _calculateIoU(boxA, boxB) {
-        const xA = Math.max(boxA.x, boxB.x);
-        const yA = Math.max(boxA.y, boxB.y);
-        const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
-        const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
-
-        const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
-        if (interArea === 0) return 0;
-
-        const boxAArea = boxA.width * boxA.height;
-        const boxBArea = boxB.width * boxB.height;
-        return interArea / (boxAArea + boxBArea - interArea);
     },
 
     /**

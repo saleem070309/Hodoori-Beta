@@ -249,6 +249,35 @@
                 box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 4px 22px rgba(239, 68, 68, 0.6);
             }
         }
+
+        /* وضع تحسين الأداء وتخفيف الواجهة (Performance Mode) */
+        body.perf-boost-mode *,
+        body.perf-boost-mode *::before,
+        body.perf-boost-mode *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+        body.perf-boost-mode .liquid-glass,
+        body.perf-boost-mode .liquid-glass-nav,
+        body.perf-boost-mode .liquid-glass-modal,
+        body.perf-boost-mode .liquid-glass-heavy,
+        body.perf-boost-mode .liquid-glass-chip,
+        body.perf-boost-mode .liquid-glass-icon {
+            background-color: #ffffff !important;
+            border-color: #e5e7eb !important;
+        }
+
+        body.perf-boost-mode .liquid-glass-overlay {
+            background: rgba(0, 0, 0, 0.6) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
     </style>
 </head>
 
@@ -285,9 +314,16 @@
                 class="font-bold text-sm sm:text-xl refractive-text truncate max-w-[100px] sm:max-w-none">تحضير الصف
             </h1>
         </div>
-        <div id="classNameDisplay" onclick="resetClassSelection()"
-            class="liquid-glass-chip px-3 sm:px-4 py-1.5 rounded-full text-primary text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-primary/15 transition-all active:none relative z-10">
-            اختر الصف
+        <div class="flex items-center gap-2 relative z-10">
+            <div id="classNameDisplay" onclick="resetClassSelection()"
+                class="liquid-glass-chip px-3 sm:px-4 py-1.5 rounded-full text-primary text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-primary/15 transition-all active:none">
+                اختر الصف
+            </div>
+            <!-- Settings Button -->
+            <button onclick="openTeacherSettingsModal()" title="إعدادات الواجهة والأداء"
+                class="liquid-glass-icon w-9 h-9 sm:w-10 sm:h-10 rounded-xl cursor-pointer flex items-center justify-center text-gray-500 hover:text-primary hover:bg-primary/10 transition-all">
+                <span class="material-symbols-outlined text-lg sm:text-xl leading-none">settings</span>
+            </button>
         </div>
     </nav>
 
@@ -453,6 +489,54 @@
                     <h4 class="text-gray-800 font-bold text-2xl px-4 text-center mt-2" id="qrSuccessText">تم تحضير
                         الطالب</h4>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teacher Settings Modal -->
+    <div id="teacherSettingsModal"
+        class="hidden fixed inset-0 z-50 liquid-glass-overlay flex items-center justify-center p-4 transition-all duration-200">
+        <div class="liquid-glass-modal w-full max-w-md p-6 sm:p-7 rounded-[2rem] relative max-h-[85vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-5 pb-3 border-b border-gray-100 shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">tune</span>
+                    </div>
+                    <h2 class="text-lg sm:text-xl font-black text-gray-800">إعدادات المعلم</h2>
+                </div>
+                <button type="button" onclick="closeTeacherSettingsModal()"
+                    class="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto space-y-4 text-right pl-1 pr-1">
+                <!-- Setting: Performance Boost Mode -->
+                <div class="p-4 rounded-2xl border border-gray-100 bg-gray-50/70 flex items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-amber-500 text-lg">bolt</span>
+                            <span class="text-sm font-black text-gray-800">تحسين الأداء</span>
+                        </div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed">
+                            يقوم بإلغاء الحركات (Animations)، وتخفيف الظلال، وإلغاء تأثيرات الغباش والبلور (Blur) لتسريع استجابة الواجهة على الأجهزة الضعيفة.
+                        </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input type="checkbox" id="teacherPerfToggle" onchange="toggleTeacherPerformanceMode(this.checked)" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-4 mt-2 border-t border-gray-100 shrink-0">
+                <button type="button" onclick="closeTeacherSettingsModal()"
+                    class="w-full liquid-button liquid-button-prominent text-white font-bold py-3 rounded-xl">
+                    إغلاق
+                </button>
             </div>
         </div>
     </div>
@@ -1802,6 +1886,50 @@
                 UI.toast('حدث خطأ أثناء حفظ التقرير', 'error');
             }
         }
+
+        // ══════════════════════════════════════════════════
+        // TEACHER SETTINGS & PERFORMANCE BOOST MODE
+        // ══════════════════════════════════════════════════
+        function openTeacherSettingsModal() {
+            const modal = document.getElementById('teacherSettingsModal');
+            const toggle = document.getElementById('teacherPerfToggle');
+            if (toggle) {
+                toggle.checked = localStorage.getItem('hodoori_perf_mode') === 'true';
+            }
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeTeacherSettingsModal() {
+            const modal = document.getElementById('teacherSettingsModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function toggleTeacherPerformanceMode(enabled) {
+            if (enabled) {
+                document.body.classList.add('perf-boost-mode');
+                localStorage.setItem('hodoori_perf_mode', 'true');
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('تم تفعيل وضع تحسين الأداء وتخفيف الواجهة', 'success');
+                }
+            } else {
+                document.body.classList.remove('perf-boost-mode');
+                localStorage.setItem('hodoori_perf_mode', 'false');
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('تم إيقاف وضع تحسين الأداء', 'info');
+                }
+            }
+        }
+
+        // Apply saved performance preference immediately
+        (function initPerformanceMode() {
+            if (localStorage.getItem('hodoori_perf_mode') === 'true') {
+                document.body.classList.add('perf-boost-mode');
+            }
+        })();
 
         // Update init to sync status
         const originalInit = init;

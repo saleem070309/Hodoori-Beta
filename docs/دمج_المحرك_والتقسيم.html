@@ -4,9 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>محرك كشف ومطابقة الوجوه بالتقسيم الهرمي والبث الحي فائق السرعة</title>
-    <!-- مكتبة التعرف على الوجوه Face-API الحديثة -->
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
-    <script src="../scripts/module-telemetry.js"></script>
+    <!-- مكتبة التعرف على الوجوه Face-API (محلي أولاً ثم CDN) -->
+    <script src="face-api.js"></script>
+    <script>
+        if (typeof faceapi === 'undefined') {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+            s.onload = () => { if (typeof Engine !== 'undefined' && !Engine.isLoaded) Engine.init(); };
+            document.head.appendChild(s);
+        }
+    </script>
+    <script src="../scripts/module-telemetry.js" onerror="this.onerror=null;this.src='scripts/module-telemetry.js';"></script>
     <style>
         /* =========================================================================
            نظام التصميم: أبيض وأسود عالي التباين، بدون أي وهج أو ظلال إشعاعية
@@ -658,83 +666,135 @@
         // =========================================================================
         const Engine = {
             isLoaded: false,
+            isLoading: false,
             referenceDescriptor: null,
             
-            minConfidence: 0.56,
+            minConfidence: 0.50,
             matchThreshold: 0.54,
-            staticInputSize: 2560,
-            liveInputSize: 416, // حجم مثالي للبث المباشر < 30ms
+            liveInputSize: 224,
             paddingRatio: 0.20,
-            iouThreshold: 0.35,
+            iouThreshold: 0.45,
             enableAlignment: true,
-            enableSlicing: true, // خيار تفعيل أو إلغاء التقسيم الهرمي للصور (9 قطاعات)
+            enableSlicing: true,
 
-            localModelsPaths: ['../models', '/models', './models', 'models'],
-            cdnModelsUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+            localModelsPaths: ['./models', '../models', 'models', '/models'],
+            cdnModelsUrls: [
+                'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model',
+                'https://vladmandic.github.io/face-api/model',
+                'https://unpkg.com/@vladmandic/face-api/model',
+                'https://raw.githubusercontent.com/vladmandic/face-api/master/model'
+            ],
+
+            loadModelWithTimeout(promise, ms = 5000) {
+                return Promise.race([
+                    promise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout loading model")), ms))
+                ]);
+            },
 
             async init() {
+                if (this.isLoaded) return true;
+                if (this.isLoading) return;
+                this.isLoading = true;
+
+                const statusEl = document.getElementById('engine-status');
+                const updateStatus = (txt, color = "var(--text-secondary)", border = "var(--border-light)") => {
+                    if (statusEl) {
+                        statusEl.textContent = txt;
+                        statusEl.style.color = color;
+                        statusEl.style.borderColor = border;
+                    }
+                };
+
                 const t0 = performance.now();
+                updateStatus("جاري تهيئة كرت الشاشة والمكتبة...");
+
                 try {
+                    // 1. انتظار توفر مكتبة face-api
+                    let waitCount = 0;
+                    while (typeof faceapi === 'undefined') {
+                        if (waitCount++ > 30) {
+                            throw new Error("تعذر العثور على مكتبة face-api.js.");
+                        }
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+
+                    // 2. تهيئة مسرع الرسوميات WebGL النظيف
                     if (faceapi.tf) {
                         try {
-                            const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-                            await faceapi.tf.setBackend('webgl');
-                            await faceapi.tf.ready();
-                            if (!isMobile) {
-                                try { faceapi.tf.env().set('WEBGL_PACK', true); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true); } catch (_) {}
-                            } else {
-                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', false); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_PACK', false); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0); } catch (_) {}
+                            const tf = faceapi.tf;
+                            tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                            tf.env().set('WEBGL_PACK', true);
+
+                            if (tf.findBackend('webgl')) {
+                                await tf.setBackend('webgl');
+                                await tf.ready();
+                            } else if (tf.findBackend('wasm')) {
+                                await tf.setBackend('wasm');
+                                await tf.ready();
                             }
-                        } catch (_) {
-                            try { await faceapi.tf.setBackend('cpu'); } catch (_) {}
+                        } catch (backendErr) {
+                            console.warn("فشل تهيئة WebGL، محاولة التبديل لـ WASM:", backendErr);
                         }
                     }
 
                     let loaded = false;
                     let source = "سحابي";
+                    const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+                    
+                    const pathsToTry = isFileProtocol 
+                        ? [...this.cdnModelsUrls, ...this.localModelsPaths] 
+                        : [...this.localModelsPaths, ...this.cdnModelsUrls];
 
-                    // محاولة التحميل من المسارات المحلية المحتملة
-                    for (const path of this.localModelsPaths) {
+                    // 3. محاولة التحميل بالتسلسل مع مهلة زمنية ذكية لمنع التعليق
+                    for (const path of pathsToTry) {
+                        const isLocal = !path.startsWith('http');
                         try {
-                            await Promise.all([
-                                faceapi.nets.ssdMobilenetv1.loadFromUri(path),
-                                faceapi.nets.faceLandmark68Net.loadFromUri(path),
-                                faceapi.nets.faceRecognitionNet.loadFromUri(path)
-                            ]);
+                            updateStatus(isLocal ? "جاري فحص النماذج محلياً (1/4)..." : "جاري تنزيل النماذج سحابياً (1/4)...");
+                            console.log("Hodoori: Trying model source:", path);
+
+                            // فحص سريع للنموذج الأول بمهلة 2.5 ثانية
+                            await this.loadModelWithTimeout(faceapi.nets.tinyFaceDetector.loadFromUri(path), isLocal ? 2500 : 8000);
+                            
+                            updateStatus(isLocal ? "جاري تحميل شبكة المعالم (2/4)..." : "جاري تنزيل شبكة المعالم (2/4)...");
+                            await this.loadModelWithTimeout(faceapi.nets.faceLandmark68Net.loadFromUri(path), isLocal ? 2500 : 8000);
+
+                            updateStatus(isLocal ? "جاري تحميل شبكة البصمة (3/4)..." : "جاري تنزيل شبكة البصمة (3/4)...");
+                            await this.loadModelWithTimeout(faceapi.nets.faceRecognitionNet.loadFromUri(path), isLocal ? 4000 : 15000);
+
+                            updateStatus(isLocal ? "جاري تحميل شبكة الفحص الهرمي (4/4)..." : "جاري تنزيل شبكة الفحص الهرمي (4/4)...");
+                            await this.loadModelWithTimeout(faceapi.nets.ssdMobilenetv1.loadFromUri(path), isLocal ? 4000 : 15000);
+
                             loaded = true;
-                            source = "محلي";
-                            console.log("تم تحميل النماذج بنجاح من المسار المحلي:", path);
+                            source = isLocal ? "محلي" : "سحابي (CDN)";
+                            console.log("تم تحميل كافة نماذج الذكاء الاصطناعي بنجاح من:", path);
                             break;
                         } catch (err) {
-                            // تجربة المسار التالي
+                            console.warn("تعذر التحميل من المسار:", path, err.message || err);
                         }
                     }
 
-                    // في حال فشلت المسارات المحلية (مثلاً عند فتح الصفحة كملف مباشر file://)
                     if (!loaded) {
-                        console.warn("تعذر التحميل المحلي، جاري التحميل من الـ CDN السحابي...");
-                        await Promise.all([
-                            faceapi.nets.ssdMobilenetv1.loadFromUri(this.cdnModelsUrl),
-                            faceapi.nets.faceLandmark68Net.loadFromUri(this.cdnModelsUrl),
-                            faceapi.nets.faceRecognitionNet.loadFromUri(this.cdnModelsUrl)
-                        ]);
-                        source = window.location.protocol === 'file:' ? "سحابي (CORS file://)" : "سحابي (CDN)";
+                        throw new Error("تعذر تحميل ملفات النماذج من كافة الخوادم والمسارات المتاحة.");
                     }
 
                     this.isLoaded = true;
+                    this.isLoading = false;
                     const t1 = performance.now();
-                    const statusEl = document.getElementById('engine-status');
-                    statusEl.textContent = `المحرك جاهز (${source})`;
-                    statusEl.style.borderColor = "var(--accent-match)";
-                    statusEl.style.color = "var(--accent-match)";
-                    document.getElementById('t-load-time').textContent = (t1 - t0).toFixed(0) + " ms";
+                    updateStatus(`المحرك جاهز (${source})`, "var(--accent-match)", "var(--accent-match)");
+                    
+                    const loadTimeEl = document.getElementById('t-load-time');
+                    if (loadTimeEl) loadTimeEl.textContent = (t1 - t0).toFixed(0) + " ms";
+                    return true;
                 } catch (e) {
-                    console.error("فشل تحميل النماذج:", e);
-                    document.getElementById('engine-status').textContent = "خطأ في التحميل";
-                    document.getElementById('engine-status').style.color = "var(--accent-unmatch)";
+                    console.error("فشل تهيئة المحرك:", e);
+                    this.isLoading = false;
+                    if (statusEl) {
+                        statusEl.innerHTML = `خطأ في التحميل <button onclick="Engine.init()" style="background:var(--accent-unmatch);color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;margin-right:6px;font-size:11px;">إعادة المحاولة</button>`;
+                        statusEl.style.borderColor = "var(--accent-unmatch)";
+                        statusEl.style.color = "var(--accent-unmatch)";
+                    }
+                    return false;
                 }
             },
 
@@ -742,17 +802,16 @@
             async extractSingleDescriptor(imgElement) {
                 if (!this.isLoaded) await this.init();
 
-                // 1. المحاولة الأولى: دقة متوازنة متوافقة مع ذاكرة الهواتف
+                // 1. المحاولة الأولى: SSD MobileNet
                 let detection = await faceapi.detectSingleFace(imgElement, new faceapi.SsdMobilenetv1Options({ 
-                    minConfidence: 0.18, 
-                    inputSize: 512 
+                    minConfidence: 0.18 
                 })).withFaceLandmarks().withFaceDescriptor();
 
-                // 2. المحاولة الثانية: دقة أعلى إذا كانت الصورة عالية الوضوح
+                // 2. المحاولة الثانية: TinyFaceDetector في حال كان الوجه قريباً أو منخفض الإضاءة
                 if (!detection) {
-                    detection = await faceapi.detectSingleFace(imgElement, new faceapi.SsdMobilenetv1Options({ 
-                        minConfidence: 0.12, 
-                        inputSize: 1024 
+                    detection = await faceapi.detectSingleFace(imgElement, new faceapi.TinyFaceDetectorOptions({ 
+                        scoreThreshold: 0.15, 
+                        inputSize: 320 
                     })).withFaceLandmarks().withFaceDescriptor();
                 }
 
@@ -774,9 +833,15 @@
                         rCtx.drawImage(imgElement, -imgElement.width / 2, -imgElement.height / 2);
 
                         detection = await faceapi.detectSingleFace(rotatedCanvas, new faceapi.SsdMobilenetv1Options({
-                            minConfidence: 0.15,
-                            inputSize: 512
+                            minConfidence: 0.15
                         })).withFaceLandmarks().withFaceDescriptor();
+
+                        if (!detection) {
+                            detection = await faceapi.detectSingleFace(rotatedCanvas, new faceapi.TinyFaceDetectorOptions({
+                                scoreThreshold: 0.15,
+                                inputSize: 320
+                            })).withFaceLandmarks().withFaceDescriptor();
+                        }
 
                         if (detection) break;
                     }
@@ -785,8 +850,7 @@
                 // 4. المحاولة الرابعة: فحص شامل واختيار الوجه الأعلى ثقة
                 if (!detection) {
                     const all = await faceapi.detectAllFaces(imgElement, new faceapi.SsdMobilenetv1Options({ 
-                        minConfidence: 0.10, 
-                        inputSize: 416 
+                        minConfidence: 0.10 
                     })).withFaceLandmarks().withFaceDescriptors();
 
                     if (all && all.length > 0) {
@@ -854,23 +918,17 @@
                     const dx = rightEye.x - leftEye.x;
                     const rawAngle = Math.atan2(dy, dx);
                     
-                    // منع الدوران المفرط للزوايا الجانبية الشديدة (> 40 درجة)
                     if (Math.abs(rawAngle) < Math.PI / 4.5) {
                         angle = rawAngle;
                     }
                 }
 
                 if (angle !== 0) {
-                    const boxCenterX = box.x + box.width / 2;
-                    const boxCenterY = box.y + box.height / 2;
-
                     ctx.save();
-                    // نقل مركز الرسم إلى منتصف الكانفاس المستهدف
                     ctx.translate(width / 2, height / 2);
-                    // تدوير عكس زاوية ميلان العينين لجعلها أفقية تماماً
                     ctx.rotate(-angle);
-                    // رسم الصورة الأصلية متموضعة بدقة حول مركز الوجه
-                    ctx.drawImage(sourceImg, -boxCenterX, -boxCenterY);
+                    // اقتصاص الرقعة الصغيرة المحددة فقط من الصورة الأصلية وتدويرها (توفير معالجة ملايين البكسلات)
+                    ctx.drawImage(sourceImg, startX, startY, width, height, -width / 2, -height / 2, width, height);
                     ctx.restore();
                 } else {
                     ctx.drawImage(sourceImg, startX, startY, width, height, 0, 0, width, height);
@@ -878,93 +936,109 @@
 
                 return {
                     canvas: c,
-                    dataUrl: c.toDataURL('image/png'),
                     width,
                     height,
                     x: startX,
                     y: startY,
-                    padPercent: Math.round(ratio * 100)
+                    padPercent: Math.round(ratio * 100),
+                    get dataUrl() {
+                        if (!this._cachedDataUrl) {
+                            this._cachedDataUrl = this.canvas.toDataURL('image/jpeg', 0.85);
+                        }
+                        return this._cachedDataUrl;
+                    }
                 };
             },
 
+            detectCanvas: null,
+            detectCtx: null,
+
             // -------------------------------------------------------------
-            // المسار 1: المسار فائق السرعة للكاميرا المباشرة (< 30ms)
+            // المسار 1: المسار فائق السرعة والدقة للكاميرا المباشرة (30-60 FPS < 8ms)
             // -------------------------------------------------------------
-            async processLiveCameraFrame(videoElement, extractDescriptor = false) {
+            async processLiveCameraFrame(videoElement) {
                 if (!this.isLoaded) await this.init();
 
-                const options = new faceapi.SsdMobilenetv1Options({
-                    minConfidence: this.minConfidence,
-                    inputSize: this.liveInputSize,
-                    maxResults: 15
+                const vW = videoElement.videoWidth || 640;
+                const vH = videoElement.videoHeight || 480;
+
+                // دقة متوازنة عالية الوضوح (320px) لكشف الوجوه البعيدة والصغيرة بدقة فائقة مع زمن معالجة 6-8ms
+                const targetW = 320;
+                const targetH = Math.round(targetW * (vH / vW));
+                if (!this.detectCanvas) {
+                    this.detectCanvas = document.createElement('canvas');
+                    this.detectCanvas.width = targetW;
+                    this.detectCanvas.height = targetH;
+                    this.detectCtx = this.detectCanvas.getContext('2d', { alpha: false, willReadFrequently: false });
+                } else if (this.detectCanvas.width !== targetW || this.detectCanvas.height !== targetH) {
+                    this.detectCanvas.width = targetW;
+                    this.detectCanvas.height = targetH;
+                }
+
+                this.detectCtx.drawImage(videoElement, 0, 0, targetW, targetH);
+
+                const scaleX = vW / targetW;
+                const scaleY = vH / targetH;
+
+                const options = new faceapi.TinyFaceDetectorOptions({
+                    scoreThreshold: 0.40,
+                    inputSize: 224 // حجم مثالي للتوازن بين دقة كشف الوجوه والسرعة 30 FPS
                 });
 
-                let detections;
-                if (extractDescriptor) {
-                    detections = await faceapi.detectAllFaces(videoElement, options)
-                        .withFaceLandmarks()
-                        .withFaceDescriptors();
-                } else {
-                    detections = await faceapi.detectAllFaces(videoElement, options)
-                        .withFaceLandmarks();
-                }
+                const detections = await faceapi.detectAllFaces(this.detectCanvas, options);
 
                 if (!detections || detections.length === 0) return [];
 
                 return detections.map((d, index) => {
-                    const box = {
-                        x: d.detection.box.x,
-                        y: d.detection.box.y,
-                        width: d.detection.box.width,
-                        height: d.detection.box.height
-                    };
-                    const landmarks = d.landmarks ? d.landmarks.positions.map(pt => ({ x: pt.x, y: pt.y })) : null;
-                    const descriptor = d.descriptor ? Array.from(d.descriptor) : null;
+                    const rawBox = d.box || (d.detection ? d.detection.box : d);
+                    const score = d.score || (d.detection ? d.detection.score : 0.9);
 
-                    let matchResult = null;
-                    if (descriptor && this.referenceDescriptor) {
-                        matchResult = this.matchIdentity(descriptor, this.referenceDescriptor);
-                    }
+                    const box = {
+                        x: Math.round((rawBox.x || 0) * scaleX),
+                        y: Math.round((rawBox.y || 0) * scaleY),
+                        width: Math.round((rawBox.width || 0) * scaleX),
+                        height: Math.round((rawBox.height || 0) * scaleY)
+                    };
 
                     return {
                         id: index + 1,
-                        score: d.detection.score,
+                        score: score,
                         box,
-                        landmarks,
-                        descriptor,
-                        matchResult,
+                        landmarks: null,
+                        descriptor: null,
+                        matchResult: null,
                         sourceSlice: "بث مباشر فائق السرعة"
                     };
                 });
             },
 
             // -------------------------------------------------------------
-            // المسار 2: المسار الهرمي للصور الثابتة (مسافة 7م و 20 وجه)
+            // المسار 2: المسار الهرمي للصور الثابتة (كشف صناديق أولاً ثم NMS ثم استخراج المعالم)
             // -------------------------------------------------------------
             async processHierarchicalDetection(sourceImg) {
                 if (!this.isLoaded) await this.init();
 
-                const allRawDetections = [];
-                const sliceResults = [];
+                try {
+                    const allRawDetections = [];
+                    const sliceResults = [];
 
+                // نموذج SSD MobileNet يعمل بدقته الطبيعية دون المتغير الوهمي inputSize
                 const detectOptions = new faceapi.SsdMobilenetv1Options({ 
                     minConfidence: this.minConfidence, 
-                    inputSize: this.staticInputSize,
-                    maxResults: 100 // كشف كامل الوجوه دون أي حجب أو تقييد عددي
+                    maxResults: 100
                 });
 
-                // 1. فحص القطاعات الـ 9 الهرمية (عند تفعيل خيار التقسيم)
+                // 1. كشف الصناديق فقط (detectAllFaces بدون Landmarks) على الشرائح الـ 9
                 if (this.enableSlicing) {
                     const slices = SLICE_DEFINITIONS.map(def => this.createSliceCanvas(sourceImg, def));
 
                     for (let s of slices) {
-                        const detections = await faceapi.detectAllFaces(s.canvas, detectOptions)
-                            .withFaceLandmarks();
+                        const detections = await faceapi.detectAllFaces(s.canvas, detectOptions);
 
                         const count = detections ? detections.length : 0;
                         sliceResults.push({
                             sliceDef: s.sliceDef,
-                            dataUrl: s.canvas.toDataURL('image/png'),
+                            canvas: s.canvas,
                             detectedCount: count,
                             width: s.cropW,
                             height: s.cropH
@@ -972,22 +1046,17 @@
 
                         if (detections && detections.length > 0) {
                             for (let d of detections) {
-                                const globalBox = {
-                                    x: d.detection.box.x + s.cropX,
-                                    y: d.detection.box.y + s.cropY,
-                                    width: d.detection.box.width,
-                                    height: d.detection.box.height
-                                };
-
-                                const globalLandmarks = d.landmarks.positions.map(pt => ({
-                                    x: pt.x + s.cropX,
-                                    y: pt.y + s.cropY
-                                }));
+                                const rawBox = d.box || (d.detection ? d.detection.box : d);
+                                const score = d.score || (d.detection ? d.detection.score : 0.9);
 
                                 allRawDetections.push({
-                                    score: d.detection.score,
-                                    box: globalBox,
-                                    landmarks: globalLandmarks,
+                                    score: score,
+                                    box: {
+                                        x: rawBox.x + s.cropX,
+                                        y: rawBox.y + s.cropY,
+                                        width: rawBox.width,
+                                        height: rawBox.height
+                                    },
                                     sourceSlice: s.sliceDef.name
                                 });
                             }
@@ -995,44 +1064,70 @@
                     }
                 }
 
-                // 2. فحص الصورة الكاملة الشاملة (دائماً يعمل)
-                const fullDetections = await faceapi.detectAllFaces(sourceImg, detectOptions)
-                    .withFaceLandmarks();
+                // 2. كشف الصناديق على الصورة الكاملة
+                const fullDetections = await faceapi.detectAllFaces(sourceImg, detectOptions);
 
                 if (fullDetections && fullDetections.length > 0) {
                     for (let d of fullDetections) {
+                        const rawBox = d.box || (d.detection ? d.detection.box : d);
+                        const score = d.score || (d.detection ? d.detection.score : 0.9);
+
                         allRawDetections.push({
-                            score: d.detection.score,
+                            score: score,
                             box: {
-                                x: d.detection.box.x,
-                                y: d.detection.box.y,
-                                width: d.detection.box.width,
-                                height: d.detection.box.height
+                                x: rawBox.x,
+                                y: rawBox.y,
+                                width: rawBox.width,
+                                height: rawBox.height
                             },
-                            landmarks: d.landmarks.positions.map(pt => ({ x: pt.x, y: pt.y })),
                             sourceSlice: "الصورة الكاملة"
                         });
                     }
                 }
 
+                // 3. تطبيق خوارزمية NMS المعتمدة حصرياً على IoU الصافي
                 const finalBoxes = this.applyNonMaximumSuppression(allRawDetections, this.iouThreshold);
                 const croppedFaces = [];
 
+                // 4. استخراج الـ Landmarks والبصمة بدقة فائقة فقط للوجوه الفريدة المتبقية بعد NMS
                 for (let i = 0; i < finalBoxes.length; i++) {
                     const faceItem = finalBoxes[i];
-                    const cropInfo = this.cropAndAlignFace(sourceImg, faceItem.box, faceItem.landmarks, this.paddingRatio);
+                    const cropInfo = this.cropAndAlignFace(sourceImg, faceItem.box, null, 0.25);
 
-                    if (cropInfo) {
+                    if (cropInfo && cropInfo.canvas) {
                         let descriptor = null;
-                        const cropDetection = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.1 }))
-                            .withFaceLandmarks()
-                            .withFaceDescriptor();
+                        let landmarks = null;
 
-                        if (cropDetection && cropDetection.descriptor) {
-                            descriptor = Array.from(cropDetection.descriptor);
-                        } else {
-                            const fallback = await faceapi.computeFaceDescriptor(cropInfo.canvas);
-                            if (fallback) descriptor = Array.from(fallback);
+                        try {
+                            // استخدام TinyFaceDetector لاستخراج معالم الوجه 68-points والبصمة من الشريحة المقصوصة
+                            const singleDet = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
+                                .withFaceLandmarks()
+                                .withFaceDescriptor();
+
+                            if (singleDet) {
+                                if (singleDet.landmarks) landmarks = singleDet.landmarks.positions;
+                                if (singleDet.descriptor) descriptor = Array.from(singleDet.descriptor);
+                            } else {
+                                const ssdSingle = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.1 }))
+                                    .withFaceLandmarks()
+                                    .withFaceDescriptor();
+                                if (ssdSingle) {
+                                    if (ssdSingle.landmarks) landmarks = ssdSingle.landmarks.positions;
+                                    if (ssdSingle.descriptor) descriptor = Array.from(ssdSingle.descriptor);
+                                }
+                            }
+                        } catch (_) {
+                            try {
+                                const fallbackDesc = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                                if (fallbackDesc) descriptor = Array.from(fallbackDesc);
+                            } catch (_) {}
+                        }
+
+                        if (!descriptor) {
+                            try {
+                                const directDesc = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                                if (directDesc) descriptor = Array.from(directDesc);
+                            } catch (_) {}
                         }
 
                         let matchResult = null;
@@ -1043,7 +1138,7 @@
                         croppedFaces.push({
                             id: i + 1,
                             box: faceItem.box,
-                            landmarks: faceItem.landmarks,
+                            landmarks: landmarks,
                             score: faceItem.score,
                             sourceSlice: faceItem.sourceSlice,
                             crop: cropInfo,
@@ -1053,63 +1148,96 @@
                     }
                 }
 
-                return {
-                    croppedFaces,
-                    sliceResults,
-                    rawCount: allRawDetections.length
-                };
-            },
-
-            calculateIoU(boxA, boxB) {
-                const xA = Math.max(boxA.x, boxB.x);
-                const yA = Math.max(boxA.y, boxB.y);
-                const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
-                const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
-
-                const interW = Math.max(0, xB - xA);
-                const interH = Math.max(0, yB - yA);
-                const interArea = interW * interH;
-
-                const areaA = boxA.width * boxA.height;
-                const areaB = boxB.width * boxB.height;
-                const unionArea = areaA + areaB - interArea;
-
-                if (unionArea <= 0) return 0;
-                return interArea / unionArea;
-            },
-
-            applyNonMaximumSuppression(detections, iouThreshold = 0.35) {
-                if (!detections || detections.length === 0) return [];
-
-                const sorted = [...detections].sort((a, b) => b.score - a.score);
-                const selected = [];
-
-                for (let i = 0; i < sorted.length; i++) {
-                    const current = sorted[i];
-                    let isDuplicate = false;
-
-                    for (let existing of selected) {
-                        const iou = this.calculateIoU(current.box, existing.box);
-                        const currentCenterX = current.box.x + current.box.width / 2;
-                        const currentCenterY = current.box.y + current.box.height / 2;
-                        const isCenterInside = (
-                            currentCenterX >= existing.box.x &&
-                            currentCenterX <= existing.box.x + existing.box.width &&
-                            currentCenterY >= existing.box.y &&
-                            currentCenterY <= existing.box.y + existing.box.height
-                        );
-
-                        if (iou > iouThreshold || isCenterInside) {
-                            isDuplicate = true;
+                // فلتر ثانوي ذكي: دمج أي وجوه متطابقة بيومترياً ومكانياً
+                const finalUniqueFaces = [];
+                for (let f of croppedFaces) {
+                    let isDup = false;
+                    for (let uf of finalUniqueFaces) {
+                        const { ioMin, iou } = this.calculateOverlap(f.box, uf.box);
+                        let bioDist = 1.0;
+                        if (f.descriptor && uf.descriptor) {
+                            bioDist = faceapi.euclideanDistance(f.descriptor, uf.descriptor);
+                        }
+                        if (ioMin > 0.45 || iou > 0.30 || (bioDist < 0.25 && ioMin > 0.20)) {
+                            isDup = true;
                             break;
                         }
                     }
-
-                    if (!isDuplicate) selected.push(current);
+                    if (!isDup) finalUniqueFaces.push(f);
                 }
 
-                return selected;
-            },
+                // إعادة ترقيم الوجوه الفريدة النهائية
+                finalUniqueFaces.forEach((f, idx) => f.id = idx + 1);
+
+                return {
+                    croppedFaces: finalUniqueFaces,
+                    sliceResults,
+                    rawCount: allRawDetections.length
+                };
+            } catch (err) {
+                console.error("Hierarchical detection error:", err);
+                return { croppedFaces: [], sliceResults: [], rawCount: 0 };
+            }
+        },
+
+        calculateOverlap(boxA, boxB) {
+            const xA = Math.max(boxA.x, boxB.x);
+            const yA = Math.max(boxA.y, boxB.y);
+            const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
+            const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
+
+            const interW = Math.max(0, xB - xA);
+            const interH = Math.max(0, yB - yA);
+            const interArea = interW * interH;
+
+            if (interArea <= 0) return { iou: 0, ioMin: 0 };
+
+            const areaA = boxA.width * boxA.height;
+            const areaB = boxB.width * boxB.height;
+            const unionArea = areaA + areaB - interArea;
+            const minArea = Math.min(areaA, areaB);
+
+            const iou = unionArea > 0 ? interArea / unionArea : 0;
+            const ioMin = minArea > 0 ? interArea / minArea : 0;
+
+            return { iou, ioMin };
+        },
+
+        // خوارزمية NMS الذكية: دمج الصناديق المتطابقة وإلغاء الشرائح الجزئية للوجه الواحد (IoU + IoMin)
+        applyNonMaximumSuppression(detections, iouThreshold = 0.35, ioMinThreshold = 0.60) {
+            if (!detections || detections.length === 0) return [];
+
+            // فرز الصناديق تنازلياً مع تفضيل الصندوق الكامل الذي يغطي كامل الوجه بدلاً من النصف المقصوص
+            const sorted = [...detections].sort((a, b) => {
+                const areaA = a.box.width * a.box.height;
+                const areaB = b.box.width * b.box.height;
+                if (Math.abs(b.score - a.score) > 0.20) {
+                    return b.score - a.score;
+                }
+                return areaB - areaA;
+            });
+
+            const selected = [];
+
+            for (let i = 0; i < sorted.length; i++) {
+                const current = sorted[i];
+                let isDuplicate = false;
+
+                for (let existing of selected) {
+                    const { iou, ioMin } = this.calculateOverlap(current.box, existing.box);
+
+                    // إذا كان التقاطع الصافي كبيراً أو كان أحد الصندوقين مقصوصاً ومحتوى بأكثر من 60% داخل الصندوق الآخر
+                    if (iou > iouThreshold || ioMin > ioMinThreshold) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+
+                if (!isDuplicate) selected.push(current);
+            }
+
+            return selected;
+        },
 
             matchIdentity(descriptor, referenceDescriptor) {
                 if (!descriptor || !referenceDescriptor) return null;
@@ -1154,9 +1282,11 @@
         let liveFrameCounter = 0;
         let cachedDescriptors = {};
 
-        window.addEventListener('DOMContentLoaded', () => {
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', () => Engine.init());
+        } else {
             Engine.init();
-        });
+        }
 
         sliderMinConf.addEventListener('input', (e) => {
             Engine.minConfidence = parseFloat(e.target.value);
@@ -1382,8 +1512,15 @@
                 document.getElementById('slices-block').style.display = 'none'; // إخفاء الشرائح في البث لتوفير المساحة
                 document.getElementById('t-mode-status').textContent = "بث حي فائق (< 30ms)";
 
+                const isPortrait = window.innerHeight > window.innerWidth;
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+                    audio: false,
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: isPortrait ? 480 : 640, max: 640 },
+                        height: { ideal: isPortrait ? 640 : 480, max: 640 },
+                        frameRate: { ideal: 30, max: 30 }
+                    }
                 });
                 videoEl.srcObject = stream;
 
@@ -1395,6 +1532,7 @@
                     document.getElementById('btn-camera').style.display = 'none';
                     document.getElementById('btn-stop-cam').style.display = 'block';
                     isCameraRunning = true;
+                    isProcessingFrame = false;
                     liveFrameCounter = 0;
                     cachedDescriptors = {};
 
@@ -1405,8 +1543,126 @@
             }
         });
 
+        // نظام التعقب والتعرف المنفصل فائق الكفاءة (Track-then-Recognize Architecture)
+        const FaceTracker = {
+            tracks: new Map(),
+            nextId: 1,
+            maxDisappeared: 25,
+            isRecognizing: false,
+
+            update(detections) {
+                const now = performance.now();
+                const matchedTrackIds = new Set();
+                const outputFaces = [];
+
+                for (const det of detections) {
+                    let bestTrack = null;
+                    let bestIou = 0.25;
+
+                    for (const [id, track] of this.tracks.entries()) {
+                        if (matchedTrackIds.has(id)) continue;
+                        const iou = Engine.calculateIoU(det.box, track.box);
+                        if (iou > bestIou) {
+                            bestIou = iou;
+                            bestTrack = track;
+                        }
+                    }
+
+                    if (bestTrack) {
+                        bestTrack.box = det.box;
+                        bestTrack.score = det.score;
+                        bestTrack.lastSeen = now;
+                        bestTrack.disappeared = 0;
+                        matchedTrackIds.add(bestTrack.id);
+                        outputFaces.push(bestTrack);
+                    } else {
+                        const newTrack = {
+                            id: this.nextId++,
+                            box: det.box,
+                            score: det.score,
+                            descriptor: null,
+                            matchResult: null,
+                            lastSeen: now,
+                            disappeared: 0,
+                            isPendingRecognition: false,
+                            sourceSlice: "بث مباشر فائق السرعة"
+                        };
+                        this.tracks.set(newTrack.id, newTrack);
+                        matchedTrackIds.add(newTrack.id);
+                        outputFaces.push(newTrack);
+                    }
+                }
+
+                for (const [id, track] of this.tracks.entries()) {
+                    if (!matchedTrackIds.has(id)) {
+                        track.disappeared = (track.disappeared || 0) + 1;
+                        if (track.disappeared > this.maxDisappeared) {
+                            this.tracks.delete(id);
+                        }
+                    }
+                }
+
+                return outputFaces;
+            },
+
+            // استخراج البصمة لوجه واحد في الخلفية كل ثانية دون تعطيل الـ 30 FPS
+            async processRecognitionQueue(videoElement) {
+                if (this.isRecognizing || !Engine.referenceDescriptor) return;
+
+                let targetTrack = null;
+                for (const track of this.tracks.values()) {
+                    if (!track.descriptor && !track.isPendingRecognition && track.disappeared === 0) {
+                        targetTrack = track;
+                        break;
+                    }
+                }
+
+                if (!targetTrack) return;
+
+                targetTrack.isPendingRecognition = true;
+                this.isRecognizing = true;
+
+                try {
+                    const cropInfo = Engine.cropAndAlignFace(videoElement, targetTrack.box, null, 0.25);
+                    if (cropInfo && cropInfo.canvas) {
+                        const det = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
+                            .withFaceLandmarks()
+                            .withFaceDescriptor();
+
+                        if (det && det.descriptor) {
+                            targetTrack.descriptor = Array.from(det.descriptor);
+                            targetTrack.matchResult = Engine.matchIdentity(targetTrack.descriptor, Engine.referenceDescriptor);
+                        } else {
+                            const fallbackDesc = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                            if (fallbackDesc) {
+                                targetTrack.descriptor = Array.from(fallbackDesc);
+                                targetTrack.matchResult = Engine.matchIdentity(targetTrack.descriptor, Engine.referenceDescriptor);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Async face recognition notice:", e);
+                } finally {
+                    targetTrack.isPendingRecognition = false;
+                    this.isRecognizing = false;
+                }
+            },
+
+            clear() {
+                this.tracks.clear();
+                this.nextId = 1;
+                this.isRecognizing = false;
+            }
+        };
+
+        let latestDetections = [];
+        let isDetecting = false;
+
         function stopCamera() {
             isCameraRunning = false;
+            isDetecting = false;
+            latestDetections = [];
+            FaceTracker.clear();
             if (videoEl.srcObject) {
                 videoEl.srcObject.getTracks().forEach(t => t.stop());
             }
@@ -1420,49 +1676,50 @@
 
         document.getElementById('btn-stop-cam').addEventListener('click', stopCamera);
 
-        // حلقة البث المباشر فائقة السرعة
+        // حلقة البث المباشر ثنائية المسار (Decoupled Pipeline - ثبات 30-60 FPS)
         async function runHighSpeedCameraLoop() {
             if (!isCameraRunning) return;
 
-            if (videoEl.readyState >= 2 && !videoEl.paused) {
-                const t0 = performance.now();
-                liveFrameCounter++;
+            // المسار أ: محرك الكشف غير المتزامن فائق السرعة
+            async function detectionWorker() {
+                if (!isCameraRunning) return;
+                if (!isDetecting && videoEl.readyState >= 2 && !videoEl.paused) {
+                    isDetecting = true;
+                    const t0 = performance.now();
+                    try {
+                        const rawDetections = await Engine.processLiveCameraFrame(videoEl);
+                        const trackedFaces = FaceTracker.update(rawDetections);
+                        latestDetections = trackedFaces;
+                        const latency = performance.now() - t0;
+                        if (liveFrameCounter % 15 === 0) {
+                            document.getElementById('t-detect-time').textContent = latency.toFixed(1) + " ms";
+                            document.getElementById('t-final-count').textContent = trackedFaces.length;
+                        }
 
-                // استخراج البصمة مرة كل 4 إطارات لتوفير معالجة GPU ومضاعفة السرعة
-                const shouldExtractDescriptor = (liveFrameCounter % 4 === 0) || !cachedDescriptors[1];
-                
-                const detections = await Engine.processLiveCameraFrame(videoEl, shouldExtractDescriptor);
-                const t1 = performance.now();
-                const latency = t1 - t0;
-
-                // تحديث زمن المعالجة والـ FPS
-                document.getElementById('t-detect-time').textContent = latency.toFixed(1) + " ms";
-                updateFPS();
-
-                if (detections && detections.length > 0) {
-                    if (detections[0].descriptor) {
-                        cachedDescriptors[1] = {
-                            descriptor: detections[0].descriptor,
-                            matchResult: detections[0].matchResult
-                        };
-                    } else if (cachedDescriptors[1]) {
-                        detections[0].descriptor = cachedDescriptors[1].descriptor;
-                        detections[0].matchResult = cachedDescriptors[1].matchResult;
+                        // تشغيل التعرف البيومتري غير المتزامن لوجه واحد في الخلفية
+                        FaceTracker.processRecognitionQueue(videoEl);
+                    } catch (e) {
+                        console.warn("Detection worker notice:", e);
+                    } finally {
+                        isDetecting = false;
                     }
                 }
-
-                renderAnalysis({ croppedFaces: detections });
-                document.getElementById('t-final-count').textContent = detections.length;
-
-                // تنظيف الذاكرة دورياً
-                if (liveFrameCounter % 60 === 0 && faceapi.tf && faceapi.tf.memory().numTensors > 120) {
-                    faceapi.tf.disposeVariables();
+                if (isCameraRunning) {
+                    setTimeout(detectionWorker, 4);
                 }
             }
 
-            if (isCameraRunning) {
-                requestAnimationFrame(runHighSpeedCameraLoop);
+            // المسار ب: محرك الرسم المباشر (معدل الشاشة الكامل 30-60 FPS)
+            function renderWorker() {
+                if (!isCameraRunning) return;
+                liveFrameCounter++;
+                updateFPS();
+                renderAnalysis({ croppedFaces: latestDetections });
+                requestAnimationFrame(renderWorker);
             }
+
+            detectionWorker();
+            renderWorker();
         }
 
         function updateFPS() {
@@ -1476,7 +1733,7 @@
         }
 
         // =========================================================================
-        // 4. الرسم المباشر والمحاذاة 100%
+        // 4. الرسم المباشر فائق السرعة (بدون إجهاد DOM)
         // =========================================================================
         function renderAnalysis(analysis) {
             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
@@ -1484,18 +1741,16 @@
             const { croppedFaces } = analysis;
 
             if (!croppedFaces || croppedFaces.length === 0) {
-                detectStatusEl.textContent = "لم يتم كشف أي وجه";
-                detectStatusEl.className = "status-box status-fail";
-                matchStatusEl.textContent = "غير متاح";
-                matchStatusEl.className = "status-box";
+                if (liveFrameCounter % 30 === 0) {
+                    detectStatusEl.textContent = "لم يتم كشف أي وجه";
+                    detectStatusEl.className = "status-box status-fail";
+                }
                 return;
             }
 
-            detectStatusEl.textContent = `تم كشف ${croppedFaces.length} وجه بنجاح`;
-            detectStatusEl.className = "status-box status-success";
-
-            if (croppedFaces[0].descriptor) {
-                vectorOutputEl.textContent = JSON.stringify(croppedFaces[0].descriptor, null, 2);
+            if (liveFrameCounter % 30 === 0) {
+                detectStatusEl.textContent = `تم كشف ${croppedFaces.length} وجه بنجاح`;
+                detectStatusEl.className = "status-box status-success";
             }
 
             let hasAnyMatch = false;
@@ -1675,12 +1930,14 @@
                     ? `<span class="detection-tag">تم كشف (${s.detectedCount}) وجه</span>` 
                     : `<span class="no-detection-tag">لا وجوه</span>`;
 
+                const thumbUrl = s.canvas ? s.canvas.toDataURL('image/jpeg', 0.6) : (s.dataUrl || '');
+
                 card.innerHTML = `
                     <div class="slice-card-header">
                         <span style="font-weight:700;">#${s.sliceDef.id} ${s.sliceDef.name}</span>
                         <span style="font-family:monospace;">${s.sliceDef.type}</span>
                     </div>
-                    <img class="slice-thumb" src="${s.dataUrl}" alt="${s.sliceDef.name}">
+                    <img class="slice-thumb" src="${thumbUrl}" alt="${s.sliceDef.name}">
                     <div class="slice-info">
                         <span style="color:var(--text-muted);">${s.width}×${s.height}</span>
                         ${detectedText}

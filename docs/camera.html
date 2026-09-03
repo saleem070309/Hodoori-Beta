@@ -798,15 +798,19 @@
             isLoading: false,
             minConfidence: 0.30,
             matchThreshold: 0.55,
-            staticInputSize: isMobileDevice ? 512 : 1024,
-            liveInputSize: isMobileDevice ? 224 : 320,
+            liveInputSize: isMobileDevice ? 160 : 224,
             paddingRatio: 0.20,
-            iouThreshold: 0.38,
+            iouThreshold: 0.45,
             enableAlignment: true,
             enableSlicing: true,
 
             localModelsPaths: ['../models', '/models', './models', 'models'],
-            cdnModelsUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+            cdnModelsUrls: [
+                'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/',
+                'https://vladmandic.github.io/face-api/model/',
+                'https://unpkg.com/@vladmandic/face-api/model/',
+                'https://raw.githubusercontent.com/vladmandic/face-api/master/model/'
+            ],
 
             async init() {
                 if (this.isLoaded) return true;
@@ -814,20 +818,35 @@
                 this.isLoading = true;
 
                 try {
+                    let waitCount = 0;
+                    while (typeof faceapi === 'undefined') {
+                        if (waitCount++ > 60) {
+                            throw new Error("تعذر تحميل سكريبت face-api.js من الـ CDN.");
+                        }
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+
                     if (typeof faceapi !== 'undefined' && faceapi.tf) {
                         try {
-                            await faceapi.tf.setBackend('webgl');
-                            await faceapi.tf.ready();
-                            if (!isMobileDevice) {
-                                try { faceapi.tf.env().set('WEBGL_PACK', true); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true); } catch (_) {}
-                            } else {
-                                try { faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', false); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_PACK', false); } catch (_) {}
-                                try { faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0); } catch (_) {}
+                            const tf = faceapi.tf;
+                            tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                            tf.env().set('WEBGL_PACK', true);
+
+                            if (tf.findBackend('webgl')) {
+                                await tf.setBackend('webgl');
+                                await tf.ready();
+                            } else if (tf.findBackend('wasm')) {
+                                await tf.setBackend('wasm');
+                                await tf.ready();
                             }
-                        } catch (_) {
-                            try { await faceapi.tf.setBackend('cpu'); } catch (_) {}
+                        } catch (backendErr) {
+                            console.warn("WebGL notice, trying WASM fallback:", backendErr);
+                            try {
+                                if (faceapi.tf.findBackend('wasm')) {
+                                    await faceapi.tf.setBackend('wasm');
+                                    await faceapi.tf.ready();
+                                }
+                            } catch (_) {}
                         }
                     }
 
@@ -835,6 +854,7 @@
                     for (const path of this.localModelsPaths) {
                         try {
                             await Promise.all([
+                                faceapi.nets.tinyFaceDetector.loadFromUri(path),
                                 faceapi.nets.ssdMobilenetv1.loadFromUri(path),
                                 faceapi.nets.faceLandmark68Net.loadFromUri(path),
                                 faceapi.nets.faceRecognitionNet.loadFromUri(path)
@@ -846,12 +866,26 @@
                     }
 
                     if (!loaded) {
-                        console.log("Hodoori: Loading Face models from CDN fallback...");
-                        await Promise.all([
-                            faceapi.nets.ssdMobilenetv1.loadFromUri(this.cdnModelsUrl),
-                            faceapi.nets.faceLandmark68Net.loadFromUri(this.cdnModelsUrl),
-                            faceapi.nets.faceRecognitionNet.loadFromUri(this.cdnModelsUrl)
-                        ]);
+                        for (const cdnUrl of this.cdnModelsUrls) {
+                            try {
+                                console.log("Hodoori: Loading Face models from CDN:", cdnUrl);
+                                await Promise.all([
+                                    faceapi.nets.tinyFaceDetector.loadFromUri(cdnUrl),
+                                    faceapi.nets.ssdMobilenetv1.loadFromUri(cdnUrl),
+                                    faceapi.nets.faceLandmark68Net.loadFromUri(cdnUrl),
+                                    faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
+                                ]);
+                                loaded = true;
+                                console.log("Hodoori: Loaded models from CDN:", cdnUrl);
+                                break;
+                            } catch (cdnErr) {
+                                console.warn("Hodoori: CDN mirror failed, trying next...", cdnUrl);
+                            }
+                        }
+                    }
+
+                    if (!loaded) {
+                        throw new Error("Failed to load models from any source.");
                     }
 
                     this.isLoaded = true;
@@ -925,13 +959,10 @@
                 }
 
                 if (angle !== 0) {
-                    const boxCenterX = box.x + box.width / 2;
-                    const boxCenterY = box.y + box.height / 2;
-
                     ctx.save();
                     ctx.translate(width / 2, height / 2);
                     ctx.rotate(-angle);
-                    ctx.drawImage(sourceImg, -boxCenterX, -boxCenterY);
+                    ctx.drawImage(sourceImg, startX, startY, width, height, -width / 2, -height / 2, width, height);
                     ctx.restore();
                 } else {
                     ctx.drawImage(sourceImg, startX, startY, width, height, 0, 0, width, height);
@@ -946,7 +977,7 @@
                 };
             },
 
-            calculateIoU(boxA, boxB) {
+            calculateOverlap(boxA, boxB) {
                 const xA = Math.max(boxA.x, boxB.x);
                 const yA = Math.max(boxA.y, boxB.y);
                 const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
@@ -956,18 +987,35 @@
                 const interH = Math.max(0, yB - yA);
                 const interArea = interW * interH;
 
+                if (interArea <= 0) return { iou: 0, ioMin: 0 };
+
                 const areaA = boxA.width * boxA.height;
                 const areaB = boxB.width * boxB.height;
                 const unionArea = areaA + areaB - interArea;
+                const minArea = Math.min(areaA, areaB);
 
-                if (unionArea <= 0) return 0;
-                return interArea / unionArea;
+                const iou = unionArea > 0 ? interArea / unionArea : 0;
+                const ioMin = minArea > 0 ? interArea / minArea : 0;
+
+                return { iou, ioMin };
             },
 
-            applyNonMaximumSuppression(detections, iouThreshold = 0.38) {
+            calculateIoU(boxA, boxB) {
+                return this.calculateOverlap(boxA, boxB).iou;
+            },
+
+            applyNonMaximumSuppression(detections, iouThreshold = 0.35, ioMinThreshold = 0.60) {
                 if (!detections || detections.length === 0) return [];
 
-                const sorted = [...detections].sort((a, b) => b.score - a.score);
+                const sorted = [...detections].sort((a, b) => {
+                    const areaA = a.box.width * a.box.height;
+                    const areaB = b.box.width * b.box.height;
+                    if (Math.abs(b.score - a.score) > 0.20) {
+                        return b.score - a.score;
+                    }
+                    return areaB - areaA;
+                });
+
                 const selected = [];
 
                 for (let i = 0; i < sorted.length; i++) {
@@ -975,17 +1023,8 @@
                     let isDuplicate = false;
 
                     for (let existing of selected) {
-                        const iou = this.calculateIoU(current.box, existing.box);
-                        const currentCenterX = current.box.x + current.box.width / 2;
-                        const currentCenterY = current.box.y + current.box.height / 2;
-                        const isCenterInside = (
-                            currentCenterX >= existing.box.x &&
-                            currentCenterX <= existing.box.x + existing.box.width &&
-                            currentCenterY >= existing.box.y &&
-                            currentCenterY <= existing.box.y + existing.box.height
-                        );
-
-                        if (iou > iouThreshold || isCenterInside) {
+                        const { iou, ioMin } = this.calculateOverlap(current.box, existing.box);
+                        if (iou > iouThreshold || ioMin > ioMinThreshold) {
                             isDuplicate = true;
                             break;
                         }
@@ -1020,30 +1059,27 @@
                 const allRawDetections = [];
                 const detectOptions = new faceapi.SsdMobilenetv1Options({ 
                     minConfidence: this.minConfidence, 
-                    inputSize: this.staticInputSize,
                     maxResults: 100
                 });
 
-                // 1. Slicing pass (if enabled)
+                // 1. كشف الصناديق فقط على الشرائح
                 if (enableSlicing) {
                     const slices = SLICE_DEFINITIONS.map(def => this.createSliceCanvas(workingSource, def));
                     for (let s of slices) {
                         try {
-                            const detections = await faceapi.detectAllFaces(s.canvas, detectOptions).withFaceLandmarks();
+                            const detections = await faceapi.detectAllFaces(s.canvas, detectOptions);
                             if (detections && detections.length > 0) {
                                 for (let d of detections) {
+                                    const rawBox = d.box || (d.detection ? d.detection.box : d);
+                                    const score = d.score || (d.detection ? d.detection.score : 0.9);
                                     allRawDetections.push({
-                                        score: d.detection.score,
+                                        score: score,
                                         box: {
-                                            x: (d.detection.box.x + s.cropX) / scaleRatio,
-                                            y: (d.detection.box.y + s.cropY) / scaleRatio,
-                                            width: d.detection.box.width / scaleRatio,
-                                            height: d.detection.box.height / scaleRatio
+                                            x: (rawBox.x + s.cropX) / scaleRatio,
+                                            y: (rawBox.y + s.cropY) / scaleRatio,
+                                            width: rawBox.width / scaleRatio,
+                                            height: rawBox.height / scaleRatio
                                         },
-                                        landmarks: d.landmarks.positions.map(pt => ({
-                                            x: (pt.x + s.cropX) / scaleRatio,
-                                            y: (pt.y + s.cropY) / scaleRatio
-                                        })),
                                         sourceSlice: s.sliceDef.name
                                     });
                                 }
@@ -1052,30 +1088,28 @@
                     }
                 }
 
-                // 2. Full image pass
+                // 2. كشف الصناديق على الصورة الكاملة
                 try {
-                    const fullDetections = await faceapi.detectAllFaces(workingSource, detectOptions).withFaceLandmarks();
+                    const fullDetections = await faceapi.detectAllFaces(workingSource, detectOptions);
                     if (fullDetections && fullDetections.length > 0) {
                         for (let d of fullDetections) {
+                            const rawBox = d.box || (d.detection ? d.detection.box : d);
+                            const score = d.score || (d.detection ? d.detection.score : 0.9);
                             allRawDetections.push({
-                                score: d.detection.score,
+                                score: score,
                                 box: {
-                                    x: d.detection.box.x / scaleRatio,
-                                    y: d.detection.box.y / scaleRatio,
-                                    width: d.detection.box.width / scaleRatio,
-                                    height: d.detection.box.height / scaleRatio
+                                    x: rawBox.x / scaleRatio,
+                                    y: rawBox.y / scaleRatio,
+                                    width: rawBox.width / scaleRatio,
+                                    height: rawBox.height / scaleRatio
                                 },
-                                landmarks: d.landmarks.positions.map(pt => ({
-                                    x: pt.x / scaleRatio,
-                                    y: pt.y / scaleRatio
-                                })),
                                 sourceSlice: "الصورة الكاملة"
                             });
                         }
                     }
                 } catch (_) {}
 
-                // 3. Multi-Angle Fallback for phone vertical photos
+                // 3. التدوير في حال عدم العثور على وجوه
                 if (allRawDetections.length === 0) {
                     const angles = [90, 270, 180];
                     for (const angle of angles) {
@@ -1095,22 +1129,20 @@
                             rCtx.rotate((angle * Math.PI) / 180);
                             rCtx.drawImage(workingSource, -w / 2, -h / 2);
 
-                            const rotDetections = await faceapi.detectAllFaces(rotCanvas, detectOptions).withFaceLandmarks();
+                            const rotDetections = await faceapi.detectAllFaces(rotCanvas, detectOptions);
                             if (rotDetections && rotDetections.length > 0) {
                                 for (let d of rotDetections) {
+                                    const rawBox = d.box || (d.detection ? d.detection.box : d);
+                                    const score = d.score || (d.detection ? d.detection.score : 0.9);
                                     allRawDetections.push({
-                                        score: d.detection.score,
+                                        score: score,
                                         box: {
-                                            x: d.detection.box.x / scaleRatio,
-                                            y: d.detection.box.y / scaleRatio,
-                                            width: d.detection.box.width / scaleRatio,
-                                            height: d.detection.box.height / scaleRatio
+                                            x: rawBox.x / scaleRatio,
+                                            y: rawBox.y / scaleRatio,
+                                            width: rawBox.width / scaleRatio,
+                                            height: rawBox.height / scaleRatio
                                         },
-                                        landmarks: d.landmarks.positions.map(pt => ({
-                                            x: pt.x / scaleRatio,
-                                            y: pt.y / scaleRatio
-                                        })),
-                                        sourceSlice: `rotated_${angle}`
+                                        sourceSlice: `مائلة ${angle}°`
                                     });
                                 }
                                 break;
@@ -1119,33 +1151,49 @@
                     }
                 }
 
+                // 4. تطبيق NMS القياسي
                 const finalBoxes = this.applyNonMaximumSuppression(allRawDetections, this.iouThreshold);
                 const croppedFaces = [];
 
+                // 5. استخراج الـ Landmarks والبصمة فقط للوجوه الفريدة بعد NMS
                 for (let i = 0; i < finalBoxes.length; i++) {
                     if (i > 0 && i % 3 === 0) await new Promise(r => setTimeout(r, 0));
                     const faceItem = finalBoxes[i];
-                    const cropInfo = this.cropAndAlignFace(sourceImg, faceItem.box, faceItem.landmarks, this.paddingRatio);
+                    const cropInfo = this.cropAndAlignFace(sourceImg, faceItem.box, null, 0.25);
 
                     if (cropInfo) {
                         let descriptor = null;
+                        let landmarks = null;
                         try {
-                            const cropDetection = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15, inputSize: 224 }))
+                            const cropDetection = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 }))
                                 .withFaceLandmarks()
                                 .withFaceDescriptor();
 
                             if (cropDetection && cropDetection.descriptor) {
                                 descriptor = Array.from(cropDetection.descriptor);
+                                if (cropDetection.landmarks) landmarks = cropDetection.landmarks.positions;
                             } else {
-                                const fallback = await faceapi.computeFaceDescriptor(cropInfo.canvas);
-                                if (fallback) descriptor = Array.from(fallback);
+                                const ssdDetection = await faceapi.detectSingleFace(cropInfo.canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.10 }))
+                                    .withFaceLandmarks()
+                                    .withFaceDescriptor();
+                                if (ssdDetection && ssdDetection.descriptor) {
+                                    descriptor = Array.from(ssdDetection.descriptor);
+                                    if (ssdDetection.landmarks) landmarks = ssdDetection.landmarks.positions;
+                                }
                             }
                         } catch (_) {}
+
+                        if (!descriptor) {
+                            try {
+                                const fallback = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                                if (fallback) descriptor = Array.from(fallback);
+                            } catch (_) {}
+                        }
 
                         croppedFaces.push({
                             id: i + 1,
                             box: faceItem.box,
-                            landmarks: faceItem.landmarks,
+                            landmarks: landmarks,
                             score: faceItem.score,
                             descriptor,
                             crop: cropInfo

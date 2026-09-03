@@ -1139,7 +1139,7 @@
     <div id="modalOverlay" class="fixed inset-0 liquid-glass-overlay z-50 hidden flex items-center justify-center p-4">
 
         <!-- Add/Edit Teacher Modal -->
-        <div id="teacherModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+        <div id="teacherModal" class="liquid-glass-modal w-full max-w-md p-6 sm:p-7 rounded-[2rem] hidden relative max-h-[85vh] overflow-y-auto liquid-glass-scrollbar">
             <!-- Close Button (X) -->
             <button onclick="closeModal()"
                 class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
@@ -1214,88 +1214,96 @@
         </div>
 
         <!-- Add/Edit Student Modal -->
-        <div id="studentModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
-            <!-- Close Button (X) -->
-            <button onclick="closeModal()"
-                class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
-                <span class="material-symbols-outlined">close</span>
-            </button>
-            <h2 id="studentModalTitle" class="text-xl font-black text-gray-800 mb-6">إضافة طالب جديد</h2>
-            <form onsubmit="handleAddStudent(event)" class="space-y-4 text-right">
+        <div id="studentModal" class="liquid-glass-modal w-full max-w-lg p-5 sm:p-7 rounded-[2rem] hidden relative max-h-[85vh] flex flex-col">
+            <!-- Header with Title and Close Button (Fixed top) -->
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 shrink-0">
+                <h2 id="studentModalTitle" class="text-xl font-black text-gray-800">إضافة طالب جديد</h2>
+                <button type="button" onclick="closeModal()"
+                    class="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+            <!-- Scrollable Form Body -->
+            <form onsubmit="handleAddStudent(event)" class="flex-1 overflow-y-auto space-y-3.5 text-right pl-1 pr-1 liquid-glass-scrollbar">
                 <input type="hidden" id="sClassId">
                 <input type="hidden" id="sEditId">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">اسم الطالب</label>
-                    <input type="text" id="sName" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1 mr-1">اسم الطالب</label>
+                        <input type="text" id="sName" required class="w-full liquid-glass-input rounded-xl p-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1 mr-1">الرقم الوطني</label>
+                        <input type="text" id="sId" required class="w-full liquid-glass-input rounded-xl p-3 text-sm">
+                    </div>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">الرقم الوطني</label>
-                    <input type="text" id="sId" required class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">رقم هاتف ولي الأمر (إجباري - 10
-                        أرقام)</label>
+                    <label class="block text-xs font-bold text-gray-400 mb-1 mr-1">رقم هاتف ولي الأمر (إجباري - 10 أرقام)</label>
                     <input type="text" id="sPhone" placeholder="مثال: 0790000000" required pattern="07[789][0-9]{7}"
                         title="يرجى إدخال رقم هاتف صالح يبدأ بـ 07 ويتكون من 10 أرقام"
-                        class="w-full liquid-glass-input rounded-xl p-3.5 text-sm">
+                        class="w-full liquid-glass-input rounded-xl p-3 text-sm">
                 </div>
-                <div id="sImagePreviewContainer" class="hidden mb-4 relative group">
-                    <div class="relative w-28 h-28 mx-auto">
+
+                <div id="sImagePreviewContainer" class="hidden my-2 relative group text-center">
+                    <div class="relative w-20 h-20 mx-auto">
                         <img id="sImagePreview" src=""
-                            class="w-full h-full rounded-2xl object-cover border-4 border-primary/20 cursor-pointer interactive"
+                            class="w-full h-full rounded-2xl object-cover border-2 border-primary/20 cursor-pointer interactive shadow-sm"
                             onclick="UI.viewImage(this.src)">
-                        <div
-                            class="absolute -bottom-2 -right-2 bg-primary text-white w-7 h-7 rounded-full flex items-center justify-center border-2 border-white">
-                            <span class="material-symbols-outlined text-xs">check</span>
+                        <div class="absolute -bottom-1.5 -right-1.5 bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                            <span class="material-symbols-outlined text-[11px]">check</span>
                         </div>
                     </div>
                 </div>
+
                 <div id="sFingerprintStatus"
-                    class="hidden p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined">fingerprint</span>
+                    class="hidden p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined text-base">fingerprint</span>
                         </div>
                         <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest text-primary">البصمة الرقمية</p>
+                            <p class="text-[9px] font-black uppercase tracking-widest text-primary">البصمة الرقمية</p>
                             <p id="sFingerprintCount" class="text-xs font-bold text-gray-700">مخزن: 0 بصمات</p>
                         </div>
                     </div>
                     <button type="button" onclick="clearStudentFingerprints()"
-                        class="text-xs font-black text-error hover:underline">مسح الكل</button>
+                        class="text-xs font-black text-error hover:underline px-2 py-1">مسح الكل</button>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">صورة الطالب <span
+                    <label class="block text-xs font-bold text-gray-400 mb-1 mr-1">صورة الطالب <span
                             id="sImgRequiredLabel" class="text-error">(إجباري)</span></label>
                     <div class="relative group">
                         <input type="file" id="sImage" accept="image/*"
                             class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             onchange="previewStudentImage(this)">
-                        <div
-                            class="liquid-glass-input rounded-xl p-3.5 flex items-center justify-between pointer-events-none">
-                            <span id="sImageName" class="text-gray-400 text-sm">اختر صورة الطالب...</span>
-                            <span class="material-symbols-outlined text-primary text-lg">image</span>
+                        <div class="liquid-glass-input rounded-xl p-3 flex items-center justify-between pointer-events-none">
+                            <span id="sImageName" class="text-gray-400 text-xs sm:text-sm truncate">اختر صورة الطالب...</span>
+                            <span class="material-symbols-outlined text-primary text-base">image</span>
                         </div>
                     </div>
-                    <div id="sAppendFingerprintContainer" class="hidden mt-2 flex items-center gap-2 mr-1">
-                        <input type="checkbox" id="sAppendFingerprint" class="w-4 h-4 accent-primary">
-                        <label for="sAppendFingerprint" class="text-[10px] font-bold text-gray-500">إضافة كبصمة إضافية
-                            (لزيادة الدقة)</label>
+                    <div id="sAppendFingerprintContainer" class="hidden mt-1.5 flex items-center gap-2 mr-1">
+                        <input type="checkbox" id="sAppendFingerprint" class="w-3.5 h-3.5 accent-primary">
+                        <label for="sAppendFingerprint" class="text-[10px] font-bold text-gray-500">إضافة كبصمة إضافية (لزيادة الدقة)</label>
                     </div>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-gray-400 mb-1.5 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
-                    <textarea id="sNotes" class="w-full liquid-glass-input rounded-xl p-3.5 text-sm h-16 resize-none" placeholder="مثال: البريد الإلكتروني هو parent.ahmad@example.com"></textarea>
+                    <label class="block text-xs font-bold text-gray-400 mb-1 mr-1">ملاحظات (مثال: البريد الإلكتروني أو معلومات التواصل)</label>
+                    <textarea id="sNotes" class="w-full liquid-glass-input rounded-xl p-3 text-sm h-14 resize-none" placeholder="مثال: البريد الإلكتروني هو parent.ahmad@example.com"></textarea>
                 </div>
-                <div class="flex gap-3 pt-4">
+
+                <div class="pt-3 sticky bottom-0 bg-white/90 backdrop-blur-md -mb-2 pb-2">
                     <button type="submit"
-                        class="flex-1 liquid-button liquid-button-prominent text-white font-black py-3.5 rounded-xl">حفظ</button>
+                        class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl shadow-md">حفظ</button>
                 </div>
             </form>
         </div>
 
         <!-- Add/Edit Notification Modal -->
-        <div id="notificationModal" class="liquid-glass-modal w-full max-w-md p-7 rounded-[2rem] hidden relative">
+        <div id="notificationModal" class="liquid-glass-modal w-full max-w-md p-6 sm:p-7 rounded-[2rem] hidden relative max-h-[85vh] overflow-y-auto liquid-glass-scrollbar">
             <!-- Close Button (X) -->
             <button onclick="closeModal()"
                 class="absolute top-6 left-6 w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all">
