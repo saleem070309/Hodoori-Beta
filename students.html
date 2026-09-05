@@ -217,6 +217,90 @@
                         <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">رقم هاتف ولي الأمر (اختياري)</label>
                         <input type="tel" id="modal-student-parent-phone" placeholder="مثال: 0501234567" class="flat-input" />
                     </div>
+
+                    <!-- ─── Biometric / Face Fingerprint Section ─── -->
+                    <div class="border-t border-stone-100 dark:border-neutral-800/80 pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-extrabold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">face</span>
+                                <span>بصمة الوجه الرقمية (Biometric ID)</span>
+                            </label>
+                            <span id="modal-biometric-status-badge" class="badge-tag badge-status-absent text-[10px]">غير مسجلة</span>
+                        </div>
+
+                        <!-- Existing Fingerprint Info Banner (Shown when student has fingerprints) -->
+                        <div id="modal-fingerprint-info" class="hidden mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm">fingerprint</span>
+                                <span id="modal-fingerprint-info-text" class="text-xs font-bold text-amber-900 dark:text-amber-300">مخزن: 1 بصمات</span>
+                            </div>
+                            <button type="button" onclick="clearCurrentStudentFingerprints()" class="text-[11px] font-black text-rose-600 hover:text-rose-700 hover:underline px-2 py-0.5">
+                                مسح البصمات
+                            </button>
+                        </div>
+
+                        <!-- Capture / Upload Container -->
+                        <div class="space-y-2.5">
+                            <!-- Action Buttons: Upload or Camera -->
+                            <div class="grid grid-cols-2 gap-2" id="biometric-action-triggers">
+                                <button type="button" onclick="document.getElementById('modal-student-image-file').click()" class="flat-input !py-2 flex items-center justify-center gap-1.5 hover:border-amber-500 text-xs font-bold text-stone-700 dark:text-stone-200">
+                                    <span class="material-symbols-outlined text-sm text-amber-600">upload_file</span>
+                                    <span>رفع صورة من الجهاز</span>
+                                </button>
+                                <input type="file" id="modal-student-image-file" accept="image/*" class="hidden" onchange="handleStudentImageSelected(this)" />
+
+                                <button type="button" id="btn-open-student-camera" onclick="startStudentCameraCapture()" class="flat-input !py-2 flex items-center justify-center gap-1.5 hover:border-amber-500 text-xs font-bold text-stone-700 dark:text-stone-200">
+                                    <span class="material-symbols-outlined text-sm text-sky-600">photo_camera</span>
+                                    <span>التقاط بالكاميرا</span>
+                                </button>
+                            </div>
+
+                            <!-- Live Camera Stream View (Hidden by default) -->
+                            <div id="modal-camera-container" class="hidden flex flex-col items-center gap-2 p-3 rounded-xl bg-stone-900 text-white relative overflow-hidden">
+                                <div class="relative w-full max-w-[280px] aspect-[4/3] rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                                    <video id="modal-student-video" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+                                    <div class="absolute inset-0 border-2 border-dashed border-amber-400/70 rounded-lg pointer-events-none flex items-center justify-center">
+                                        <span class="text-[10px] text-amber-300 font-bold bg-black/60 px-2 py-0.5 rounded-full">وجّه الوجه داخل الإطار</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 w-full justify-center">
+                                    <button type="button" onclick="captureFromStudentCamera()" class="btn-primary-action !h-8 !text-xs !py-0 !px-4">
+                                        <span class="material-symbols-outlined text-sm">camera</span>
+                                        <span>التقاط واستخراج</span>
+                                    </button>
+                                    <button type="button" onclick="stopStudentCameraCapture()" class="header-action-btn !h-8 !text-xs !py-0 !px-3 bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700">
+                                        <span>إلغاء</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Image & Extraction Status Preview Card -->
+                            <div id="modal-biometric-preview-card" class="hidden p-2.5 rounded-xl border border-stone-200 dark:border-neutral-800 bg-stone-50 dark:bg-neutral-900/60 flex items-center gap-3">
+                                <div class="relative w-12 h-12 rounded-lg overflow-hidden bg-stone-200 shrink-0 border border-stone-300 dark:border-neutral-700">
+                                    <img id="modal-student-img-preview" src="" alt="Student Face" class="w-full h-full object-cover" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5">
+                                        <span id="modal-biometric-extract-spinner" class="material-symbols-outlined text-sm text-amber-600 animate-spin hidden">sync</span>
+                                        <span id="modal-biometric-extract-icon" class="material-symbols-outlined text-sm text-emerald-600 hidden">check_circle</span>
+                                        <span id="modal-biometric-extract-status" class="text-xs font-bold text-stone-700 dark:text-stone-300 truncate">جاري استخراج البصمة...</span>
+                                    </div>
+                                    <p id="modal-biometric-extract-detail" class="text-[10px] text-stone-400 mt-0.5">جاهزة للحفظ مع بيانات الطالب</p>
+                                </div>
+                                <button type="button" onclick="removePendingBiometric()" class="agent-icon-btn text-stone-400 hover:text-rose-500" title="إزالة الصورة">
+                                    <span class="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+
+                            <!-- Append Fingerprint Checkbox (Shown when student already has fingerprints) -->
+                            <div id="modal-append-fingerprint-container" class="hidden flex items-center gap-2 pr-1">
+                                <input type="checkbox" id="modal-append-fingerprint" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer">
+                                <label for="modal-append-fingerprint" class="text-xs font-bold text-stone-600 dark:text-stone-400 cursor-pointer">
+                                    إضافة كبصمة إضافية (لزيادة دقة التعرف في زوايا وإضاءات مختلفة)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="app-dialog-footer">
@@ -241,6 +325,8 @@
     <script src="scripts/utils-morphicons.js"></script>
     <script src="scripts/module-telemetry.js"></script>
     <script src="scripts/component-sidebar.js"></script>
+    <script src="scripts/face-api.js"></script>
+    <script src="scripts/module-face-api.js"></script>
 
     <!-- Page Specific Controller Logic -->
     <script>
