@@ -6,7 +6,7 @@
  * @license Proprietary - All rights reserved.
  */
 
-const Telemetry = {
+var Telemetry = (typeof window !== 'undefined' && window.Telemetry) || {
     STORAGE_KEY: 'hodoori_telemetry_logs_v1',
     FIRESTORE_COLLECTION: 'v2_system_logs',
     MAX_LOCAL_LOGS: 150,
@@ -99,6 +99,9 @@ const Telemetry = {
                     msg.includes('deprecated') ||
                     msg.includes('WebChannelConnection') ||
                     msg.includes('@firebase/firestore') ||
+                    msg.includes('Firestore error sync failed') ||
+                    msg.includes('Telemetry:') ||
+                    msg.includes('Missing or insufficient permissions') ||
                     msg.includes('Listen') ||
                     msg.includes('transport errored') ||
                     msg.includes('WEBGL_FLUSH_THRESHOLD') ||
@@ -120,14 +123,24 @@ const Telemetry = {
 
         // Periodic & Event-based Pending Logs Synchronization
         if (typeof window !== 'undefined') {
-            window.addEventListener('online', () => {
-                this.flushPendingLogs();
-            });
+            const self = this;
+            const safeFlush = () => {
+                try {
+                    if (typeof self.flushPendingLogs === 'function') {
+                        self.flushPendingLogs();
+                    } else if (typeof Telemetry !== 'undefined' && typeof Telemetry.flushPendingLogs === 'function') {
+                        Telemetry.flushPendingLogs();
+                    }
+                } catch (_) {}
+            };
+            window.addEventListener('online', safeFlush);
             if (typeof setTimeout === 'function') {
-                setTimeout(() => this.flushPendingLogs(), 2500);
+                const t = setTimeout(safeFlush, 2500);
+                if (t && typeof t.unref === 'function') t.unref();
             }
             if (typeof setInterval === 'function') {
-                setInterval(() => this.flushPendingLogs(), 60000);
+                const i = setInterval(safeFlush, 60000);
+                if (i && typeof i.unref === 'function') i.unref();
             }
         }
     },

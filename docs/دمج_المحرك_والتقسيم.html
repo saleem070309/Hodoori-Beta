@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>محرك كشف ومطابقة الوجوه بالتقسيم الهرمي والبث الحي فائق السرعة</title>
-    <!-- مكتبة التعرف على الوجوه Face-API (محلي أولاً ثم CDN) -->
-    <script src="face-api.js"></script>
+    <!-- مكتبة التعرف على الوجوه Face-API الحديثة (دعم محلي + CDN) -->
+    <script src="../scripts/face-api.js" onerror="this.onerror=null;this.src='face-api.js';"></script>
     <script>
         if (typeof faceapi === 'undefined') {
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
-            s.onload = () => { if (typeof Engine !== 'undefined' && !Engine.isLoaded) Engine.init(); };
-            document.head.appendChild(s);
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"><\/script>');
         }
     </script>
     <script src="../scripts/module-telemetry.js" onerror="this.onerror=null;this.src='scripts/module-telemetry.js';"></script>
@@ -710,11 +707,33 @@
                 updateStatus("جاري تهيئة كرت الشاشة والمكتبة...");
 
                 try {
-                    // 1. انتظار توفر مكتبة face-api
+                    // 1. انتظار توفر مكتبة face-api مع محاولة التحميل الديناميكي
+                    if (typeof faceapi === 'undefined') {
+                        const cdnSources = [
+                            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js',
+                            'https://unpkg.com/@vladmandic/face-api/dist/face-api.js',
+                            'face-api.js',
+                            '../scripts/face-api.js'
+                        ];
+                        for (const src of cdnSources) {
+                            if (typeof faceapi !== 'undefined') break;
+                            try {
+                                await new Promise((resolve) => {
+                                    const s = document.createElement('script');
+                                    s.src = src;
+                                    s.onload = () => resolve();
+                                    s.onerror = () => resolve();
+                                    document.head.appendChild(s);
+                                    setTimeout(resolve, 3000);
+                                });
+                            } catch (_) {}
+                        }
+                    }
+
                     let waitCount = 0;
                     while (typeof faceapi === 'undefined') {
-                        if (waitCount++ > 30) {
-                            throw new Error("تعذر العثور على مكتبة face-api.js.");
+                        if (waitCount++ > 60) {
+                            throw new Error("تعذر العثور على مكتبة face-api.js أو فشل تحميلها من كافة المصادر.");
                         }
                         await new Promise(r => setTimeout(r, 100));
                     }

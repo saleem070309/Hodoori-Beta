@@ -197,13 +197,46 @@ const Agent = {
         deepinfra: ''   // Put your DeepInfra API key here (e.g., 'your_key')
     },
 
+    getApiKey(provider) {
+        const p = (provider || '').toLowerCase();
+        const keysObj = (this && this.apiKeys) || (typeof Agent !== 'undefined' && Agent.apiKeys) || {};
+        if (p === 'openrouter') {
+            return (
+                keysObj.openrouter ||
+                (typeof Gemini !== 'undefined' && typeof Gemini.getOpenRouterKey === 'function' ? Gemini.getOpenRouterKey() : '') ||
+                (typeof window !== 'undefined' && window.__ENV__ && (window.__ENV__.OPENROUTER_API_KEY || window.__ENV__.openrouter_api_key || window.__ENV__.OPENROUTER_KEY)) ||
+                (typeof localStorage !== 'undefined' ? (localStorage.getItem('openrouter_api_key') || localStorage.getItem('OPENROUTER_API_KEY')) : '') ||
+                ''
+            );
+        }
+        if (p === 'deepinfra') {
+            return (
+                keysObj.deepinfra ||
+                (typeof Gemini !== 'undefined' && typeof Gemini.getDeepInfraKey === 'function' ? Gemini.getDeepInfraKey() : '') ||
+                (typeof window !== 'undefined' && window.__ENV__ && (window.__ENV__.DEEPINFRA_API_KEY || window.__ENV__.deepinfra_api_key)) ||
+                (typeof localStorage !== 'undefined' ? (localStorage.getItem('deepinfra_api_key') || localStorage.getItem('DEEPINFRA_API_KEY')) : '') ||
+                ''
+            );
+        }
+        if (p === 'inworld') {
+            return (
+                keysObj.inworld ||
+                (typeof Gemini !== 'undefined' && typeof Gemini.getInworldKey === 'function' ? Gemini.getInworldKey() : '') ||
+                (typeof window !== 'undefined' && window.__ENV__ && (window.__ENV__.INWORLD_API_KEY || window.__ENV__.inworld_api_key)) ||
+                (typeof localStorage !== 'undefined' ? (localStorage.getItem('inworld_api_key') || localStorage.getItem('INWORLD_API_KEY')) : '') ||
+                ''
+            );
+        }
+        return '';
+    },
+
     getEffectiveProvider() {
-        if (this.provider !== 'auto') {
+        if (this && this.provider && this.provider !== 'auto') {
             return this.provider;
         }
-        const openrouterKey = this.apiKeys.openrouter || (typeof Gemini !== 'undefined' ? Gemini.getOpenRouterKey() : '');
-        const deepinfraKey = this.apiKeys.deepinfra || localStorage.getItem('deepinfra_api_key') || '';
-        const inworldKey = this.apiKeys.inworld || (typeof Gemini !== 'undefined' ? Gemini.getInworldKey() : '');
+        const openrouterKey = this.getApiKey('openrouter');
+        const deepinfraKey = this.getApiKey('deepinfra');
+        const inworldKey = this.getApiKey('inworld');
 
         if (openrouterKey) return 'openrouter';
         if (deepinfraKey) return 'deepinfra';
@@ -3012,15 +3045,15 @@ ${toolResultSummary}${rosterInstruction}
         const providers = {
             inworld: {
                 url: "https://api.inworld.ai/v1/chat/completions",
-                key: this.apiKeys.inworld || (typeof Gemini !== 'undefined' ? Gemini.getInworldKey() : ''),
+                key: this.getApiKey('inworld'),
                 headers: {},
                 body: { model: modelName }
             },
             openrouter: {
                 url: "https://openrouter.ai/api/v1/chat/completions",
-                key: this.apiKeys.openrouter || (typeof Gemini !== 'undefined' ? Gemini.getOpenRouterKey() : ''),
+                key: this.getApiKey('openrouter'),
                 headers: {
-                    "HTTP-Referer": window.location.origin,
+                    "HTTP-Referer": (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:3000'),
                     "X-Title": "Attendance AI Agent"
                 },
                 body: {
@@ -3029,7 +3062,7 @@ ${toolResultSummary}${rosterInstruction}
             },
             deepinfra: {
                 url: "https://api.deepinfra.com/v1/openai/chat/completions",
-                key: this.apiKeys.deepinfra || localStorage.getItem('deepinfra_api_key') || '',
+                key: this.getApiKey('deepinfra'),
                 headers: {},
                 body: {
                     model: modelName

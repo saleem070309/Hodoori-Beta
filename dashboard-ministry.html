@@ -888,6 +888,18 @@
             }
         }
 
+        function renderSchoolBadges(s) {
+            if (s.showAgent === false) {
+                return '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">visibility_off</span> الوكيل مخفي</span>';
+            }
+            const agentBadge = '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">smart_toy</span> الوكيل مفعّل</span>';
+            const modelBadge = `<span class="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">memory</span> ${getModelDisplayName(s.aiModel)}</span>`;
+            const faceBadge = (s.agentFaceAnalysis !== false)
+                ? '<span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 border border-purple-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face</span> بصمة الوجه للوكيل مفعّلة</span>'
+                : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face_retouching_off</span> بصمة الوجه للوكيل معطّلة</span>';
+            return agentBadge + '\n' + modelBadge + '\n' + faceBadge;
+        }
+
         function renderSchools(schools) {
             const list = document.getElementById('schoolsList');
             if (schools.length === 0) {
@@ -901,14 +913,7 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <h4 class="font-bold text-gray-800 text-sm truncate">${s.name}</h4>
-                            ${s.showAgent !== false 
-                                ? `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">smart_toy</span> الوكيل مفعّل</span>
-                                   <span class="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">memory</span> ${getModelDisplayName(s.aiModel)}</span>
-                                   ${s.agentFaceAnalysis !== false 
-                                       ? '<span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 border border-purple-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face</span> بصمة الوجه للوكيل مفعّلة</span>'
-                                       : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face_retouching_off</span> بصمة الوجه للوكيل معطّلة</span>'}`
-                                : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">visibility_off</span> الوكيل مخفي</span>'
-                            }
+                            ${renderSchoolBadges(s)}
                         </div>
                         <div class="flex items-center gap-3 flex-wrap text-[10px] text-gray-400 mt-1">
                             <span class="flex items-center gap-1">
@@ -1541,6 +1546,34 @@
                 await loadAndRenderLogs();
                 UI.toast('تم تسجيل الخطأ التجريبي بنجاح!');
             }
+        }
+
+        // Explicitly attach all handlers to window for inline onclick/onchange robustness
+        if (typeof window !== 'undefined') {
+            window.switchTab = switchTab;
+            window.toggleGlobalAgentFaceAnalysis = toggleGlobalAgentFaceAnalysis;
+            window.showAddSchoolModal = showAddSchoolModal;
+            window.showEditSchoolModal = showEditSchoolModal;
+            window.closeModal = closeModal;
+            window.closeSchoolModal = closeModal;
+            window.handleSaveSchool = handleSaveSchool;
+            window.handleDeleteSchool = handleDeleteSchool;
+            window.showAddPrincipalModal = showAddPrincipalModal;
+            window.showEditPrincipalModal = showEditPrincipalModal;
+            window.closePrincipalModal = closeModal;
+            window.handleSavePrincipal = handleSavePrincipal;
+            window.handleDeletePrincipal = handleDeletePrincipal;
+            window.toggleCustomModelInput = toggleCustomModelInput;
+            window.filterLogs = filterLogs;
+            window.toggleLogDetails = toggleLogDetails;
+            window.handleToggleHideLog = handleToggleHideLog;
+            window.handleCopySingleLog = handleCopySingleLog;
+            window.handleDeleteSingleLog = handleDeleteSingleLog;
+            window.handleCopyAllLogs = handleCopyAllLogs;
+            window.handleExportLogsJSON = handleExportLogsJSON;
+            window.handleExportLogs = handleExportLogsJSON;
+            window.handleClearAllLogs = handleClearAllLogs;
+            window.handleTriggerTestError = handleTriggerTestError;
         }
 
         init();

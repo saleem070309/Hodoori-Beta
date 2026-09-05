@@ -466,13 +466,23 @@
 
             try {
                 if (id) {
-                    await DB.updateTeacher(id, teacherData);
+                    if (typeof DB.updateTeacher === 'function') {
+                        await DB.updateTeacher(id, teacherData);
+                    } else if (typeof DB.update === 'function') {
+                        await DB.update(DB.KEYS.TEACHERS, id, teacherData);
+                    } else {
+                        throw new Error('No update method available on DB');
+                    }
                     UI.toast('تم تحديث بيانات المعلم بنجاح', 'success');
                 } else {
                     if (typeof DB.addTeacher === 'function') {
                         await DB.addTeacher(teacherData);
-                    } else {
+                    } else if (typeof DB.saveTeacher === 'function') {
                         await DB.saveTeacher(teacherData);
+                    } else if (typeof DB.insert === 'function') {
+                        await DB.insert(DB.KEYS.TEACHERS, teacherData);
+                    } else {
+                        throw new Error('No add/save method available on DB');
                     }
                     UI.toast('تمت إضافة المعلم بنجاح', 'success');
                 }
@@ -498,7 +508,13 @@
             if (!confirmed) return;
 
             try {
-                await DB.deleteTeacher(id);
+                if (typeof DB.deleteTeacher === 'function') {
+                    await DB.deleteTeacher(id);
+                } else if (typeof DB.delete === 'function') {
+                    await DB.delete(DB.KEYS.TEACHERS, id);
+                } else {
+                    throw new Error('No delete method available on DB');
+                }
                 UI.toast('تم حذف المعلم بنجاح', 'success');
                 closeTeacherModal();
                 await renderTeachers();
@@ -506,6 +522,15 @@
                 console.error('Delete teacher error:', err);
                 UI.toast('حدث خطأ أثناء الحذف', 'error');
             }
+        }
+
+        if (typeof window !== 'undefined') {
+            window.showAddTeacherModal = showAddTeacherModal;
+            window.showEditTeacherModal = showEditTeacherModal;
+            window.closeTeacherModal = closeTeacherModal;
+            window.handleSaveTeacher = handleSaveTeacher;
+            window.handleDeleteTeacher = handleDeleteTeacher;
+            window.filterByRole = filterByRole;
         }
     </script>
 </body>
