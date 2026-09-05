@@ -400,7 +400,16 @@
             const totalStudents = allStudents.length;
             const uniqueGrades = [...new Set(allClasses.map(c => c.name))].length;
             const totalClasses = allClasses.length;
-            const biometricCount = allStudents.filter(s => s.descriptors && s.descriptors.length > 0).length;
+            const biometricCount = allStudents.filter(s => {
+                if (!s) return false;
+                let d = s.descriptors;
+                if (typeof d === 'string') {
+                    try { d = JSON.parse(d); } catch (_) { d = []; }
+                }
+                if (Array.isArray(d) && d.length > 0) return true;
+                if (s.descriptor && s.descriptor.length > 0) return true;
+                return false;
+            }).length;
 
             UI.animateNumber('kpi-total-students', totalStudents);
             UI.animateNumber('kpi-grades-count', uniqueGrades);
@@ -612,7 +621,13 @@
                             const initial = s.name ? s.name.trim().charAt(0) : '؟';
                             const hash = Math.abs((s.id || '1').split('').reduce((a, b) => a + b.charCodeAt(0), 0));
                             const avatarBg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
-                            const hasBiometric = s.descriptors && s.descriptors.length > 0;
+                            
+                            let dList = s.descriptors;
+                            if (typeof dList === 'string') {
+                                try { dList = JSON.parse(dList); } catch (_) { dList = []; }
+                            }
+                            const hasBiometric = (Array.isArray(dList) && dList.length > 0) || (s.descriptor && s.descriptor.length > 0);
+                            const bioCount = Array.isArray(dList) && dList.length > 0 ? dList.length : (s.descriptor ? 1 : 0);
 
                             return `
                                 <div class="flex items-center justify-between gap-3 p-3.5 px-4 sm:px-6 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all">
@@ -625,10 +640,14 @@
                                             <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                                                 <span class="text-[11px] font-mono text-stone-400 font-bold">ID: ${s.academicId || 'بدون رقم'}</span>
                                                 ${hasBiometric ? `
-                                                    <span class="badge-tag badge-status-present text-[10px]">
-                                                        <span class="material-symbols-outlined text-[12px]">face</span> مفعّل الوجه
+                                                    <span class="badge-tag badge-status-present text-[10px]" title="مفعّل البصمة">
+                                                        <span class="material-symbols-outlined text-[12px]">face</span> مفعّل الوجه (${bioCount})
                                                     </span>
-                                                ` : ''}
+                                                ` : `
+                                                    <span class="badge-tag text-[10px] text-stone-400 bg-stone-100 dark:bg-neutral-800" title="غير مسجل البصمة">
+                                                        <span class="material-symbols-outlined text-[12px]">face_retouching_off</span> بدون بصمة
+                                                    </span>
+                                                `}
                                             </div>
                                         </div>
                                     </div>
@@ -670,6 +689,13 @@
                             const initial = s.name ? s.name.trim().charAt(0) : '؟';
                             const hash = Math.abs((s.id || '1').split('').reduce((a, b) => a + b.charCodeAt(0), 0));
                             const avatarBg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+                            
+                            let dList = s.descriptors;
+                            if (typeof dList === 'string') {
+                                try { dList = JSON.parse(dList); } catch (_) { dList = []; }
+                            }
+                            const hasBiometric = (Array.isArray(dList) && dList.length > 0) || (s.descriptor && s.descriptor.length > 0);
+                            const bioCount = Array.isArray(dList) && dList.length > 0 ? dList.length : (s.descriptor ? 1 : 0);
 
                             return `
                                 <div class="flex items-center justify-between p-3.5 px-6 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all">
@@ -679,7 +705,14 @@
                                         </div>
                                         <div class="min-w-0">
                                             <h4 class="font-extrabold text-sm text-stone-900 dark:text-white leading-tight truncate">${s.name}</h4>
-                                            <p class="text-[11px] font-bold text-stone-400 mt-0.5">الفصل: ${clsName} • ID: ${s.academicId || '--'}</p>
+                                            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                <p class="text-[11px] font-bold text-stone-400">الفصل: ${clsName} • ID: ${s.academicId || '--'}</p>
+                                                ${hasBiometric ? `
+                                                    <span class="badge-tag badge-status-present text-[10px]">
+                                                        <span class="material-symbols-outlined text-[12px]">face</span> مفعّل (${bioCount})
+                                                    </span>
+                                                ` : ''}
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
@@ -767,8 +800,42 @@
             }
         }
 
-        /* ─── Student Modal Handlers ─── */
+        /* ─── Student Modal Handlers & Biometrics ─── */
+        let pendingDescriptor = null;
+        let isFingerprintCleared = false;
+        let currentStudentDescriptors = [];
+        let cameraStream = null;
+
+        function resetBiometricState() {
+            pendingDescriptor = null;
+            isFingerprintCleared = false;
+            currentStudentDescriptors = [];
+            stopStudentCameraCapture();
+
+            const fileInput = document.getElementById('modal-student-image-file');
+            if (fileInput) fileInput.value = '';
+
+            const previewCard = document.getElementById('modal-biometric-preview-card');
+            if (previewCard) previewCard.classList.add('hidden');
+
+            const infoBanner = document.getElementById('modal-fingerprint-info');
+            if (infoBanner) infoBanner.classList.add('hidden');
+
+            const appendContainer = document.getElementById('modal-append-fingerprint-container');
+            if (appendContainer) appendContainer.classList.add('hidden');
+
+            const appendCheckbox = document.getElementById('modal-append-fingerprint');
+            if (appendCheckbox) appendCheckbox.checked = false;
+
+            const badge = document.getElementById('modal-biometric-status-badge');
+            if (badge) {
+                badge.className = 'badge-tag badge-status-absent text-[10px]';
+                badge.textContent = 'غير مسجلة';
+            }
+        }
+
         function showAddStudentModal(defaultClassId = '') {
+            resetBiometricState();
             document.getElementById('student-modal-title').textContent = 'إضافة طالب جديد';
             document.getElementById('modal-student-id').value = '';
             document.getElementById('student-form').reset();
@@ -779,6 +846,7 @@
         }
 
         function showEditStudentModal(id) {
+            resetBiometricState();
             const s = allStudents.find(x => x.id === id);
             if (!s) return;
             document.getElementById('student-modal-title').textContent = 'تعديل بيانات الطالب';
@@ -788,13 +856,242 @@
             document.getElementById('modal-student-class-id').value = s.classId || '';
             document.getElementById('modal-student-parent-phone').value = s.parentPhone || '';
             document.getElementById('modal-student-delete-btn').classList.remove('hidden');
+
+            // Parse descriptors
+            let descriptors = [];
+            if (s.descriptors) {
+                try {
+                    descriptors = typeof s.descriptors === 'string' ? JSON.parse(s.descriptors) : s.descriptors;
+                } catch (_) { descriptors = []; }
+            } else if (s.descriptor) {
+                try {
+                    descriptors = [typeof s.descriptor === 'string' ? JSON.parse(s.descriptor) : s.descriptor];
+                } catch (_) { descriptors = []; }
+            }
+            currentStudentDescriptors = Array.isArray(descriptors) ? descriptors.filter(d => Array.isArray(d) && d.length > 0) : [];
+
+            const badge = document.getElementById('modal-biometric-status-badge');
+            const infoBanner = document.getElementById('modal-fingerprint-info');
+            const infoText = document.getElementById('modal-fingerprint-info-text');
+            const appendContainer = document.getElementById('modal-append-fingerprint-container');
+
+            if (currentStudentDescriptors.length > 0) {
+                if (badge) {
+                    badge.className = 'badge-tag badge-status-present text-[10px]';
+                    badge.textContent = `مفعّلة (${currentStudentDescriptors.length})`;
+                }
+                if (infoBanner) infoBanner.classList.remove('hidden');
+                if (infoText) infoText.textContent = `مخزن: ${currentStudentDescriptors.length} بصمات وجه مسجلة`;
+                if (appendContainer) appendContainer.classList.remove('hidden');
+            } else {
+                if (badge) {
+                    badge.className = 'badge-tag badge-status-absent text-[10px]';
+                    badge.textContent = 'غير مسجلة';
+                }
+                if (infoBanner) infoBanner.classList.add('hidden');
+                if (appendContainer) appendContainer.classList.add('hidden');
+            }
+
             const modal = document.getElementById('student-modal');
             if (modal) modal.classList.add('active');
         }
 
         function closeStudentModal() {
+            stopStudentCameraCapture();
             const modal = document.getElementById('student-modal');
             if (modal) modal.classList.remove('active');
+        }
+
+        async function handleStudentImageSelected(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const dataUrl = e.target.result;
+                await processImageForDescriptor(dataUrl);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function processImageForDescriptor(imageSrc) {
+            const previewCard = document.getElementById('modal-biometric-preview-card');
+            const previewImg = document.getElementById('modal-student-img-preview');
+            const spinner = document.getElementById('modal-biometric-extract-spinner');
+            const checkIcon = document.getElementById('modal-biometric-extract-icon');
+            const statusText = document.getElementById('modal-biometric-extract-status');
+            const detailText = document.getElementById('modal-biometric-extract-detail');
+            const badge = document.getElementById('modal-biometric-status-badge');
+
+            if (previewCard) previewCard.classList.remove('hidden');
+            if (previewImg) previewImg.src = imageSrc;
+            if (spinner) spinner.classList.remove('hidden');
+            if (checkIcon) checkIcon.classList.add('hidden');
+            if (statusText) statusText.textContent = 'جاري تحليل ملامح الوجه واستخراج البصمة...';
+            if (detailText) detailText.textContent = 'يتم معالجة الصورة بنماذج الذكاء الاصطناعي';
+
+            try {
+                const img = await new Promise((resolve, reject) => {
+                    const i = new Image();
+                    i.onload = () => resolve(i);
+                    i.onerror = reject;
+                    i.src = imageSrc;
+                });
+
+                if (typeof FaceDetection === 'undefined') {
+                    throw new Error('محرك التعرف على الوجوه غير محمل');
+                }
+
+                const descriptor = await FaceDetection.getDescriptorFromImage(img);
+
+                if (descriptor && descriptor.length > 0) {
+                    pendingDescriptor = descriptor;
+                    isFingerprintCleared = false;
+
+                    if (spinner) spinner.classList.add('hidden');
+                    if (checkIcon) checkIcon.classList.remove('hidden');
+                    if (statusText) statusText.textContent = 'تم استخراج بصمة الوجه بنجاح ✓';
+                    if (detailText) detailText.textContent = 'البصمة الرقمية جاهزة للحفظ (128D)';
+                    if (badge) {
+                        badge.className = 'badge-tag badge-role-assistant text-[10px]';
+                        badge.textContent = 'جاهزة للحفظ';
+                    }
+                    if (typeof UI !== 'undefined' && UI.toast) {
+                        UI.toast('تم استخراج بصمة الوجه بنجاح ✓', 'success');
+                    }
+                } else {
+                    pendingDescriptor = null;
+                    if (spinner) spinner.classList.add('hidden');
+                    if (checkIcon) checkIcon.classList.add('hidden');
+                    if (statusText) statusText.textContent = 'لم يتم العثور على وجه واضح بالصورة';
+                    if (detailText) detailText.textContent = 'يرجى اختيار صورة واضحة ومباشرة للوجه';
+                    if (typeof UI !== 'undefined' && UI.toast) {
+                        UI.toast('لم يتم التعرف على وجه واضح في الصورة، يرجى تجربة صورة أخرى', 'error');
+                    }
+                }
+            } catch (err) {
+                console.error('Face descriptor extraction error:', err);
+                pendingDescriptor = null;
+                if (spinner) spinner.classList.add('hidden');
+                if (checkIcon) checkIcon.classList.add('hidden');
+                if (statusText) statusText.textContent = 'تعذر استخراج البصمة من الصورة';
+                if (detailText) detailText.textContent = 'تحقق من اتصال الشبكة ونقاء الصورة';
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('حدث خطأ أثناء معالجة الصورة', 'error');
+                }
+            }
+        }
+
+        async function startStudentCameraCapture() {
+            try {
+                const cameraContainer = document.getElementById('modal-camera-container');
+                const video = document.getElementById('modal-student-video');
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    UI.toast('المتصفح لا يدعم الوصول المباشر للكاميرا', 'error');
+                    return;
+                }
+
+                if (cameraStream) {
+                    stopStudentCameraCapture();
+                }
+
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    },
+                    audio: false
+                });
+
+                if (video) {
+                    video.srcObject = cameraStream;
+                    await video.play();
+                }
+
+                if (cameraContainer) cameraContainer.classList.remove('hidden');
+            } catch (err) {
+                console.error('Camera open error:', err);
+                UI.toast('تعذر فتح الكاميرا، يرجى منح الإذن للمتصفح أو استخدام خيار رفع صورة', 'error');
+            }
+        }
+
+        async function captureFromStudentCamera() {
+            const video = document.getElementById('modal-student-video');
+            if (!video || !cameraStream) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            
+            // Mirror back to normal for face detection
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            stopStudentCameraCapture();
+
+            await processImageForDescriptor(dataUrl);
+        }
+
+        function stopStudentCameraCapture() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            const video = document.getElementById('modal-student-video');
+            if (video) video.srcObject = null;
+
+            const cameraContainer = document.getElementById('modal-camera-container');
+            if (cameraContainer) cameraContainer.classList.add('hidden');
+        }
+
+        function removePendingBiometric() {
+            pendingDescriptor = null;
+            const previewCard = document.getElementById('modal-biometric-preview-card');
+            if (previewCard) previewCard.classList.add('hidden');
+
+            const fileInput = document.getElementById('modal-student-image-file');
+            if (fileInput) fileInput.value = '';
+
+            const badge = document.getElementById('modal-biometric-status-badge');
+            if (badge) {
+                if (currentStudentDescriptors.length > 0 && !isFingerprintCleared) {
+                    badge.className = 'badge-tag badge-status-present text-[10px]';
+                    badge.textContent = `مفعّلة (${currentStudentDescriptors.length})`;
+                } else {
+                    badge.className = 'badge-tag badge-status-absent text-[10px]';
+                    badge.textContent = 'غير مسجلة';
+                }
+            }
+        }
+
+        async function clearCurrentStudentFingerprints() {
+            const confirmed = await UI.confirm('مسح بصمات الوجه', 'هل أنت متأكد من مسح كافة بصمات الوجه المسجلة لهذا الطالب؟', { confirmText: 'نعم، امسح البصمات', type: 'error' });
+            if (!confirmed) return;
+
+            currentStudentDescriptors = [];
+            pendingDescriptor = null;
+            isFingerprintCleared = true;
+
+            const infoBanner = document.getElementById('modal-fingerprint-info');
+            if (infoBanner) infoBanner.classList.add('hidden');
+
+            const appendContainer = document.getElementById('modal-append-fingerprint-container');
+            if (appendContainer) appendContainer.classList.add('hidden');
+
+            const previewCard = document.getElementById('modal-biometric-preview-card');
+            if (previewCard) previewCard.classList.add('hidden');
+
+            const badge = document.getElementById('modal-biometric-status-badge');
+            if (badge) {
+                badge.className = 'badge-tag badge-status-absent text-[10px]';
+                badge.textContent = 'تم المسح (اضغط حفظ)';
+            }
+
+            UI.toast('تم مسح البصمات محلياً، اضغط على زر حفظ الطالب لتأكيد الحذف');
         }
 
         async function handleSaveStudent(e) {
@@ -812,13 +1109,36 @@
 
             const studentData = { name, academicId, classId, parentPhone };
 
+            // Handle Biometric Descriptor Updates
+            if (pendingDescriptor) {
+                const appendMode = document.getElementById('modal-append-fingerprint') && document.getElementById('modal-append-fingerprint').checked;
+                if (id && appendMode && currentStudentDescriptors.length > 0) {
+                    const merged = [...currentStudentDescriptors, pendingDescriptor];
+                    studentData.descriptors = JSON.stringify(merged);
+                } else {
+                    studentData.descriptors = JSON.stringify([pendingDescriptor]);
+                }
+                studentData.descriptor = null; // Clean legacy field
+            } else if (isFingerprintCleared) {
+                studentData.descriptors = null;
+                studentData.descriptor = null;
+            }
+
             try {
                 if (id) {
                     await DB.updateStudent(id, studentData);
-                    UI.toast('تم تحديث بيانات الطالب', 'success');
+                    if (pendingDescriptor) {
+                        UI.toast('تم تحديث بيانات الطالب وحفظ بصمة الوجه بنجاح ✓', 'success');
+                    } else {
+                        UI.toast('تم تحديث بيانات الطالب بنجاح', 'success');
+                    }
                 } else {
                     await DB.saveStudent(studentData);
-                    UI.toast('تمت إضافة الطالب بنجاح', 'success');
+                    if (pendingDescriptor) {
+                        UI.toast('تمت إضافة الطالب وحفظ بصمة الوجه بنجاح ✓', 'success');
+                    } else {
+                        UI.toast('تمت إضافة الطالب بنجاح', 'success');
+                    }
                 }
                 closeStudentModal();
                 await reloadAllData();
