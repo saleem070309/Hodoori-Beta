@@ -498,6 +498,105 @@ const UI = {
         observer.observe(document.body, { childList: true });
     },
     /**
+     * Transitions.dev — Formats a number / string into pop-in digit markup
+     * @param {string|number} value
+     * @param {Object} [options] { isAnimating: true, dirX: 0, dirY: 1, staggerMs: null, durationMs: null }
+     * @returns {string} HTML markup
+     */
+    formatNumberPopIn(value, options = {}) {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.length === 0) return '';
+        const chars = Array.from(str);
+        const isAnimating = options.isAnimating !== false;
+        
+        const inlineStyles = [];
+        if (options.dirX !== undefined) inlineStyles.push(`--digit-dir-x: ${options.dirX}`);
+        if (options.dirY !== undefined) inlineStyles.push(`--digit-dir-y: ${options.dirY}`);
+        if (options.staggerMs !== undefined) inlineStyles.push(`--digit-stagger: ${options.staggerMs}ms`);
+        if (options.durationMs !== undefined) inlineStyles.push(`--digit-dur: ${options.durationMs}ms`);
+        const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join('; ')}"` : '';
+
+        const digitsHtml = chars.map((ch, idx) => {
+            const staggerAttr = idx > 0 ? ` data-stagger="${idx}" style="--stagger-index:${idx}"` : ` style="--stagger-index:0"`;
+            const displayChar = ch === ' ' ? '&nbsp;' : ch;
+            return `<span class="t-digit"${staggerAttr}>${displayChar}</span>`;
+        }).join('');
+
+        return `<span class="t-digit-group${isAnimating ? ' is-animating' : ''}"${styleAttr}>${digitsHtml}</span>`;
+    },
+
+    /**
+     * Transitions.dev — Replays or updates an element with the Number Pop-in animation
+     * @param {HTMLElement|string} elementOrId
+     * @param {string|number} value
+     * @param {Object} [options]
+     */
+    animateNumber(elementOrId, value, options = {}) {
+        const el = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
+        if (!el) return;
+
+        const valStr = value !== undefined && value !== null ? String(value) : (el.textContent || '').trim();
+        const chars = Array.from(valStr);
+
+        const inlineStyles = [];
+        if (options.dirX !== undefined) inlineStyles.push(`--digit-dir-x: ${options.dirX}`);
+        if (options.dirY !== undefined) inlineStyles.push(`--digit-dir-y: ${options.dirY}`);
+        if (options.staggerMs !== undefined) inlineStyles.push(`--digit-stagger: ${options.staggerMs}ms`);
+        if (options.durationMs !== undefined) inlineStyles.push(`--digit-dur: ${options.durationMs}ms`);
+        const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join('; ')}"` : '';
+
+        const digitsHtml = chars.map((ch, idx) => {
+            const staggerAttr = idx > 0 ? ` data-stagger="${idx}" style="--stagger-index:${idx}"` : ` style="--stagger-index:0"`;
+            const displayChar = ch === ' ' ? '&nbsp;' : ch;
+            return `<span class="t-digit"${staggerAttr}>${displayChar}</span>`;
+        }).join('');
+
+        // Step 1: Render digits without .is-animating
+        el.innerHTML = `<span class="t-digit-group"${styleAttr}>${digitsHtml}</span>`;
+        const group = el.querySelector('.t-digit-group');
+        
+        if (group) {
+            // Step 2: Force reflow
+            void group.offsetWidth;
+            // Step 3: Trigger pop-in animation
+            group.classList.add('is-animating');
+        }
+    },
+
+    /**
+     * Auto-initializes number pop-in animation for initial dashboard stat elements
+     */
+    initAutoNumberPopIn() {
+        const run = () => {
+            const statSelectors = [
+                '.kpi-val',
+                '.liquid-glass-stat h2',
+                '[data-number-pop]',
+                '#statStudents',
+                '#statPresent',
+                '#statAbsent',
+                '#statAttendanceRate',
+                '#totalStudents',
+                '#presentCount',
+                '#totalSchools'
+            ];
+            
+            document.querySelectorAll(statSelectors.join(', ')).forEach(el => {
+                if (!el.querySelector('.t-digit-group') && el.textContent.trim()) {
+                    this.animateNumber(el, el.textContent.trim());
+                }
+            });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', run);
+        } else {
+            run();
+        }
+    },
+
+    /**
      * Modal Helpers
      */
     showModal(modalId) {
@@ -537,5 +636,14 @@ const UI = {
     }
 };
 
+// Global shortcuts
+window.animateNumber = (el, val, opts) => UI.animateNumber(el, val, opts);
+window.formatNumberPopIn = (val, opts) => UI.formatNumberPopIn(val, opts);
+window.Transitions = {
+    popIn: (el, val, opts) => UI.animateNumber(el, val, opts),
+    format: (val, opts) => UI.formatNumberPopIn(val, opts)
+};
+
 // Auto-init on script load
 UI.init();
+UI.initAutoNumberPopIn();

@@ -352,6 +352,35 @@
                     <h2 id="totalStudents" class="text-2xl font-black text-gray-800">0</h2>
                 </div>
             </div>
+
+            <!-- AI Agent Central Policy & Capabilities Card -->
+            <div class="liquid-glass p-4 sm:p-5 rounded-2xl mb-6 border border-purple-500/20 bg-gradient-to-l from-purple-500/5 to-amber-500/5 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-black shrink-0 shadow-sm border border-purple-500/20">
+                            <span class="material-symbols-outlined text-[26px]" id="globalFaceIcon">face</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-extrabold text-sm text-gray-800">تحليل وبصمة الوجه للوكيل الذكي</h3>
+                                <span id="globalFaceBadge" class="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                                    مفعّل على مستوى المنظومة
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-gray-500 mt-1">التحكم المركزي في قدرة الوكيل على تحليل ومطابقة الوجوه؛ عند التعطيل يتم تجريد الوكيل تماماً بحيث لا يعرف بوجود تحليل الوجه</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 self-end sm:self-center shrink-0">
+                        <span class="text-xs font-extrabold text-emerald-600" id="globalFaceStatusText">مفعّل</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="globalAgentFaceAnalysisToggle" onchange="toggleGlobalAgentFaceAnalysis(this.checked)" class="sr-only peer" checked>
+                            <div class="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div class="liquid-glass p-4 rounded-2xl">
                     <h3 class="font-bold text-sm mb-4">توزيع المدارس حسب الموقع / المدينة</h3>
@@ -545,6 +574,18 @@
                             <input type="text" id="schoolCustomAiModel" placeholder="مثال: meta-llama/llama-3-8b-instruct" class="w-full liquid-glass-input rounded-xl p-2.5 text-xs" />
                         </div>
                     </div>
+
+                    <!-- School Agent Face Analysis Toggle -->
+                    <div class="pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                        <div class="space-y-0.5">
+                            <label class="block text-xs font-bold text-gray-800 cursor-pointer" for="schoolAgentFaceAnalysis">تحليل الوجه للوكيل الذكي</label>
+                            <p class="text-[10px] text-gray-500">تمكين الوكيل من مطابقة الوجوه وبصمة الوجه لطلاب هذه المدرسة</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="schoolAgentFaceAnalysis" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
                 </div>
                 <button type="submit" id="schoolModalSubmitBtn" class="w-full liquid-button liquid-button-prominent text-white font-black py-3 rounded-xl mt-4">حفظ المدرسة</button>
                 <button type="button" onclick="closeModal()" class="w-full text-gray-400 text-sm font-bold py-2">إلغاء</button>
@@ -588,47 +629,131 @@
     <script>
         // Check Auth
         const user = Auth.checkAuth('ministry');
-        if (!user) window.location.href = 'index.html';
+        if (!user) {
+            const currentUser = Auth.getCurrentUser();
+            if (!currentUser) {
+                window.location.href = 'index.html';
+            }
+        }
 
         let allSchools = [];
         let allPrincipals = [];
 
         async function init() {
-            initSidebarState();
-            UI.setLoading(true);
-            await DB.init();
-            await refreshData();
-            updateSidebarCounts();
-            UI.setLoading(false);
+            try {
+                initSidebarState();
+                UI.setLoading(true);
+                await DB.init();
+                await refreshData();
+                await loadAndRenderLogs();
+                updateSidebarCounts();
+                initTelemetryRealtimeSync();
+            } catch (err) {
+                console.error('[Ministry Init Error]:', err);
+                UI.toast('تم تحميل لوحة الوزارة مع بعض القيود', 'info');
+            } finally {
+                UI.setLoading(false);
+            }
         }
 
         async function refreshData() {
-            const schools = await DB.getSchools();
-            allSchools = schools;
-            const teachers = await DB.getTeachers(); // For ministry, this returns all teachers
-            allPrincipals = teachers.filter(t => t.role === 'admin');
-            const students = await DB.getStudents();
-            const records = await DB.getCollection(DB.KEYS.RECORDS);
+            try {
+                const schools = await DB.getSchools();
+                allSchools = Array.isArray(schools) ? schools : [];
+                const teachers = await DB.getTeachers(); // For ministry, this returns all teachers
+                allPrincipals = Array.isArray(teachers) ? teachers.filter(t => t.role === 'admin') : [];
+                const students = await DB.getStudents();
+                const allStudentsList = Array.isArray(students) ? students : [];
+                const records = await DB.getCollection(DB.KEYS.RECORDS);
+                const allRecordsList = Array.isArray(records) ? records : [];
 
-            document.getElementById('totalSchools').textContent = schools.length;
-            document.getElementById('totalStudents').textContent = students.length;
+                UI.animateNumber('totalSchools', allSchools.length);
+                UI.animateNumber('totalStudents', allStudentsList.length);
 
-            renderSchools(schools);
-            renderPrincipals(allPrincipals);
-            updateSidebarCounts();
-            
-            // Populate school select in principal modal
-            const schoolSelect = document.getElementById('pSchoolId');
-            schoolSelect.innerHTML = schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                renderSchools(allSchools);
+                renderPrincipals(allPrincipals);
+                updateSidebarCounts();
+                
+                // Populate school select in principal modal
+                const schoolSelect = document.getElementById('pSchoolId');
+                if (schoolSelect) {
+                    schoolSelect.innerHTML = allSchools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                }
 
-            // Render visual analytics charts
-            renderMinistryCharts(schools, students, records);
+                // Render visual analytics charts
+                renderMinistryCharts(allSchools, allStudentsList, allRecordsList);
+
+                // Load and render Global Agent Face Analysis Policy
+                try {
+                    let faceEnabled = true;
+                    if (typeof localStorage !== 'undefined') {
+                        const localPref = localStorage.getItem('hodoori_agent_face_analysis_enabled');
+                        if (localPref !== null) faceEnabled = (localPref !== 'false');
+                    }
+                    const settings = await DB.getSettings();
+                    if (settings && typeof settings.enableAgentFaceAnalysis !== 'undefined') {
+                        faceEnabled = !!settings.enableAgentFaceAnalysis;
+                    }
+                    updateGlobalFaceAnalysisUI(faceEnabled);
+                } catch (e) {
+                    console.warn('[Ministry] Could not load face analysis settings:', e);
+                }
+            } catch (err) {
+                console.error('[Ministry Refresh Error]:', err);
+            }
+        }
+
+        function updateGlobalFaceAnalysisUI(enabled) {
+            const toggle = document.getElementById('globalAgentFaceAnalysisToggle');
+            const badge = document.getElementById('globalFaceBadge');
+            const statusText = document.getElementById('globalFaceStatusText');
+            const icon = document.getElementById('globalFaceIcon');
+
+            if (toggle) toggle.checked = enabled;
+            if (statusText) {
+                statusText.textContent = enabled ? 'مفعّل' : 'معطّل تماماً';
+                statusText.className = enabled ? 'text-xs font-extrabold text-emerald-600' : 'text-xs font-extrabold text-rose-600';
+            }
+            if (badge) {
+                if (enabled) {
+                    badge.className = 'px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1';
+                    badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span> مفعّل على مستوى المنظومة';
+                } else {
+                    badge.className = 'px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1';
+                    badge.innerHTML = '<span class="material-symbols-outlined text-[12px]">visibility_off</span> معطّل ومخفي تماماً عن الوكيل';
+                }
+            }
+            if (icon) {
+                icon.textContent = enabled ? 'face' : 'face_retouching_off';
+            }
+        }
+
+        async function toggleGlobalAgentFaceAnalysis(enabled) {
+            updateGlobalFaceAnalysisUI(enabled);
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('hodoori_agent_face_analysis_enabled', enabled ? 'true' : 'false');
+                }
+                await DB.saveSettings({ enableAgentFaceAnalysis: enabled });
+                if (enabled) {
+                    UI.toast('تم تفعيل تحليل وبصمة الوجه للوكيل الذكي بنجاح ✓', 'success');
+                } else {
+                    UI.toast('تم تعطيل تحليل الوجه عند الوكيل وتجريده من الميزة تماماً', 'warning');
+                }
+            } catch (err) {
+                console.error('Failed to update face analysis policy:', err);
+                UI.toast('حدث خطأ أثناء حفظ الإعداد', 'error');
+            }
         }
 
         let distChartInstance = null;
         let schoolAttendChartInstance = null;
 
         function renderMinistryCharts(schools, students, records) {
+            if (typeof Chart === 'undefined') {
+                console.warn('[Ministry] Chart.js is not loaded, skipping chart rendering.');
+                return;
+            }
             // 1. Calculate school distribution by address
             const regionCounts = {};
             schools.forEach(s => {
@@ -778,7 +903,10 @@
                             <h4 class="font-bold text-gray-800 text-sm truncate">${s.name}</h4>
                             ${s.showAgent !== false 
                                 ? `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">smart_toy</span> الوكيل مفعّل</span>
-                                   <span class="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">memory</span> ${getModelDisplayName(s.aiModel)}</span>`
+                                   <span class="px-2 py-0.5 bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">memory</span> ${getModelDisplayName(s.aiModel)}</span>
+                                   ${s.agentFaceAnalysis !== false 
+                                       ? '<span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 border border-purple-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face</span> بصمة الوجه للوكيل مفعّلة</span>'
+                                       : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">face_retouching_off</span> بصمة الوجه للوكيل معطّلة</span>'}`
                                 : '<span class="px-2 py-0.5 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">visibility_off</span> الوكيل مخفي</span>'
                             }
                         </div>
@@ -924,6 +1052,7 @@
             document.getElementById('schoolName').value = '';
             document.getElementById('schoolAddress').value = '';
             document.getElementById('schoolShowAgent').checked = true;
+            document.getElementById('schoolAgentFaceAnalysis').checked = true;
             document.getElementById('schoolAiModel').value = 'nvidia/nemotron-3.5-lightning:free';
             document.getElementById('schoolCustomAiModel').value = '';
             document.getElementById('customModelWrapper').classList.add('hidden');
@@ -940,6 +1069,7 @@
             document.getElementById('schoolName').value = s.name || '';
             document.getElementById('schoolAddress').value = s.address || '';
             document.getElementById('schoolShowAgent').checked = (s.showAgent !== false);
+            document.getElementById('schoolAgentFaceAnalysis').checked = (s.agentFaceAnalysis !== false);
             
             const currentModel = s.aiModel || 'nvidia/nemotron-3.5-lightning:free';
             const modelSelect = document.getElementById('schoolAiModel');
@@ -1004,6 +1134,7 @@
                 name: document.getElementById('schoolName').value.trim(),
                 address: document.getElementById('schoolAddress').value.trim(),
                 showAgent: document.getElementById('schoolShowAgent').checked,
+                agentFaceAnalysis: document.getElementById('schoolAgentFaceAnalysis').checked,
                 aiModel: aiModel
             };
 
@@ -1112,6 +1243,27 @@
             allTelemetryLogs = logs || [];
             updateTelemetryStats(allTelemetryLogs);
             renderLogsList(allTelemetryLogs);
+        }
+
+        function initTelemetryRealtimeSync() {
+            try {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    const bc = new BroadcastChannel('hodoori_telemetry_channel');
+                    bc.onmessage = (ev) => {
+                        if (ev.data && ev.data.type === 'NEW_ERROR') {
+                            loadAndRenderLogs();
+                        }
+                    };
+                }
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'hodoori_telemetry_logs_v1') {
+                        loadAndRenderLogs();
+                    }
+                });
+                window.addEventListener('hodoori:telemetry_error', () => {
+                    loadAndRenderLogs();
+                });
+            } catch (_) {}
         }
 
         function updateTelemetryStats(logs) {

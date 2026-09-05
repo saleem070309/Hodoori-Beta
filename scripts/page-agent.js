@@ -274,11 +274,11 @@
 
         if (theme === 'dark-orange' || theme === 'dark') {
             document.documentElement.className = 'dark theme-dark-orange';
-            document.documentElement.style.backgroundColor = '#0d0d0d';
+            document.documentElement.style.backgroundColor = '#09090b';
             document.documentElement.style.colorScheme = 'dark';
             document.body.className = 'theme-dark-orange';
             if (root) root.className = 'agent-page-container theme-dark-orange';
-            if (metaTheme) metaTheme.setAttribute('content', '#0d0d0d');
+            if (metaTheme) metaTheme.setAttribute('content', '#09090b');
             if (themeIcon && typeof Morphicons !== 'undefined') {
                 Morphicons.morph(themeIcon, 'Sun');
             }
@@ -286,11 +286,11 @@
         } else {
             document.documentElement.className = 'theme-light-warm';
             document.documentElement.classList.remove('dark');
-            document.documentElement.style.backgroundColor = '#faf7f2';
+            document.documentElement.style.backgroundColor = '#f4f6f8';
             document.documentElement.style.colorScheme = 'light';
             document.body.className = 'theme-light-warm';
             if (root) root.className = 'agent-page-container theme-light-warm';
-            if (metaTheme) metaTheme.setAttribute('content', '#faf7f2');
+            if (metaTheme) metaTheme.setAttribute('content', '#f4f6f8');
             if (themeIcon && typeof Morphicons !== 'undefined') {
                 Morphicons.morph(themeIcon, 'Moon');
             }
@@ -473,7 +473,35 @@
             return;
         }
 
-        // 3. Populate User Greeting
+        // 2.1 Early Database Initialization & Telemetry Sync Bridge
+        if (typeof DB !== 'undefined' && typeof DB.init === 'function') {
+            try {
+                await DB.init();
+                if (typeof Telemetry !== 'undefined' && typeof Telemetry.flushPendingLogs === 'function') {
+                    Telemetry.flushPendingLogs();
+                }
+            } catch (dbInitErr) {
+                console.warn('DB early init warning in agent page:', dbInitErr);
+            }
+        }
+
+        // 2.2 Pre-warm AI Agent Context from instant local cache (0ms latency, zero extra reads)
+        if (typeof Agent !== 'undefined' && typeof Agent.getSystemContext === 'function') {
+            try {
+                Agent.getSystemContext().catch(() => {});
+            } catch (_) {}
+        }
+
+        // 2.3 Realtime Change Reactivity: keep Agent context in sync with local and multi-tab mutations
+        if (typeof DB !== 'undefined' && typeof DB.onDataChange === 'function') {
+            DB.onDataChange(() => {
+                if (typeof Agent !== 'undefined' && typeof Agent.getSystemContext === 'function') {
+                    Agent.getSystemContext().catch(() => {});
+                }
+            });
+        }
+
+        // 3. Populate User Greeting & Instant School Stats Subtitle
         const firstName = user.name ? user.name.trim().split(' ')[0] : 'مدير المدرسة';
         const greetingEl = document.getElementById('assistant-greeting-text');
         if (greetingEl) {

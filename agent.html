@@ -14,7 +14,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#faf7f2">
+    <meta name="theme-color" content="#f4f6f8">
     <title>المساعد الذكي | حضوري</title>
     <link rel="icon" type="image/png" href="assets/brand-logo.png" />
     
@@ -24,7 +24,7 @@
             try {
                 var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
                 var isDark = theme === 'dark-orange' || theme === 'dark';
-                var bgColor = isDark ? '#0d0d0d' : '#faf7f2';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
                 document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
                 document.documentElement.style.backgroundColor = bgColor;
                 document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
@@ -52,6 +52,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="scripts/module-telemetry.js?v=2.9.3"></script>
 
     <!-- App & Component Stylesheets -->
     <link href="styles/style.css?v=3.0" rel="stylesheet" />
@@ -211,7 +212,6 @@
     <script src="scripts/module-face-api.js?v=2.9.3"></script>
     <script src="scripts/module-ai-prompt.js?v=2.9.3"></script>
     <script src="scripts/module-ai-agent.js?v=2.9.3"></script>
-    <script src="scripts/module-telemetry.js?v=2.9.3"></script>
 
     <!-- ═══ MODULAR COMPONENT & PAGE SCRIPTS ═══ -->
     <script src="scripts/component-sidebar.js"></script>

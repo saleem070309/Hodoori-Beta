@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>إدارة المعلمين والكادر التعليمي | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-common.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Header ─── -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+            <div class="pr-10 sm:pr-0">
+                <h1 class="text-lg sm:text-[20px] font-black text-stone-900 dark:text-white leading-tight">إدارة المعلمين</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block mt-0.5" id="school-name-display">مدرسة حضوري الذكية</span>
+            </div>
+
+            <div class="w-full sm:w-auto">
+                <button type="button" onclick="showAddTeacherModal()" class="btn-primary-action w-full sm:w-auto justify-center">
+                    <span class="material-symbols-outlined text-sm">person_add</span>
+                    <span>إضافة كادر جديد</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ─── 1. TOP KPI ROW ─── -->
+        <section class="kpi-segmented-card mb-5">
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الكادر</span>
+                <span class="kpi-val" id="kpi-total-staff">--</span>
+                <span class="kpi-sub">عضو مسجل</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">المعلمون</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-teachers-count">--</span>
+                <span class="kpi-sub">معلم نشط</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">الوكلاء والمساعدون</span>
+                <span class="kpi-val text-sky-600 dark:text-sky-400" id="kpi-assistants-count">--</span>
+                <span class="kpi-sub">وكيل / مساعد مدرسة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">الإدارة المركزية</span>
+                <span class="kpi-val text-purple-600 dark:text-purple-400" id="kpi-admins-count">--</span>
+                <span class="kpi-sub">مدير المدرسة</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. SEARCH & FILTER TOOLBAR ─── -->
+        <section class="hodoori-card mb-5 p-3.5">
+            <div class="flex flex-col sm:flex-row items-center gap-3">
+                <div class="relative flex-1 w-full">
+                    <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400">
+                        <span class="material-symbols-outlined text-lg">search</span>
+                    </span>
+                    <input type="text" id="search-teacher-input" placeholder="ابحث بالاسم أو الرقم الوزاري..." oninput="handleTeacherSearch(this.value)" class="flat-input pr-10 text-xs" />
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto shrink-0 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                    <button type="button" class="header-action-btn active border-amber-500 text-amber-600 dark:text-amber-400" id="filter-role-all" onclick="filterByRole('')">الكل</button>
+                    <button type="button" class="header-action-btn" id="filter-role-teacher" onclick="filterByRole('teacher')">المعلمون</button>
+                    <button type="button" class="header-action-btn" id="filter-role-assistant" onclick="filterByRole('assistant')">الوكلاء والمساعدون</button>
+                    <button type="button" class="header-action-btn" id="filter-role-admin" onclick="filterByRole('admin')">الإدارة</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── 3. TEACHERS LIST / TABLE ─── -->
+        <section class="hodoori-card !p-0 overflow-hidden">
+            <!-- Table Header -->
+            <div class="hidden sm:flex items-center justify-between gap-4 p-3.5 px-6 border-b border-stone-200/70 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-900/40 text-[11px] font-black text-stone-400 uppercase tracking-wider">
+                <div class="sm:w-1/2">اسم العضو / الصفة</div>
+                <div class="sm:w-1/4">الرقم الوزاري / الحساب</div>
+                <div class="shrink-0 text-left pl-6">الإجراءات</div>
+            </div>
+
+            <!-- Table Body -->
+            <div id="teachers-list-container" class="divide-y divide-stone-100 dark:divide-neutral-800/60">
+                <div class="p-12 text-center text-xs font-bold text-stone-400">جاري تحميل بيانات المعلمين...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ ADD / EDIT TEACHER MODAL ═══ -->
+    <div id="teacher-modal" class="hodoori-app-modal-backdrop" onclick="closeTeacherModal(event)">
+        <div class="hodoori-app-dialog" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">person</span>
+                    </span>
+                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white" id="teacher-modal-title">إضافة كادر تعليمي جديد</h3>
+                </div>
+                <button type="button" onclick="closeTeacherModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form id="teacher-form" onsubmit="handleSaveTeacher(event)" class="flex flex-col m-0 p-0">
+                <div class="app-dialog-body">
+                    <input type="hidden" id="modal-teacher-id" />
+
+                    <!-- Name Field -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الاسم الرباعي الكامل *</label>
+                        <input type="text" id="modal-teacher-name" required placeholder="مثال: أ. محمد أحمد الشهري" class="flat-input" />
+                    </div>
+
+                    <!-- Role Field -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الصفة الوظيفية (الدور) *</label>
+                        <select id="modal-teacher-role" class="flat-select">
+                            <option value="teacher">معلم</option>
+                            <option value="assistant">مساعد / وكيل مدرسة</option>
+                            <option value="admin">مدير المدرسة (إدارة النظام)</option>
+                        </select>
+                        <p id="modal-role-notice" class="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1 hidden">
+                            مدير المدرسة يملك صلاحيات كاملة لإدارة النظام والإعدادات والتقارير.
+                        </p>
+                    </div>
+
+                    <!-- Ministry ID / Username -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الرقم الوزاري / اسم الدخول</label>
+                        <input type="text" id="modal-teacher-ministry" placeholder="مثال: T-10492 أو رقم الهوية" class="flat-input" />
+                    </div>
+
+                    <!-- Password / PIN -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">كلمة المرور / الرمز السري</label>
+                        <input type="password" id="modal-teacher-password" placeholder="أدخل كلمة المرور لتسجيل الدخول" class="flat-input" autocomplete="new-password" />
+                    </div>
+
+                    <!-- Notes Field -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">ملاحظات إضافية</label>
+                        <textarea id="modal-teacher-notes" rows="2" placeholder="المواد المسندة، التخصص، أو أي ملاحظات..." class="flat-input"></textarea>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="app-dialog-footer">
+                    <button type="button" id="modal-teacher-delete-btn" onclick="handleDeleteTeacher()" class="header-action-btn text-rose-600 hover:border-rose-300 dark:hover:border-rose-900 mr-auto hidden">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                        حذف
+                    </button>
+                    <button type="button" class="header-action-btn" onclick="closeTeacherModal()">إلغاء</button>
+                    <button type="submit" class="btn-primary-action">حفظ البيانات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script src="scripts/component-sidebar.js"></script>
+
+    <!-- Page Specific Controller Logic -->
+    <script>
+        let allTeachers = [];
+        let currentSearchQuery = '';
+        let currentRoleFilter = '';
+
+        const AVATAR_COLORS = [
+            '#f59e0b', '#3b82f6', '#10b981', '#ef4444', 
+            '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchoolMeta();
+
+            // 1. Instant paint from local cache (0ms latency)
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    if (instant.teachers && instant.teachers.length > 0) {
+                        allTeachers = instant.teachers;
+                        updateTeachersKpis();
+                        applyFiltersAndRender();
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Realtime change reactivity
+            if (typeof DB !== 'undefined' && DB.onDataChange) {
+                DB.onDataChange(() => {
+                    renderTeachers();
+                });
+            }
+
+            await renderTeachers();
+        });
+
+        async function loadSchoolMeta() {
+            try {
+                const schoolName = localStorage.getItem('attendance_school_name') || 'مدرسة حضوري الذكية';
+                const el = document.getElementById('school-name-display');
+                if (el) el.textContent = schoolName;
+            } catch (_) {}
+        }
+
+        function updateTeachersKpis() {
+            const total = allTeachers.length;
+            const teachersCount = allTeachers.filter(t => t.role !== 'admin' && t.role !== 'assistant').length;
+            const assistantsCount = allTeachers.filter(t => t.role === 'assistant').length;
+            const adminsCount = allTeachers.filter(t => t.role === 'admin').length;
+
+            UI.animateNumber('kpi-total-staff', total);
+            UI.animateNumber('kpi-teachers-count', teachersCount);
+            UI.animateNumber('kpi-assistants-count', assistantsCount);
+            UI.animateNumber('kpi-admins-count', adminsCount);
+        }
+
+        async function renderTeachers() {
+            const container = document.getElementById('teachers-list-container');
+            if (!container) return;
+
+            try {
+                allTeachers = await DB.getTeachers();
+            } catch (err) {
+                console.error('Error fetching teachers:', err);
+                if (!allTeachers || allTeachers.length === 0) allTeachers = [];
+            }
+
+            updateTeachersKpis();
+            applyFiltersAndRender();
+        }
+
+        function applyFiltersAndRender() {
+            const container = document.getElementById('teachers-list-container');
+            if (!container) return;
+
+            let filtered = allTeachers;
+
+            if (currentRoleFilter) {
+                if (currentRoleFilter === 'teacher') {
+                    filtered = filtered.filter(t => t.role !== 'admin' && t.role !== 'assistant');
+                } else {
+                    filtered = filtered.filter(t => t.role === currentRoleFilter);
+                }
+            }
+
+            if (currentSearchQuery) {
+                const q = currentSearchQuery.toLowerCase().trim();
+                filtered = filtered.filter(t => 
+                    (t.name && t.name.toLowerCase().includes(q)) || 
+                    (t.ministryId && t.ministryId.toLowerCase().includes(q)) ||
+                    (t.notes && t.notes.toLowerCase().includes(q))
+                );
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="p-12 text-center text-stone-400">
+                        <span class="material-symbols-outlined text-4xl mb-2 text-stone-300 dark:text-neutral-700">person_off</span>
+                        <p class="text-sm font-bold">لا يوجد نتائج مطابقة</p>
+                        <p class="text-xs text-stone-500 mt-1">اضغط على زر "إضافة كادر جديد" لإضافة معلمين أو وكلاء.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(t => {
+                const initial = t.name ? t.name.trim().charAt(0) : '؟';
+                const hash = Math.abs((t.id || '1').split('').reduce((a, b) => a + b.charCodeAt(0), 0));
+                const avatarBg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+
+                let roleBadge = '';
+                if (t.role === 'admin') {
+                    roleBadge = `<span class="badge-tag badge-role-admin"><span class="material-symbols-outlined text-[13px]">shield_person</span> مدير المدرسة</span>`;
+                } else if (t.role === 'assistant') {
+                    roleBadge = `<span class="badge-tag badge-role-assistant"><span class="material-symbols-outlined text-[13px]">badge</span> وكيل / مساعد مدرسة</span>`;
+                } else {
+                    roleBadge = `<span class="badge-tag badge-role-teacher"><span class="material-symbols-outlined text-[13px]">school</span> معلم</span>`;
+                }
+
+                return `
+                    <div class="flex items-center justify-between gap-3 p-3.5 px-4 sm:px-6 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all cursor-pointer group" onclick="showEditTeacherModal('${t.id}')">
+                        <!-- Right: Avatar & Info -->
+                        <div class="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1 sm:w-1/2">
+                            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm sm:text-base shrink-0 shadow-sm" style="background-color: ${avatarBg}">
+                                ${initial}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h4 class="font-extrabold text-sm text-stone-900 dark:text-white leading-tight truncate">${t.name}</h4>
+                                <div class="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                                    ${roleBadge}
+                                    ${t.ministryId ? `<span class="sm:hidden text-[10px] font-mono font-bold text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">#${t.ministryId}</span>` : ''}
+                                    ${t.notes ? `<span class="text-[11px] text-stone-400 font-medium truncate max-w-[120px] sm:max-w-[160px]">• ${t.notes}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Center: Ministry ID (Visible on Desktop / Tablet) -->
+                        <div class="hidden sm:block sm:w-1/4 text-right">
+                            <span class="text-xs font-bold font-mono text-stone-600 dark:text-stone-300">
+                                ${t.ministryId ? t.ministryId : '<span class="text-stone-400 font-sans text-[11px]">بدون رقم وزاري</span>'}
+                            </span>
+                        </div>
+
+                        <!-- Left: Actions Button & Chevron -->
+                        <div class="shrink-0 flex items-center justify-end gap-2" onclick="event.stopPropagation()">
+                            <button type="button" onclick="showEditTeacherModal('${t.id}')" class="header-action-btn !h-8 !min-h-0 !py-1 !px-2.5 text-xs text-amber-600 dark:text-amber-400 font-bold" title="تعديل">
+                                <span class="material-symbols-outlined text-sm">edit</span>
+                                <span>تعديل</span>
+                            </button>
+                            <span class="material-symbols-outlined text-stone-300 dark:text-neutral-700 group-hover:text-amber-500 transition-transform group-hover:-translate-x-1 hidden sm:inline-block">chevron_left</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleTeacherSearch(value) {
+            currentSearchQuery = value;
+            applyFiltersAndRender();
+        }
+
+        function filterByRole(role) {
+            currentRoleFilter = role;
+            const buttons = [
+                { id: 'filter-role-all', val: '' },
+                { id: 'filter-role-teacher', val: 'teacher' },
+                { id: 'filter-role-assistant', val: 'assistant' },
+                { id: 'filter-role-admin', val: 'admin' }
+            ];
+
+            buttons.forEach(b => {
+                const el = document.getElementById(b.id);
+                if (!el) return;
+                if (b.val === role) {
+                    el.classList.add('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                } else {
+                    el.classList.remove('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                }
+            });
+
+            applyFiltersAndRender();
+        }
+
+        function showAddTeacherModal() {
+            document.getElementById('teacher-modal-title').textContent = 'إضافة كادر تعليمي جديد';
+            document.getElementById('modal-teacher-id').value = '';
+            document.getElementById('modal-teacher-delete-btn').classList.add('hidden');
+            document.getElementById('teacher-form').reset();
+
+            const roleSelect = document.getElementById('modal-teacher-role');
+            roleSelect.disabled = false;
+            roleSelect.value = 'teacher';
+            document.getElementById('modal-role-notice').classList.add('hidden');
+
+            const modal = document.getElementById('teacher-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        async function showEditTeacherModal(id) {
+            const t = allTeachers.find(x => x.id === id);
+            if (!t) return;
+
+            document.getElementById('teacher-modal-title').textContent = 'تعديل بيانات الكادر التعليمي';
+            document.getElementById('modal-teacher-id').value = t.id;
+            document.getElementById('modal-teacher-name').value = t.name || '';
+            document.getElementById('modal-teacher-ministry').value = t.ministryId || '';
+            document.getElementById('modal-teacher-password').value = t.password || '';
+            document.getElementById('modal-teacher-notes').value = t.notes || '';
+
+            const roleSelect = document.getElementById('modal-teacher-role');
+            const notice = document.getElementById('modal-role-notice');
+            const deleteBtn = document.getElementById('modal-teacher-delete-btn');
+
+            if (t.role === 'admin') {
+                roleSelect.value = 'admin';
+                roleSelect.disabled = true;
+                notice.classList.remove('hidden');
+                deleteBtn.classList.add('hidden');
+            } else {
+                roleSelect.disabled = false;
+                roleSelect.value = t.role || 'teacher';
+                notice.classList.add('hidden');
+                deleteBtn.classList.remove('hidden');
+            }
+
+            const modal = document.getElementById('teacher-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeTeacherModal(e = null) {
+            const modal = document.getElementById('teacher-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        async function handleSaveTeacher(e) {
+            e.preventDefault();
+            const id = document.getElementById('modal-teacher-id').value;
+            const name = document.getElementById('modal-teacher-name').value.trim();
+            const role = document.getElementById('modal-teacher-role').value;
+            const ministryId = document.getElementById('modal-teacher-ministry').value.trim();
+            const password = document.getElementById('modal-teacher-password').value.trim();
+            const notes = document.getElementById('modal-teacher-notes').value.trim();
+
+            if (!name) {
+                UI.toast('يرجى كتابة الاسم الرباعي', 'error');
+                return;
+            }
+
+            const teacherData = {
+                name,
+                role,
+                ministryId,
+                notes
+            };
+
+            if (password) {
+                teacherData.password = password;
+            }
+
+            try {
+                if (id) {
+                    await DB.updateTeacher(id, teacherData);
+                    UI.toast('تم تحديث بيانات المعلم بنجاح', 'success');
+                } else {
+                    if (typeof DB.addTeacher === 'function') {
+                        await DB.addTeacher(teacherData);
+                    } else {
+                        await DB.saveTeacher(teacherData);
+                    }
+                    UI.toast('تمت إضافة المعلم بنجاح', 'success');
+                }
+
+                closeTeacherModal();
+                await renderTeachers();
+            } catch (err) {
+                console.error('Save teacher error:', err);
+                UI.toast('حدث خطأ أثناء حفظ البيانات', 'error');
+            }
+        }
+
+        async function handleDeleteTeacher() {
+            const id = document.getElementById('modal-teacher-id').value;
+            if (!id) return;
+
+            const confirmed = await UI.confirm(
+                'حذف المعلم', 
+                'هل أنت متأكد من حذف هذا المعلم؟ سيتم مسح حسابه من النظام نهائياً.',
+                { confirmText: 'نعم، احذف', type: 'error' }
+            );
+
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteTeacher(id);
+                UI.toast('تم حذف المعلم بنجاح', 'success');
+                closeTeacherModal();
+                await renderTeachers();
+            } catch (err) {
+                console.error('Delete teacher error:', err);
+                UI.toast('حدث خطأ أثناء الحذف', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

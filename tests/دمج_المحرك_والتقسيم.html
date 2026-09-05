@@ -1,0 +1,3184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محرك كشف ومطابقة الوجوه بالتقسيم الهرمي والبث الحي فائق السرعة</title>
+    <!-- مكتبة التعرف على الوجوه Face-API الحديثة (دعم محلي + CDN) -->
+    <script src="../scripts/face-api.js"></script>
+    <script>
+        if (typeof faceapi === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"><\/script>');
+        }
+    </script>
+    <style>
+        /* =========================================================================
+           نظام التصميم: أبيض وأسود عالي التباين، بدون أي وهج أو ظلال إشعاعية
+           ========================================================================= */
+        :root {
+            --bg-main: #000000;
+            --bg-panel: #111111;
+            --bg-card: #181818;
+            --bg-input: #0a0a0a;
+            --border: #333333;
+            --border-light: #555555;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --text-muted: #777777;
+            --accent-match: #00e676;     /* أخضر صريح للتمييز الإيجابي فقط */
+            --accent-unmatch: #ff5252;   /* أحمر صريح للتنبيه فقط */
+            --accent-slice: #38bdf8;     /* أزرق هادئ للترقيم */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            text-shadow: none !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            padding: 16px;
+            direction: rtl;
+            line-height: 1.5;
+        }
+
+        header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border-radius: 4px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-panel);
+            color: var(--text-secondary);
+        }
+
+        /* شبكة القياسات (Telemetry) */
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .telemetry-item {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .telemetry-item .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .telemetry-item .value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: monospace;
+        }
+
+        /* مساحة العمل الرئيسية */
+        .workspace {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 980px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .panel-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .custom-file-input {
+            display: none;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #ffffff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.15s ease;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .btn:disabled {
+            opacity: 0.65 !important;
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+            filter: grayscale(0.5);
+        }
+
+        .spinner-inline {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0, 0, 0, 0.25);
+            border-top-color: #000000;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #ffffff;
+            border: 1px solid var(--border-light);
+        }
+
+        .btn-outline:hover {
+            background: #222222;
+        }
+
+        .btn-danger {
+            background: var(--accent-unmatch);
+            color: #ffffff;
+            border-color: var(--accent-unmatch);
+        }
+
+        .status-box {
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            font-size: 0.82rem;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-success {
+            border-color: var(--accent-match);
+            color: var(--accent-match);
+        }
+
+        .status-fail {
+            border-color: var(--accent-unmatch);
+            color: var(--accent-unmatch);
+        }
+
+        .status-warn {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .vector-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: #d1d5db;
+            font-family: monospace;
+            font-size: 0.7rem;
+            padding: 8px;
+            height: 90px;
+            overflow-y: auto;
+            border-radius: 4px;
+            word-break: break-all;
+            direction: ltr;
+        }
+
+        /* عناصر التحكم والإعدادات المتقدمة */
+        .settings-group {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.78rem;
+        }
+
+        .setting-label-row {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-secondary);
+        }
+
+        .setting-val {
+            color: var(--text-primary);
+            font-family: monospace;
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            accent-color: #ffffff;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .diag-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            padding: 4px 0;
+            border-bottom: 1px dashed #222222;
+        }
+
+        .diag-item strong {
+            color: var(--text-primary);
+            font-family: monospace;
+        }
+
+        .diag-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            border-radius: 3px;
+            font-family: system-ui, sans-serif;
+        }
+
+        .diag-badge.pass {
+            background: rgba(0, 230, 118, 0.12);
+            color: var(--accent-match);
+            border: 1px solid var(--accent-match);
+        }
+
+        .diag-badge.fail {
+            background: rgba(255, 82, 82, 0.12);
+            color: var(--accent-unmatch);
+            border: 1px solid var(--accent-unmatch);
+        }
+
+        .diag-badge.warn {
+            background: rgba(255, 193, 7, 0.12);
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+
+        /* كروت وقائمة الأشخاص المرجعيين */
+        .ref-person-item {
+            background: #181b22;
+            border: 1px solid rgba(0, 230, 118, 0.3);
+            border-radius: 6px;
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+        .ref-person-item:hover {
+            border-color: var(--accent-match);
+            background: #1f242d;
+        }
+        .ref-person-thumb {
+            width: 42px;
+            height: 42px;
+            border-radius: 4px;
+            object-fit: cover;
+            border: 1px solid var(--accent-match);
+            flex-shrink: 0;
+            background: #000;
+        }
+        .ref-person-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        .ref-person-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ref-person-subtitle {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+        }
+        .ref-person-del {
+            background: rgba(255, 82, 82, 0.15);
+            border: 1px solid rgba(255, 82, 82, 0.4);
+            color: #ff5252;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .ref-person-del:hover {
+            background: rgba(255, 82, 82, 0.35);
+            color: #ffffff;
+        }
+
+        @keyframes pulseBorder {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); }
+            70% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(0, 230, 118, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+        }
+        .btn-pulse {
+            animation: pulseBorder 1.5s infinite;
+            border: 1px solid var(--accent-match) !important;
+        }
+
+        /* حاوية العرض المتطابقة بدقة 100% للرسم الصحيح على الوجه */
+        .stage-container {
+            background: #000000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 480px;
+        }
+
+        .stage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        .media-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 0 auto;
+            max-width: 100%;
+            background: #050505;
+            border: 1px solid var(--border);
+            line-height: 0;
+        }
+
+        .media-wrapper img,
+        .media-wrapper video {
+            display: block;
+            max-width: 100%;
+            max-height: 520px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .media-wrapper canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .section-block {
+            margin-top: 24px;
+            border-top: 2px solid var(--border);
+            padding-top: 16px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .faces-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .face-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .face-card.is-matched {
+            border-color: var(--accent-match);
+        }
+
+        .face-card-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .face-crop-preview {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #000000;
+            border: 1px solid var(--border);
+            object-fit: contain;
+            display: block;
+            border-radius: 2px;
+        }
+
+        .face-meta {
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .face-meta-row {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+        }
+
+        .face-meta-val {
+            color: var(--text-primary);
+            font-family: monospace;
+            font-weight: 700;
+        }
+
+        .slices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .slice-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 0.75rem;
+        }
+
+        .slice-card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .slice-thumb {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #000000;
+            border: 1px solid var(--border);
+            object-fit: contain;
+            display: block;
+        }
+
+        .slice-info {
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detection-tag {
+            color: var(--accent-match);
+            font-weight: 700;
+        }
+
+        .no-detection-tag {
+            color: var(--text-muted);
+        }
+
+        .options-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .options-row input[type="checkbox"] {
+            accent-color: #ffffff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- الترويسة الرئيسية -->
+    <header>
+        <div>
+            <h1>نظام كشف ومطابقة الوجوه (هرمي للصور + بث حي فائق السرعة &lt; 30ms)</h1>
+            <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">
+                مسار مزدوج ذكي: مسار هرمي فائق الدقة للصور (مسافة 7م و 20 وجه) + مسار بث كاميرا فائق السرعة (Single-Pass Real-Time &lt; 30ms)
+            </p>
+        </div>
+        <div class="badge" id="engine-status">جاري تهيئة النماذج...</div>
+    </header>
+
+    <!-- شريط القياسات والأداء الحقيقي والإحصاء الزمني -->
+    <div class="telemetry-grid">
+        <div class="telemetry-item">
+            <div class="label">تحميل النموذج</div>
+            <div class="value" id="t-load-time" style="color:#38bdf8;">-- ms</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">كشف الوجه (Detection)</div>
+            <div class="value" id="t-detect-time" style="color:var(--accent-match);">-- ms</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">كشف الهوية والبصمة (128D)</div>
+            <div class="value" id="t-match-time" style="color:#c084fc;">-- ms</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">إجمالي وقت المعالجة</div>
+            <div class="value" id="t-total-time" style="color:#f59e0b; font-weight: 700;">-- ms</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">معدل الإطارات (FPS)</div>
+            <div class="value" id="t-fps">--</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">تقنية المعالجة (Backend)</div>
+            <div class="value" id="t-backend" style="color:var(--accent-slice); font-size: 0.95rem;">WebGL</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">النموذج النشط (Model)</div>
+            <div class="value" id="t-model" style="color:var(--accent-match); font-size: 0.82rem;">SSD MobileNet</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">دقة الإدخال الفعلية</div>
+            <div class="value" id="t-input-res" style="color:#f59e0b; font-size: 0.95rem;">416 px</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">الوجوه المكتشفة</div>
+            <div class="value" id="t-final-count">0</div>
+        </div>
+        <div class="telemetry-item">
+            <div class="label">نمط المعالجة الحالي</div>
+            <div class="value" id="t-mode-status" style="font-size:0.85rem;">خامل</div>
+        </div>
+    </div>
+
+    <!-- مساحة العمل الرئيسية -->
+    <div class="workspace">
+        
+        <!-- لوحة التحكم الجانبية -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>1. الصورة المرجعية (الهوية المستهدفة)</span>
+            </div>
+            
+            <label class="btn btn-outline" for="ref-file" id="lbl-ref-file">
+                رفع صورة مرجعية (تدعم عدة أشخاص)
+            </label>
+            <input type="file" id="ref-file" class="custom-file-input" accept="image/*" multiple>
+            <div id="ref-status" class="status-box">لم تُرفع صورة مرجعية بعد</div>
+
+            <!-- حاوية عرض وإدارة الأشخاص المرجعيين المتعددين -->
+            <div id="ref-persons-container" style="display:none; margin-top: 8px; background: rgba(0, 230, 118, 0.04); border: 1px solid rgba(0, 230, 118, 0.25); border-radius: 6px; padding: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 0.76rem; font-weight: 700; color: var(--accent-match);">
+                        الأشخاص المرجعيون (<span id="ref-count-badge">0</span>)
+                    </span>
+                    <div style="display:flex; gap: 4px;">
+                        <button type="button" id="btn-add-more-refs" onclick="document.getElementById('ref-file').click()" style="background: none; border: 1px solid var(--accent-match); color: var(--accent-match); border-radius: 4px; padding: 2px 6px; font-size: 0.68rem; cursor: pointer;">
+                            + إضافة
+                        </button>
+                        <button type="button" id="btn-clear-refs" style="background: none; border: 1px solid rgba(255, 82, 82, 0.5); color: var(--accent-unmatch); border-radius: 4px; padding: 2px 6px; font-size: 0.68rem; cursor: pointer;">
+                            مسح الكل
+                        </button>
+                    </div>
+                </div>
+                <div id="ref-persons-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
+                    <!-- كروت الأشخاص المرجعيين المصغرة تضاف ديناميكياً هنا -->
+                </div>
+            </div>
+
+            <div class="panel-title" style="margin-top: 10px;">
+                <span>2. صورة الفحص أو البث المباشر</span>
+            </div>
+
+            <label class="btn btn-outline" for="test-file" id="lbl-test-file" style="cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                📁 اختيار / رفع صورة الفحص
+            </label>
+            <input type="file" id="test-file" class="custom-file-input" accept="image/*">
+
+            <!-- زر بدء / إعادة تحليل الصورة يدوياً بالإعدادات الحالية -->
+            <button type="button" class="btn" id="btn-reanalyze" style="background: var(--accent-match); color: #000; font-weight: 700; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>⚡ بدء تحليل الصورة</span>
+            </button>
+
+            <!-- زر اختبار التقنية (مقارنة WebGL ضد WASM على الصورة الفعلية) -->
+            <button type="button" class="btn btn-outline" id="btn-compare-backends" style="border-color: #38bdf8; color: #38bdf8; font-weight: 700; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>⚔️ اختبار التقنية (WebGL vs WASM)</span>
+            </button>
+
+            <!-- زر فحص أداء مكثف 10 مرات متتالية لحساب المتوسط الإجمالي -->
+            <button type="button" class="btn btn-outline" id="btn-benchmark-10" style="border-color: #f59e0b; color: #f59e0b; font-weight: 700; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>📊 فحص أداء مكثف (10 دورات)</span>
+            </button>
+
+            <button type="button" class="btn btn-outline" id="btn-toggle-hierarchical" style="border-color: var(--accent-slice); color: var(--accent-slice); font-size: 0.8rem;">
+                التقسيم الهرمي: مفعل (انقر للتعطيل)
+            </button>
+
+            <button class="btn btn-outline" id="btn-camera">تشغيل الكاميرا المباشرة (&lt; 30ms)</button>
+            <button class="btn btn-danger" id="btn-stop-cam" style="display:none;">إيقاف الكاميرا</button>
+
+            <!-- لوحة الإعدادات المتقدمة للتحكم في النموذج والتقنية والدقة -->
+            <div class="panel-title" style="margin-top: 5px;">
+                <span>إعدادات النموذج والتقنية</span>
+            </div>
+
+            <div class="settings-group">
+                <!-- 1. اختيار النموذج: SSD أو Tiny -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>نموذج الكشف (Model):</span>
+                        <span class="setting-val" id="val-active-model">SSD MobileNet v1</span>
+                    </div>
+                    <select id="select-model">
+                        <option value="ssd" selected>SSD MobileNet v1 (دقة عالية ومتانة للمسافات والزوايا)</option>
+                        <option value="tiny">Tiny Face Detector (فائق السرعة وخفيف الوزن مع تحكم مرن بالدقة)</option>
+                    </select>
+                </div>
+
+                <!-- 2. اختيار التقنية: WebGL أو WASM -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>تقنية المعالجة (Backend):</span>
+                        <span class="setting-val" id="val-active-backend">WebGL</span>
+                    </div>
+                    <select id="select-backend">
+                        <option value="webgl" selected>WebGL (تسريع بطاقة الرسوميات GPU)</option>
+                        <option value="wasm">WASM (معالجة WebAssembly على المعالج CPU مع SIMD)</option>
+                    </select>
+                </div>
+
+                <!-- 3. دقة إدخال المعالجة (Input Resolution) -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>دقة إدخال المعالجة (Input Resolution):</span>
+                        <span class="setting-val" id="val-input-size">416 px</span>
+                    </div>
+                    <select id="select-live-size">
+                        <option value="160">160px (أقصى سرعة ~10ms)</option>
+                        <option value="224">224px (خفيف جداً ~15ms)</option>
+                        <option value="320">320px (سريع ~20ms)</option>
+                        <option value="416" selected>416px (متوازن وموصى به ~30ms)</option>
+                        <option value="512">512px (دقة أعلى ~45ms)</option>
+                        <option value="608">608px (فائق الدقة للوجوه الصغيرة ~65ms)</option>
+                    </select>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; line-height: 1.3;">
+                        ⚡ <strong>ملاحظة:</strong> التحكم بدقة الإدخال يعمل مباشرة مع نموذج <strong>Tiny Face Detector</strong>، بينما نموذج <strong>SSD MobileNet</strong> يعمل بهيكل دقة قياسي ثابت.
+                    </div>
+                </div>
+
+                <!-- 4. خيار وحالة التقسيم الهرمي للصور -->
+                <div class="setting-item" style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px; padding: 8px;">
+                    <div class="setting-label-row">
+                        <span style="font-weight: 700; color: #ffffff;">التقسيم الهرمي للصور:</span>
+                        <span class="setting-val" id="val-hierarchical" style="color: var(--accent-slice);">مفعل (9 قطاعات)</span>
+                    </div>
+                    <div class="options-row" style="margin-top: 5px;">
+                        <label style="color:#ffffff; font-weight:700; cursor:pointer;">
+                            <input type="checkbox" id="chk-hierarchical" checked> تفعيل مسار التقسيم الهرمي للصور الثابتة
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 5. عتبة ثقة كاشف الوجه -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>عتبة ثقة الكشف (Min Confidence):</span>
+                        <span class="setting-val" id="val-min-conf">0.56</span>
+                    </div>
+                    <input type="range" id="slider-min-conf" min="0.10" max="0.85" step="0.02" value="0.56">
+                </div>
+
+                <!-- 6. عتبة مسافة مطابقة الهوية -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>عتبة مطابقة الهوية (Distance Threshold):</span>
+                        <span class="setting-val" id="val-match-thresh">0.54</span>
+                    </div>
+                    <input type="range" id="slider-match-thresh" min="0.35" max="0.65" step="0.01" value="0.54">
+                </div>
+
+                <!-- 7. هامش توسيع اقتطاع الوجه -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <span>هامش توسيع الاقتطاع (Padding):</span>
+                        <span class="setting-val" id="val-padding">+20%</span>
+                    </div>
+                    <input type="range" id="slider-padding" min="0" max="50" step="5" value="20">
+                </div>
+
+                <!-- 8. خيار استعدال ومحاذاة زاوية الوجه -->
+                <div class="options-row" style="margin-top: 4px;">
+                    <label style="color:#ffffff; font-weight:700;">
+                        <input type="checkbox" id="chk-align-face" checked> تفعيل محاذاة واستعدال زاوية الوجه (Eye Alignment)
+                    </label>
+                </div>
+            </div>
+
+            <!-- لوحة فحص وتأكيد التقنية -->
+            <div class="panel-title" style="margin-top: 5px;">
+                <span>فحص وتأكيد التقنية (Health Check)</span>
+            </div>
+
+            <div class="settings-group" id="diag-container">
+                <div class="diag-item">
+                    <span>التقنية الحالية:</span>
+                    <strong id="diag-backend-val">WebGL (GPU)</strong>
+                    <span id="diag-backend-status" class="diag-badge pass">✓ نشط</span>
+                </div>
+                <div class="diag-item">
+                    <span>النموذج النشط:</span>
+                    <strong id="diag-model-val">SSD MobileNet</strong>
+                    <span id="diag-model-status" class="diag-badge pass">✓ جاهز</span>
+                </div>
+                <div class="diag-item">
+                    <span>التقسيم الهرمي:</span>
+                    <strong id="diag-hierarchical-val">مفعل (9 قطاعات)</strong>
+                    <span id="diag-hierarchical-status" class="diag-badge pass">✓ نشط</span>
+                </div>
+                <div class="diag-item">
+                    <span>دقة الإدخال النشطة:</span>
+                    <strong id="diag-res-val">416 px</strong>
+                    <span id="diag-res-status" class="diag-badge pass">✓ مُطبقة</span>
+                </div>
+                <div class="diag-item">
+                    <span>الحسابات الرياضية:</span>
+                    <strong id="diag-math-val">سليمة (30 = 30)</strong>
+                    <span id="diag-math-status" class="diag-badge pass">✓ متطابق</span>
+                </div>
+
+                <button type="button" class="btn btn-outline" id="btn-run-diag" style="font-size:0.75rem; padding:6px; margin-top:4px;">
+                    إجراء فحص تشخيصي فوري
+                </button>
+                <div id="diag-summary-box" class="status-box status-success" style="font-size:0.72rem; text-align:right; font-family:monospace; line-height:1.4; display:none;"></div>
+            </div>
+
+            <div class="options-row">
+                <label>
+                    <input type="checkbox" id="chk-draw-landmarks" checked> رسم قناع المعالم (68 نقطة)
+                </label>
+            </div>
+            <div class="options-row">
+                <label>
+                    <input type="checkbox" id="chk-draw-boxes" checked> رسم إطارات التحديد
+                </label>
+            </div>
+
+            <div class="panel-title" style="margin-top: 5px;">
+                <span>3. حالة التحليل والمطابقة</span>
+            </div>
+
+            <div id="detect-status" class="status-box">بانتظار المدخلات...</div>
+            <div id="match-status" class="status-box">بانتظار المقارنة...</div>
+
+            <div class="label" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;">بصمة الوجه المكتشف (128D Vector):</div>
+            <div class="vector-box" id="vector-output">[]</div>
+        </div>
+
+        <!-- منطقة العرض والمعاينة المجمعة -->
+        <div class="stage-container">
+            <div class="stage-header">
+                <span style="font-weight: 700; font-size: 0.9rem;">المعاينة المجمعة ومحاذاة القناع بدقة 100%</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span id="canvas-dims" style="font-size: 0.75rem; color: var(--text-secondary); font-family: monospace;"></span>
+                    <div id="timing-breakdown-badge" style="font-size: 0.72rem; background: #11141a; border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; color: var(--text-secondary); display: none;">
+                        ⏱️ نموذج: <strong id="tb-model" style="color:#38bdf8;">--</strong> | كشف: <strong id="tb-detect" style="color:var(--accent-match);">--</strong> | بصمة: <strong id="tb-id" style="color:#c084fc;">--</strong> | إجمالي: <strong id="tb-total" style="color:#f59e0b;">--</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; align-items: center; flex: 1;">
+                <div class="media-wrapper" id="media-wrapper">
+                    <img id="test-image" alt="الصورة قيد الفحص" style="display: none;">
+                    <video id="webcam-video" autoplay muted playsinline style="display: none;"></video>
+                    <canvas id="overlay-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- قسم الوجوه المقتطعة مع التوسيع لضمان ظهور كامل المعالم -->
+    <div class="section-block">
+        <div class="section-header">
+            <div class="section-title">الوجوه المقتطعة والمحاذاة (Aligned & Padded Face Chips)</div>
+            <span class="badge" id="faces-badge">0 وجه مقتطع</span>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px;">
+            تظهر هنا الوجوه المقتطعة مع هامش التوسيع واستعدال زاوية العينين (Eye Leveling Alignment) لضمان أعلى مطابقة للهوية.
+        </p>
+        <div class="faces-grid" id="faces-grid">
+            <div style="color: var(--text-muted); font-size: 0.8rem;">ستظهر هنا الوجوه المقتطعة الموسعة فور انتهاء التحليل.</div>
+        </div>
+    </div>
+
+    <!-- قسم عرض الشرائح الـ 9 المحللة -->
+    <div class="section-block" id="slices-block">
+        <div class="section-header">
+            <div class="section-title">القطاعات الـ 9 المفحوصة (للصور الثابتة)</div>
+            <span class="badge">4 أركان (2x2) + 5 محاور ومركز (3x3)</span>
+        </div>
+        <div class="slices-grid" id="slices-grid"></div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. تعريف الشرائح الـ 9 للصور الثابتة
+        // =========================================================================
+        const SLICE_DEFINITIONS = [
+            { id: 1, name: "أعلى يسار (ركن)", layer: 1, type: "2x2", xR: 0, yR: 0, wR: 0.5, hR: 0.5 },
+            { id: 2, name: "أعلى يمين (ركن)", layer: 1, type: "2x2", xR: 0.5, yR: 0, wR: 0.5, hR: 0.5 },
+            { id: 3, name: "أسفل يسار (ركن)", layer: 1, type: "2x2", xR: 0, yR: 0.5, wR: 0.5, hR: 0.5 },
+            { id: 4, name: "أسفل يمين (ركن)", layer: 1, type: "2x2", xR: 0.5, yR: 0.5, wR: 0.5, hR: 0.5 },
+            { id: 5, name: "أعلى منتصف (محور)", layer: 2, type: "3x3", xR: 1/3, yR: 0, wR: 1/3, hR: 1/3 },
+            { id: 6, name: "يسار منتصف (محور)", layer: 2, type: "3x3", xR: 0, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 7, name: "المركز (الوسط)", layer: 2, type: "3x3", xR: 1/3, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 8, name: "يمين منتصف (محور)", layer: 2, type: "3x3", xR: 2/3, yR: 1/3, wR: 1/3, hR: 1/3 },
+            { id: 9, name: "أسفل منتصف (محور)", layer: 2, type: "3x3", xR: 1/3, yR: 2/3, wR: 1/3, hR: 1/3 }
+        ];
+
+        // =========================================================================
+        // 2. محرك الذكاء الاصطناعي ثنائي المسار (Dual Pipeline) المتطور
+        // =========================================================================
+        const Engine = {
+            isLoaded: false,
+            isSwitching: false,
+            isAnalyzing: false,
+            referenceDescriptor: null,
+            referencePersons: [],       // مصفوفة الأشخاص المرجعيين المتعددين [{ id, label, descriptor, cropUrl, box }]
+            
+            selectedModel: 'ssd',       // 'ssd' | 'tiny'
+            selectedBackend: 'webgl',   // 'webgl' | 'wasm'
+            minConfidence: 0.56,
+            matchThreshold: 0.54,
+            staticInputSize: 416,
+            liveInputSize: 416,         // 160, 224, 320, 416, 512, 608
+            paddingRatio: 0.20,
+            iouThreshold: 0.35,
+            enableAlignment: true,
+            enableHierarchical: true,
+            liveCanvas: null,
+            lastModelLoadTime: 0,
+            lastTimings: null,
+
+            clearReferencePersons() {
+                this.referencePersons = [];
+                this.referenceDescriptor = null;
+            },
+
+            addReferencePerson(personData) {
+                const nextId = this.referencePersons.length > 0 
+                    ? Math.max(...this.referencePersons.map(p => p.id)) + 1 
+                    : 1;
+                const newPerson = {
+                    id: nextId,
+                    label: personData.label || `شخص مرجعي #${nextId}`,
+                    descriptor: personData.descriptor,
+                    cropUrl: personData.cropUrl || '',
+                    box: personData.box || null
+                };
+                this.referencePersons.push(newPerson);
+                this.referenceDescriptor = this.referencePersons[0].descriptor;
+                return newPerson;
+            },
+
+            removeReferencePerson(id) {
+                this.referencePersons = this.referencePersons.filter(p => p.id !== id);
+                this.referenceDescriptor = this.referencePersons.length > 0 
+                    ? this.referencePersons[0].descriptor 
+                    : null;
+            },
+
+            modelPaths: [
+                '../models',
+                './models',
+                'models',
+                'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'
+            ],
+
+            async loadModelWithFallback(netName) {
+                for (const path of this.modelPaths) {
+                    try {
+                        await faceapi.nets[netName].loadFromUri(path);
+                        console.log(`[Hodoori Engine] تم تحميل شبكة ${netName} بنجاح من: ${path}`);
+                        return true;
+                    } catch (e) {
+                        // الانتقال للمسار التالي
+                    }
+                }
+                throw new Error(`تعذر تحميل شبكة ${netName} من جميع المسارات المحلية والبعيدة`);
+            },
+
+            // دالة تسخين النماذج لتفادي بطء أول فحص وتجميع كافة الشيدرز مسبقاً (Cold Start Elimination)
+            async warmUpModels() {
+                try {
+                    // إنشاء كانفاس وهمي صغير جداً 64x64 في الذاكرة لتجميع الشيدرز ونقل الأوزان للـ GPU/WASM
+                    const dummy = document.createElement('canvas');
+                    dummy.width = 64;
+                    dummy.height = 64;
+                    const ctx = dummy.getContext('2d');
+                    if (ctx) {
+                        ctx.fillStyle = '#111111';
+                        ctx.fillRect(0, 0, 64, 64);
+                    }
+
+                    // 1. تسخين كاشف Tiny Face وشبكة النقاط والمعالم 68 وشبكة استخراج البصمة 128D
+                    await faceapi.detectAllFaces(dummy, new faceapi.TinyFaceDetectorOptions({ inputSize: 160 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+
+                    // 2. تسخين كاشف SSD MobileNet v1 الرئيسي
+                    await faceapi.detectAllFaces(dummy, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.9 }));
+
+                    // 3. تسخين شبكة البصمة المباشرة (FaceRecognitionNet)
+                    await faceapi.computeFaceDescriptor(dummy);
+
+                    console.log("[Engine] تم التسخين المسبق لكافة الشبكات وتجميع الشيدرز بنجاح (All Shaders Compiled & Warmed Up) ✓");
+                } catch (e) {
+                    console.warn("[Warm-up Notice] تنبيه التسخين المسبق:", e);
+                }
+            },
+
+            async init() {
+                const t0 = performance.now();
+                const statusBadge = document.getElementById('engine-status');
+                statusBadge.textContent = "جاري تهيئة التقنية والنماذج...";
+                try {
+                    if (faceapi.tf) {
+                        try {
+                            const bestBackend = await this.autoSelectBestBackend();
+                            const selectBackend = document.getElementById('select-backend');
+                            const valActiveBackend = document.getElementById('val-active-backend');
+                            if (selectBackend) selectBackend.value = bestBackend;
+                            if (valActiveBackend) valActiveBackend.textContent = bestBackend.toUpperCase();
+                            const tBackend = document.getElementById('t-backend');
+                            if (tBackend) tBackend.textContent = bestBackend.toUpperCase();
+                        } catch (e) {
+                            console.warn("[Backend Auto-Select Warning] تعذر الفحص التلقائي، جاري الاعتماد على الافتراضي:", e);
+                        }
+                    }
+
+                    // تحميل كلا النموذجين (SSD MobileNet v1 + Tiny Face Detector) بالإضافة لشبكة النقاط 68 والتعرف
+                    await Promise.all([
+                        this.loadModelWithFallback('ssdMobilenetv1'),
+                        this.loadModelWithFallback('tinyFaceDetector'),
+                        this.loadModelWithFallback('faceLandmark68Net'),
+                        this.loadModelWithFallback('faceRecognitionNet')
+                    ]);
+
+                    // تسخين المنظومة مسبقاً وتجميع كافة الشيدرز لتفادي تأخير البداية الباردة
+                    statusBadge.textContent = "جاري تسخين وتسريع المحرك...";
+                    await this.warmUpModels();
+
+                    this.isLoaded = true;
+                    const t1 = performance.now();
+                    this.lastModelLoadTime = Math.max(1, Math.round(t1 - t0));
+                    document.getElementById('t-load-time').textContent = this.lastModelLoadTime + " ms";
+                    const tbModel = document.getElementById('tb-model');
+                    if (tbModel) tbModel.textContent = this.lastModelLoadTime + "ms";
+
+                    await runHealthCheck(false);
+                } catch (e) {
+                    console.error("فشل تحميل المحرك والنماذج:", e);
+                    statusBadge.textContent = "خطأ في التحميل: " + e.message;
+                    statusBadge.style.color = "var(--accent-unmatch)";
+                }
+            },
+
+            // إنشاء خيارات الكشف ديناميكياً بحسب النموذج والدقة المحددة
+            getDetectorOptions(isLive = false) {
+                if (this.selectedModel === 'tiny') {
+                    // نموذج Tiny Face Detector يدعم دقة إدخال متغيرة تقبل القسمة على 32
+                    return new faceapi.TinyFaceDetectorOptions({
+                        inputSize: this.liveInputSize,
+                        scoreThreshold: this.minConfidence
+                    });
+                } else {
+                    // نموذج SSD MobileNet v1 ذو دقة متناهية
+                    return new faceapi.SsdMobilenetv1Options({
+                        minConfidence: this.minConfidence,
+                        maxResults: isLive ? 10 : 100,
+                        inputSize: this.staticInputSize
+                    });
+                }
+            },
+
+            // اختبار رياضي مجهري حقيقي وتنافسي نقي يُجرى في كل مرة يدخل فيها المستخدم للموقع
+            async autoSelectBestBackend() {
+                console.log("[Engine] جاري بدء المنافسة الرياضية الحقيقية (100 MegaFLOPs Benchmark) بين WebGL و WASM...");
+
+                let webglLatency = Infinity;
+                let wasmLatency = Infinity;
+
+                // ─── الجولة الأولى: اختبار قدرة الحساب المتوازي على كرت الشاشة (WebGL GPU) ───
+                try {
+                    await faceapi.tf.setBackend('webgl');
+                    await faceapi.tf.ready();
+                    if (faceapi.tf.env) {
+                        faceapi.tf.env().set('WEBGL_PACK', true);
+                        faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                    }
+
+                    // تجهيز المصفوفات مسبقاً في ذاكرة VRAM (عزل تكلفة إنشاء المصفوفات بالـ CPU)
+                    const aGpu = faceapi.tf.ones([256, 256]);
+                    const bGpu = faceapi.tf.ones([256, 256]);
+
+                    // تمرين تمهيدي (Warm-up) لإلغاء أي تأخير في تجهيز الشيدر
+                    faceapi.tf.tidy(() => {
+                        const w = aGpu.matMul(bGpu);
+                        w.dataSync();
+                    });
+
+                    // قياس زمن المعالجة الحسابية الصافية لـ 100 مليون عملية رياضية متتالية
+                    const t0 = performance.now();
+                    faceapi.tf.tidy(() => {
+                        let res = aGpu;
+                        for (let i = 0; i < 3; i++) {
+                            res = res.matMul(bGpu);
+                        }
+                        res.dataSync();
+                    });
+                    webglLatency = performance.now() - t0;
+                    aGpu.dispose();
+                    bGpu.dispose();
+                } catch (e) {
+                    console.warn("[Benchmark] تعذر تشغيل اختبار WebGL:", e);
+                }
+
+                // ─── الجولة الثانية: اختبار قدرة الحساب على المعالج المركزي (WASM CPU) ───
+                try {
+                    if (faceapi.tf.setWasmPaths) {
+                        faceapi.tf.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/');
+                    }
+                    await faceapi.tf.setBackend('wasm');
+                    await faceapi.tf.ready();
+
+                    // تجهيز نفس المصفوفات مسبقاً في ذاكرة WASM
+                    const aCpu = faceapi.tf.ones([256, 256]);
+                    const bCpu = faceapi.tf.ones([256, 256]);
+
+                    // تمرين تمهيدي (Warm-up)
+                    faceapi.tf.tidy(() => {
+                        const w = aCpu.matMul(bCpu);
+                        w.dataSync();
+                    });
+
+                    // قياس زمن نفس العملية الحسابية تماماً لـ 100 مليون عملية
+                    const t0 = performance.now();
+                    faceapi.tf.tidy(() => {
+                        let res = aCpu;
+                        for (let i = 0; i < 3; i++) {
+                            res = res.matMul(bCpu);
+                        }
+                        res.dataSync();
+                    });
+                    wasmLatency = performance.now() - t0;
+                    aCpu.dispose();
+                    bCpu.dispose();
+                } catch (e) {
+                    console.warn("[Benchmark] تعذر تشغيل اختبار WASM:", e);
+                }
+
+                // ─── المقارنة الرياضية القطعية واختيار الأسرع رقمياً ───
+                const chosenBackend = (webglLatency <= wasmLatency && webglLatency !== Infinity) 
+                    ? 'webgl' 
+                    : (wasmLatency !== Infinity ? 'wasm' : 'webgl');
+
+                // تفعيل المحرك الفائز حسابياً في الجلسة الحالية
+                await this.switchBackend(chosenBackend);
+
+                this.lastBenchmark = {
+                    webgl: webglLatency,
+                    wasm: wasmLatency,
+                    winner: chosenBackend
+                };
+
+                console.log(`[Engine] نتيجة المنافسة الرياضية الحقيقية (100M FLOPs):\n • WebGL (GPU): ${webglLatency.toFixed(2)} ms\n • WASM (CPU):  ${wasmLatency.toFixed(2)} ms\n => الفائز الأسرع رقمياً: ${chosenBackend.toUpperCase()}`);
+                return chosenBackend;
+            },
+
+            // تبديل تقنية المعالجة (WebGL أو WASM) مع التحقق الفوري
+            async switchBackend(backendName) {
+                if (!faceapi.tf) throw new Error("TensorFlow.js غير متوفر");
+                if (faceapi.tf.getBackend() === backendName) {
+                    return { success: true, backend: backendName };
+                }
+
+                if (backendName === 'wasm') {
+                    if (faceapi.tf.setWasmPaths) {
+                        faceapi.tf.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/');
+                    }
+                }
+
+                await faceapi.tf.setBackend(backendName);
+                await faceapi.tf.ready();
+
+                if (backendName === 'webgl') {
+                    faceapi.tf.env().set('WEBGL_PACK', true);
+                    faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+                }
+
+                this.selectedBackend = faceapi.tf.getBackend();
+                cachedDescriptors = {};
+
+                // تسخين التقنية الجديدة فور التبديل لتجميع شيدرزها ونقل الأوزان
+                if (this.isLoaded) {
+                    await this.warmUpModels();
+                }
+
+                return { success: true, backend: this.selectedBackend };
+            },
+
+            // تبديل نموذج الكشف (SSD MobileNet v1 أو Tiny Face Detector)
+            async switchModel(modelName) {
+                if (this.selectedModel === modelName) return true;
+
+                const t0 = performance.now();
+                if (modelName === 'tiny') {
+                    if (!faceapi.nets.tinyFaceDetector.isLoaded) {
+                        await this.loadModelWithFallback('tinyFaceDetector');
+                    }
+                } else {
+                    if (!faceapi.nets.ssdMobilenetv1.isLoaded) {
+                        await this.loadModelWithFallback('ssdMobilenetv1');
+                    }
+                }
+                const t1 = performance.now();
+                this.lastModelLoadTime = Math.max(1, Math.round(t1 - t0));
+                const elLoad = document.getElementById('t-load-time');
+                if (elLoad) elLoad.textContent = `${this.lastModelLoadTime} ms`;
+                const tbModel = document.getElementById('tb-model');
+                if (tbModel) tbModel.textContent = `${this.lastModelLoadTime}ms`;
+
+                this.selectedModel = modelName;
+                cachedDescriptors = {};
+                return true;
+            },
+
+            // تعيين دقة الإدخال الفعلية
+            setInputSize(newSize) {
+                this.liveInputSize = parseInt(newSize, 10);
+                this.staticInputSize = this.liveInputSize;
+            },
+
+            // استخراج كافة الوجوه المرجعية من الصورة (يدعم شخصاً واحداً أو عدة أشخاص في نفس الصورة)
+            async extractAllReferenceFaces(imgElement) {
+                if (!this.isLoaded) await this.init();
+
+                let detections = await faceapi.detectAllFaces(imgElement, this.getDetectorOptions(false))
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+
+                if (!detections || detections.length === 0) {
+                    const fallbackOpts = (this.selectedModel === 'tiny')
+                        ? new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.15 })
+                        : new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 });
+
+                    detections = await faceapi.detectAllFaces(imgElement, fallbackOpts)
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+                }
+
+                if ((!detections || detections.length === 0) && faceapi.nets.ssdMobilenetv1.isLoaded && this.selectedModel !== 'ssd') {
+                    detections = await faceapi.detectAllFaces(imgElement, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.10 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+                }
+
+                if ((!detections || detections.length === 0) && imgElement instanceof HTMLCanvasElement) {
+                    const angles = [90, 270, 180];
+                    for (let angle of angles) {
+                        const rotatedCanvas = document.createElement('canvas');
+                        if (angle === 90 || angle === 270) {
+                            rotatedCanvas.width = imgElement.height;
+                            rotatedCanvas.height = imgElement.width;
+                        } else {
+                            rotatedCanvas.width = imgElement.width;
+                            rotatedCanvas.height = imgElement.height;
+                        }
+                        const rCtx = rotatedCanvas.getContext('2d');
+                        rCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+                        rCtx.rotate((angle * Math.PI) / 180);
+                        rCtx.drawImage(imgElement, -imgElement.width / 2, -imgElement.height / 2);
+
+                        const rotDetections = await faceapi.detectAllFaces(rotatedCanvas, this.getDetectorOptions(false))
+                            .withFaceLandmarks()
+                            .withFaceDescriptors();
+
+                        if (rotDetections && rotDetections.length > 0) {
+                            detections = rotDetections;
+                            imgElement = rotatedCanvas;
+                            break;
+                        }
+                    }
+                }
+
+                if (!detections || detections.length === 0) {
+                    return [];
+                }
+
+                const results = [];
+                for (let i = 0; i < detections.length; i++) {
+                    const d = detections[i];
+                    if (!d.descriptor) continue;
+
+                    const landmarks = d.landmarks ? d.landmarks.positions : null;
+                    const cropInfo = await this.cropAndAlignFace(imgElement, d.detection.box, landmarks, 0.20);
+
+                    results.push({
+                        descriptor: Array.from(d.descriptor),
+                        box: d.detection.box,
+                        score: d.detection.score,
+                        cropUrl: cropInfo ? cropInfo.dataUrl : null
+                    });
+                }
+
+                return results;
+            },
+
+            // دعم التوافقية السابقة للبصمة المنفردة
+            async extractSingleDescriptor(imgElement) {
+                const faces = await this.extractAllReferenceFaces(imgElement);
+                if (faces.length > 0) {
+                    return { descriptor: faces[0].descriptor };
+                }
+                return null;
+            },
+
+            createSliceCanvas(sourceImg, sliceDef) {
+                const imgW = sourceImg.naturalWidth || sourceImg.videoWidth || sourceImg.width;
+                const imgH = sourceImg.naturalHeight || sourceImg.videoHeight || sourceImg.height;
+
+                const cropX = Math.round(sliceDef.xR * imgW);
+                const cropY = Math.round(sliceDef.yR * imgH);
+                const cropW = Math.round(sliceDef.wR * imgW);
+                const cropH = Math.round(sliceDef.hR * imgH);
+
+                const c = document.createElement('canvas');
+                c.width = cropW;
+                c.height = cropH;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(sourceImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+                return { canvas: c, cropX, cropY, cropW, cropH, sliceDef };
+            },
+
+            async cropAndAlignFace(sourceImg, box, landmarks = null, padRatio = null) {
+                const ratio = padRatio !== null ? padRatio : this.paddingRatio;
+                const imgW = sourceImg.naturalWidth || sourceImg.videoWidth || sourceImg.width;
+                const imgH = sourceImg.naturalHeight || sourceImg.videoHeight || sourceImg.height;
+
+                const padX = box.width * ratio;
+                const padY = box.height * ratio;
+
+                const startX = Math.max(0, Math.round(box.x - padX));
+                const startY = Math.max(0, Math.round(box.y - padY));
+                const endX = Math.min(imgW, Math.round(box.x + box.width + padX));
+                const endY = Math.min(imgH, Math.round(box.y + box.height + padY));
+
+                const width = endX - startX;
+                const height = endY - startY;
+
+                if (width <= 0 || height <= 0) return null;
+
+                const c = document.createElement('canvas');
+                c.width = width;
+                c.height = height;
+                const ctx = c.getContext('2d');
+
+                // إذا لم تكن المعالم ممررة مسبقاً، نستخرجها الآن حصراً للوجه النهائي الناجي من الـ NMS
+                if (!landmarks) {
+                    ctx.drawImage(sourceImg, startX, startY, width, height, 0, 0, width, height);
+                    try {
+                        const lmRes = await faceapi.detectFaceLandmarks(c);
+                        if (lmRes && lmRes.positions) {
+                            landmarks = lmRes.positions.map(pt => ({
+                                x: pt.x + startX,
+                                y: pt.y + startY
+                            }));
+                        }
+                    } catch (err) {
+                        console.warn("فشل كشف معالم الوجه النهائي:", err);
+                    }
+                }
+
+                if (this.enableAlignment && landmarks && landmarks.length >= 68) {
+                    const leftEye = {
+                        x: (landmarks[36].x + landmarks[39].x) / 2,
+                        y: (landmarks[36].y + landmarks[39].y) / 2
+                    };
+                    const rightEye = {
+                        x: (landmarks[42].x + landmarks[47].x) / 2,
+                        y: (landmarks[42].y + landmarks[47].y) / 2
+                    };
+
+                    const dy = rightEye.y - leftEye.y;
+                    const dx = rightEye.x - leftEye.x;
+                    const angle = Math.atan2(dy, dx);
+
+                    const centerX = width / 2;
+                    const centerY = height / 2;
+
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(-angle);
+                    ctx.drawImage(sourceImg, startX, startY, width, height, -centerX, -centerY, width, height);
+                    ctx.restore();
+                } else if (!landmarks) {
+                    ctx.drawImage(sourceImg, startX, startY, width, height, 0, 0, width, height);
+                }
+
+                return {
+                    canvas: c,
+                    dataUrl: c.toDataURL('image/png'),
+                    width,
+                    height,
+                    x: startX,
+                    y: startY,
+                    padPercent: Math.round(ratio * 100),
+                    landmarks
+                };
+            },
+
+            // -------------------------------------------------------------
+            // المسار 1: المسار فائق السرعة للكاميرا المباشرة (< 30ms)
+            // مع تطبيق دقة الإدخال الفعلية وتوسيع الإحداثيات بدقة 100%
+            // -------------------------------------------------------------
+            async processLiveCameraFrame(videoElement, extractDescriptor = false) {
+                if (!this.isLoaded || this.isSwitching) return [];
+
+                const targetW = this.liveInputSize;
+                const targetH = Math.round(targetW * (videoElement.videoHeight / videoElement.videoWidth));
+
+                if (!this.liveCanvas) {
+                    this.liveCanvas = document.createElement('canvas');
+                }
+                if (this.liveCanvas.width !== targetW || this.liveCanvas.height !== targetH) {
+                    this.liveCanvas.width = targetW;
+                    this.liveCanvas.height = targetH;
+                }
+                const liveCtx = this.liveCanvas.getContext('2d', { willReadFrequently: true });
+                liveCtx.drawImage(videoElement, 0, 0, targetW, targetH);
+
+                const options = this.getDetectorOptions(true);
+
+                let rawDetections;
+                if (extractDescriptor) {
+                    rawDetections = await faceapi.detectAllFaces(this.liveCanvas, options)
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+                } else {
+                    rawDetections = await faceapi.detectAllFaces(this.liveCanvas, options)
+                        .withFaceLandmarks();
+                }
+
+                if (!rawDetections || rawDetections.length === 0) return [];
+
+                const scaleX = videoElement.videoWidth / targetW;
+                const scaleY = videoElement.videoHeight / targetH;
+
+                return rawDetections.map((d, index) => {
+                    const box = {
+                        x: d.detection.box.x * scaleX,
+                        y: d.detection.box.y * scaleY,
+                        width: d.detection.box.width * scaleX,
+                        height: d.detection.box.height * scaleY
+                    };
+                    const landmarks = d.landmarks ? d.landmarks.positions.map(pt => ({
+                        x: pt.x * scaleX,
+                        y: pt.y * scaleY
+                    })) : null;
+                    const descriptor = d.descriptor ? Array.from(d.descriptor) : null;
+
+                    let matchResult = null;
+                    if (descriptor && (this.referencePersons.length > 0 || this.referenceDescriptor)) {
+                        matchResult = this.matchIdentity(descriptor);
+                    }
+
+                    return {
+                        id: index + 1,
+                        score: d.detection.score,
+                        box,
+                        landmarks,
+                        descriptor,
+                        matchResult,
+                        sourceSlice: `بث حي (${this.selectedModel.toUpperCase()} @ ${targetW}px)`
+                    };
+                });
+            },
+
+            // -------------------------------------------------------------
+            // المسار 2: المسار الهرمي للصور الثابتة (مسافة 7م و 20 وجه)
+            // مع تفعيل النموذج ودقة الإدخال المختارة
+            // -------------------------------------------------------------
+            async processHierarchicalDetection(sourceImg) {
+                if (!this.isLoaded) await this.init();
+
+                // 1. مرحلة كشف الوجه (Face Detection Phase)
+                const tDetectStart = performance.now();
+                const allRawDetections = [];
+                const sliceResults = [];
+                const detectOptions = this.getDetectorOptions(false);
+
+                // تنفيذ التقسيم الهرمي (9 قطاعات) فقط في حال تفعيله
+                if (this.enableHierarchical) {
+                    const slices = SLICE_DEFINITIONS.map(def => this.createSliceCanvas(sourceImg, def));
+
+                    for (let s of slices) {
+                        // كشف سريع للصناديق فقط بدون استخراج المعالم لتفادي الحساب المتكرر للشرائح المتداخلة
+                        const detections = await faceapi.detectAllFaces(s.canvas, detectOptions);
+
+                        const count = detections ? detections.length : 0;
+                        sliceResults.push({
+                            sliceDef: s.sliceDef,
+                            canvas: s.canvas, 
+                            detectedCount: count,
+                            width: s.cropW,
+                            height: s.cropH
+                        });
+
+                        if (detections && detections.length > 0) {
+                            for (let d of detections) {
+                                const box = d.box || (d.detection && d.detection.box);
+                                const score = d.score || (d.detection && d.detection.score);
+                                if (!box) continue;
+
+                                const globalBox = {
+                                    x: box.x + s.cropX,
+                                    y: box.y + s.cropY,
+                                    width: box.width,
+                                    height: box.height
+                                };
+
+                                allRawDetections.push({
+                                    score: score,
+                                    box: globalBox,
+                                    sourceSlice: `#${s.sliceDef.id} ${s.sliceDef.name}`,
+                                    isFullImage: false
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // كشف شامل وسريع للصناديق فقط على الصورة الأصلية الكاملة
+                const fullDetections = await faceapi.detectAllFaces(sourceImg, detectOptions);
+
+                if (fullDetections && fullDetections.length > 0) {
+                    for (let d of fullDetections) {
+                        const box = d.box || (d.detection && d.detection.box);
+                        const score = d.score || (d.detection && d.detection.score);
+                        if (!box) continue;
+
+                        allRawDetections.push({
+                            score: score,
+                            box: {
+                                x: box.x,
+                                y: box.y,
+                                width: box.width,
+                                height: box.height
+                            },
+                            sourceSlice: this.enableHierarchical ? "الصورة الأصلية الكاملة" : "كشف مباشر كامل",
+                            isFullImage: true
+                        });
+                    }
+                }
+
+                const finalBoxes = this.applyNonMaximumSuppression(allRawDetections, this.iouThreshold);
+                const tDetectEnd = performance.now();
+                const detectTime = Math.max(1, Math.round(tDetectEnd - tDetectStart));
+
+                // 2. مرحلة كشف الهوية واستخراج البصمات والمحاذاة المعيارية (Recognition & Embedding Phase)
+                const tIdStart = performance.now();
+                const croppedFaces = [];
+
+                for (let i = 0; i < finalBoxes.length; i++) {
+                    const faceItem = finalBoxes[i];
+                    
+                    // استخراج المعالم ومحاذاة الوجه حصراً للصندوق النهائي بعد تصفية الـ NMS
+                    const cropInfo = await this.cropAndAlignFace(sourceImg, faceItem.box, null, this.paddingRatio);
+
+                    if (cropInfo) {
+                        let descriptor = null;
+                        let faceLandmarks = cropInfo.landmarks;
+
+                        try {
+                            // استخدام كاشف Tiny Face Detector فائق الخفة (inputSize: 160) داخل الوجه المقصوص
+                            // هذا يعيد المحاذاة الرسمية المعيارية 100% بدون أي بطء (~3 إلى 6ms فقط!)
+                            const alignedDetection = await faceapi.detectSingleFace(
+                                cropInfo.canvas,
+                                new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.1 })
+                            ).withFaceLandmarks().withFaceDescriptor();
+
+                            if (alignedDetection && alignedDetection.descriptor) {
+                                descriptor = Array.from(alignedDetection.descriptor);
+                                if (alignedDetection.landmarks && alignedDetection.landmarks.positions) {
+                                    faceLandmarks = alignedDetection.landmarks.positions.map(pt => ({
+                                        x: pt.x + cropInfo.x,
+                                        y: pt.y + cropInfo.y
+                                    }));
+                                }
+                            } else {
+                                // Fallback مباشر في حال تعذر كشف المعالم الدقيقة
+                                const desc = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                                if (desc) descriptor = Array.from(desc);
+                            }
+                        } catch (err) {
+                            console.warn("فشل كشف المعالم داخل الوجه المقصوص:", err);
+                            const desc = await faceapi.computeFaceDescriptor(cropInfo.canvas);
+                            if (desc) descriptor = Array.from(desc);
+                        }
+
+                        let matchResult = null;
+                        if (descriptor && (this.referencePersons.length > 0 || this.referenceDescriptor)) {
+                            matchResult = this.matchIdentity(descriptor);
+                        }
+
+                        croppedFaces.push({
+                            id: i + 1,
+                            box: faceItem.box,
+                            landmarks: faceLandmarks || cropInfo.landmarks,
+                            score: faceItem.score,
+                            sourceSlice: faceItem.sourceSlice,
+                            crop: cropInfo,
+                            descriptor,
+                            matchResult
+                        });
+                    }
+                }
+
+                const tIdEnd = performance.now();
+                const idTime = Math.max(1, Math.round(tIdEnd - tIdStart));
+                const totalTime = detectTime + idTime;
+
+                const timings = {
+                    modelLoadTime: this.lastModelLoadTime || 0,
+                    detectTime,
+                    idTime,
+                    totalTime
+                };
+                this.lastTimings = timings;
+
+                return {
+                    croppedFaces,
+                    sliceResults,
+                    rawCount: allRawDetections.length,
+                    timings
+                };
+            },
+
+            calculateIoU(boxA, boxB) {
+                const xA = Math.max(boxA.x, boxB.x);
+                const yA = Math.max(boxA.y, boxB.y);
+                const xB = Math.min(boxA.x + boxA.width, boxB.x + boxB.width);
+                const yB = Math.min(boxA.y + boxA.height, boxB.y + boxB.height);
+
+                const interW = Math.max(0, xB - xA);
+                const interH = Math.max(0, yB - yA);
+                const interArea = interW * interH;
+
+                const areaA = boxA.width * boxA.height;
+                const areaB = boxB.width * boxB.height;
+                const unionArea = areaA + areaB - interArea;
+
+                if (unionArea <= 0) return 0;
+                return interArea / unionArea;
+            },
+
+            applyNonMaximumSuppression(detections, iouThreshold = 0.35) {
+                if (!detections || detections.length === 0) return [];
+
+                // أولوية مطلقة: كشوفات الصورة الأصلية ومواقعها تأتي أولاً لمنع حذفها أو استبدالها بقطاعات
+                const sorted = [...detections].sort((a, b) => {
+                    const aFull = a.isFullImage ? 1 : 0;
+                    const bFull = b.isFullImage ? 1 : 0;
+                    if (aFull !== bFull) {
+                        return bFull - aFull; // الوجه من الصورة الأصلية الكاملة له الأولوية القصوى
+                    }
+                    return b.score - a.score;
+                });
+
+                const selected = [];
+
+                for (let i = 0; i < sorted.length; i++) {
+                    const current = sorted[i];
+                    let isDuplicate = false;
+
+                    for (let existing of selected) {
+                        const iou = this.calculateIoU(current.box, existing.box);
+                        const currentCenterX = current.box.x + current.box.width / 2;
+                        const currentCenterY = current.box.y + current.box.height / 2;
+                        const isCenterInside = (
+                            currentCenterX >= existing.box.x &&
+                            currentCenterX <= existing.box.x + existing.box.width &&
+                            currentCenterY >= existing.box.y &&
+                            currentCenterY <= existing.box.y + existing.box.height
+                        );
+
+                        if (iou > iouThreshold || isCenterInside) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+
+                    if (!isDuplicate) selected.push(current);
+                }
+
+                return selected;
+            },
+
+            matchIdentity(descriptor, referenceDescriptor = null) {
+                if (!descriptor) return null;
+
+                // في حال تم تمرير متجه مخصص منفرد 128D
+                if (referenceDescriptor && Array.isArray(referenceDescriptor) && referenceDescriptor.length === 128) {
+                    const distance = faceapi.euclideanDistance(descriptor, referenceDescriptor);
+                    const isMatch = distance <= this.matchThreshold;
+                    const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (distance / 0.7)) * 100)));
+                    return { isMatch, distance, confidencePercent, personId: 1, personLabel: 'شخص مرجعي #1' };
+                }
+
+                // فحص جميع الأشخاص المرجعيين المسجلين وإيجاد الشخص الأقرب مطابقة
+                const pool = (this.referencePersons && this.referencePersons.length > 0)
+                    ? this.referencePersons
+                    : (this.referenceDescriptor ? [{ id: 1, label: 'شخص مرجعي #1', descriptor: this.referenceDescriptor }] : []);
+
+                if (pool.length === 0) return null;
+
+                let bestMatch = null;
+                let minDistance = Infinity;
+
+                for (const ref of pool) {
+                    if (!ref.descriptor) continue;
+                    const dist = faceapi.euclideanDistance(descriptor, ref.descriptor);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestMatch = ref;
+                    }
+                }
+
+                if (!bestMatch) return null;
+
+                const isMatch = minDistance <= this.matchThreshold;
+                const confidencePercent = Math.max(0, Math.min(100, Math.round((1 - (minDistance / 0.7)) * 100)));
+
+                return {
+                    isMatch,
+                    distance: minDistance,
+                    confidencePercent,
+                    personId: bestMatch.id,
+                    personLabel: bestMatch.label || `شخص مرجعي #${bestMatch.id}`
+                };
+            }
+        };
+
+        // =========================================================================
+        // 3. واجهة المستخدم والتفاعل والتحكم الشامل
+        // =========================================================================
+        const testImgEl = document.getElementById('test-image');
+        const videoEl = document.getElementById('webcam-video');
+        const canvasEl = document.getElementById('overlay-canvas');
+        const ctx = canvasEl.getContext('2d');
+        const facesGridEl = document.getElementById('faces-grid');
+        const facesBadgeEl = document.getElementById('faces-badge');
+        const slicesGridEl = document.getElementById('slices-grid');
+        const vectorOutputEl = document.getElementById('vector-output');
+        const detectStatusEl = document.getElementById('detect-status');
+        const matchStatusEl = document.getElementById('match-status');
+        const chkDrawLandmarks = document.getElementById('chk-draw-landmarks');
+        const chkDrawBoxes = document.getElementById('chk-draw-boxes');
+
+        const selectModel = document.getElementById('select-model');
+        const valActiveModel = document.getElementById('val-active-model');
+        const selectBackend = document.getElementById('select-backend');
+        const valActiveBackend = document.getElementById('val-active-backend');
+        const selectLiveSize = document.getElementById('select-live-size');
+        const valInputSize = document.getElementById('val-input-size');
+
+        const sliderMinConf = document.getElementById('slider-min-conf');
+        const valMinConf = document.getElementById('val-min-conf');
+        const sliderMatchThresh = document.getElementById('slider-match-thresh');
+        const valMatchThresh = document.getElementById('val-match-thresh');
+        const sliderPadding = document.getElementById('slider-padding');
+        const valPadding = document.getElementById('val-padding');
+        const chkAlignFace = document.getElementById('chk-align-face');
+        const btnToggleHierarchical = document.getElementById('btn-toggle-hierarchical');
+        const chkHierarchical = document.getElementById('chk-hierarchical');
+        const valHierarchical = document.getElementById('val-hierarchical');
+        const lblTestFile = document.getElementById('lbl-test-file');
+
+        let lastAnalysisResult = null;
+        let isCameraRunning = false;
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+        let liveFrameCounter = 0;
+        let cachedDescriptors = {};
+        let currentNormalizedSource = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            Engine.init();
+        });
+
+        // 1. التبديل بين النماذج (SSD MobileNet v1 مقابل Tiny Face Detector)
+        selectModel.addEventListener('change', async (e) => {
+            const targetModel = e.target.value;
+            const modelNameAr = (targetModel === 'tiny') ? 'Tiny Face Detector' : 'SSD MobileNet v1';
+            detectStatusEl.textContent = `جاري التحويل وتجهيز نموذج ${modelNameAr}...`;
+            detectStatusEl.className = "status-box";
+
+            Engine.isSwitching = true;
+            try {
+                await Engine.switchModel(targetModel);
+                valActiveModel.textContent = (targetModel === 'tiny') ? 'Tiny Face' : 'SSD MobileNet';
+                detectStatusEl.textContent = `تم تفعيل نموذج ${modelNameAr} بنجاح`;
+                detectStatusEl.className = "status-box status-success";
+            } catch (err) {
+                console.error(err);
+                detectStatusEl.textContent = `فشل تحميل النموذج: ${err.message}`;
+                detectStatusEl.className = "status-box status-fail";
+                selectModel.value = Engine.selectedModel;
+            } finally {
+                Engine.isSwitching = false;
+                await runHealthCheck(true);
+                if (!isCameraRunning) {
+                    notifySettingsChanged(`تم تفعيل نموذج ${modelNameAr}`);
+                }
+            }
+        });
+
+        // 2. التبديل بين تقنيات المعالجة (WebGL مقابل WASM)
+        selectBackend.addEventListener('change', async (e) => {
+            const targetBackend = e.target.value;
+            detectStatusEl.textContent = `جاري التبديل إلى تقنية ${targetBackend.toUpperCase()}...`;
+            detectStatusEl.className = "status-box";
+
+            Engine.isSwitching = true;
+            try {
+                const res = await Engine.switchBackend(targetBackend);
+                if (res.success) {
+                    valActiveBackend.textContent = res.backend.toUpperCase();
+                    const tBackend = document.getElementById('t-backend');
+                    if (tBackend) tBackend.textContent = res.backend.toUpperCase();
+                    try {
+                        localStorage.setItem('hodoori_fastest_backend_v3', res.backend);
+                        localStorage.setItem('hodoori_fastest_backend_v2', res.backend);
+                        localStorage.setItem('hodoori_fastest_backend', res.backend);
+                    } catch (_) {}
+                    detectStatusEl.textContent = `تم التبديل بنجاح إلى تقنية ${res.backend.toUpperCase()}`;
+                    detectStatusEl.className = "status-box status-success";
+                } else {
+                    detectStatusEl.textContent = `تعذر التبديل إلى ${targetBackend}`;
+                    detectStatusEl.className = "status-box status-fail";
+                    selectBackend.value = faceapi.tf.getBackend();
+                }
+            } catch (err) {
+                console.error(err);
+                detectStatusEl.textContent = `خطأ أثناء تبديل التقنية: ${err.message}`;
+                detectStatusEl.className = "status-box status-fail";
+                selectBackend.value = faceapi.tf.getBackend();
+            } finally {
+                Engine.isSwitching = false;
+                await runHealthCheck(true);
+                if (!isCameraRunning) {
+                    notifySettingsChanged(`تم التبديل إلى تقنية ${targetBackend.toUpperCase()}`);
+                }
+            }
+        });
+
+        // 3. تغيير دقة الإدخال وتطبيقها الفعلي الفوري
+        selectLiveSize.addEventListener('change', async (e) => {
+            const newSize = parseInt(e.target.value, 10);
+            Engine.setInputSize(newSize);
+            valInputSize.textContent = `${newSize} px`;
+
+            if (Engine.selectedModel === 'tiny') {
+                detectStatusEl.textContent = `تم اعتماد دقة الإدخال (${newSize}px) لنموذج Tiny Face Detector ⚡`;
+                detectStatusEl.className = "status-box status-success";
+            } else {
+                detectStatusEl.textContent = `تم ضبط دقة الإدخال إلى (${newSize}px). (ملاحظة: لتجربة فارق السرعة الحقيقي قم بتحويل النموذج إلى Tiny Face Detector)`;
+                detectStatusEl.className = "status-box status-warn";
+            }
+
+            await runHealthCheck(false);
+            if (!isCameraRunning) {
+                notifySettingsChanged(`تم اعتماد دقة الإدخال ${newSize}px`);
+            }
+        });
+
+        // 4. التحكم في تفعيل / إيقاف مسار التقسيم الهرمي
+        function setHierarchicalState(enabled, trigger = false) {
+            Engine.enableHierarchical = !!enabled;
+            if (chkHierarchical) chkHierarchical.checked = Engine.enableHierarchical;
+
+            if (btnToggleHierarchical) {
+                if (Engine.enableHierarchical) {
+                    btnToggleHierarchical.textContent = "التقسيم الهرمي: مفعل (انقر للتعطيل)";
+                    btnToggleHierarchical.style.borderColor = "var(--accent-slice)";
+                    btnToggleHierarchical.style.color = "var(--accent-slice)";
+                } else {
+                    btnToggleHierarchical.textContent = "التقسيم الهرمي: معطل (انقر للتفعيل)";
+                    btnToggleHierarchical.style.borderColor = "var(--text-muted)";
+                    btnToggleHierarchical.style.color = "var(--text-muted)";
+                }
+            }
+
+            if (valHierarchical) {
+                valHierarchical.textContent = Engine.enableHierarchical ? "مفعل (9 قطاعات)" : "معطل (كشف مباشر)";
+                valHierarchical.style.color = Engine.enableHierarchical ? "var(--accent-slice)" : "var(--text-muted)";
+            }
+
+            if (lblTestFile) {
+                lblTestFile.textContent = Engine.enableHierarchical 
+                    ? "رفع وتحليل صورة (تقسيم 9 أجزاء هرمي)" 
+                    : "رفع وتحليل صورة (كشف مباشر كامل)";
+            }
+
+            const diagHierarchicalVal = document.getElementById('diag-hierarchical-val');
+            const diagHierarchicalStatus = document.getElementById('diag-hierarchical-status');
+            if (diagHierarchicalVal && diagHierarchicalStatus) {
+                if (Engine.enableHierarchical) {
+                    diagHierarchicalVal.textContent = "مفعل (9 قطاعات)";
+                    diagHierarchicalStatus.className = "diag-badge pass";
+                    diagHierarchicalStatus.textContent = "✓ نشط";
+                } else {
+                    diagHierarchicalVal.textContent = "معطل (كشف مباشر)";
+                    diagHierarchicalStatus.className = "diag-badge warn";
+                    diagHierarchicalStatus.textContent = "○ معطل";
+                }
+            }
+
+            const slicesBlock = document.getElementById('slices-block');
+            if (slicesBlock && !isCameraRunning) {
+                slicesBlock.style.display = Engine.enableHierarchical ? 'block' : 'none';
+            }
+
+            detectStatusEl.textContent = Engine.enableHierarchical 
+                ? "تم تفعيل مسار التقسيم الهرمي (9 قطاعات للأبعاد البعيدة 7م)" 
+                : "تم إيقاف مسار التقسيم الهرمي (الاعتماد على الكشف المباشر الكامل)";
+            detectStatusEl.className = "status-box status-success";
+
+            if (!isCameraRunning && testImgEl.style.display !== 'none') {
+                document.getElementById('t-mode-status').textContent = Engine.enableHierarchical ? "صورة ثابتة (9 قطع)" : "صورة ثابتة (كاملة)";
+                if (trigger) {
+                    triggerReAnalysis();
+                } else {
+                    notifySettingsChanged(Engine.enableHierarchical ? "تم تفعيل التقسيم الهرمي" : "تم إيقاف التقسيم الهرمي");
+                }
+            }
+        }
+
+        if (btnToggleHierarchical) {
+            btnToggleHierarchical.addEventListener('click', () => {
+                setHierarchicalState(!Engine.enableHierarchical, false);
+            });
+        }
+
+        if (chkHierarchical) {
+            chkHierarchical.addEventListener('change', (e) => {
+                setHierarchicalState(e.target.checked, false);
+            });
+        }
+
+        // 5. فحص تشخيصي وتأكيد أن كل تقنية تعمل بكفاءة تامة
+        async function runHealthCheck(verbose = false) {
+            const diagBox = document.getElementById('diag-summary-box');
+            if (verbose) diagBox.style.display = 'block';
+
+            const t0 = performance.now();
+            let allPassed = true;
+            const logLines = [];
+
+            // أ. فحص التقنية النشطة والحسابات الرياضية التنسورية
+            const backend = faceapi.tf ? faceapi.tf.getBackend() : 'unavailable';
+            const diagBackendVal = document.getElementById('diag-backend-val');
+            const diagBackendStatus = document.getElementById('diag-backend-status');
+            diagBackendVal.textContent = backend.toUpperCase();
+
+            let mathPassed = false;
+            let mathLatency = 0;
+            try {
+                const tm0 = performance.now();
+                const testVal = faceapi.tf.tidy(() => {
+                    const a = faceapi.tf.tensor1d([1, 2, 3, 4]);
+                    return a.square().sum().dataSync()[0];
+                });
+                mathLatency = (performance.now() - tm0).toFixed(1);
+                mathPassed = (testVal === 30);
+            } catch (err) {
+                console.error("Math test failed:", err);
+            }
+
+            const diagMathVal = document.getElementById('diag-math-val');
+            const diagMathStatus = document.getElementById('diag-math-status');
+            if (mathPassed) {
+                diagBackendStatus.className = "diag-badge pass";
+                diagBackendStatus.textContent = "✓ نشط";
+                diagMathVal.textContent = `سليم (${mathLatency}ms)`;
+                diagMathStatus.className = "diag-badge pass";
+                diagMathStatus.textContent = "✓ متطابق";
+                logLines.push(`[Backend] تقنية ${backend.toUpperCase()}: تعمل بنجاح مع حسابات تنسورية متطابقة (زمن: ${mathLatency}ms)`);
+            } else {
+                allPassed = false;
+                diagBackendStatus.className = "diag-badge fail";
+                diagBackendStatus.textContent = "✗ عطل";
+                diagMathVal.textContent = "خطأ بالحساب";
+                diagMathStatus.className = "diag-badge fail";
+                diagMathStatus.textContent = "✗ غير مطابق";
+                logLines.push(`[Backend] تحذير: فشل فحص الحسابات التنسورية على ${backend}`);
+            }
+
+            // ب. فحص جاهزية النموذج النشط
+            const isTiny = (Engine.selectedModel === 'tiny');
+            const modelNet = isTiny ? faceapi.nets.tinyFaceDetector : faceapi.nets.ssdMobilenetv1;
+            const modelName = isTiny ? "Tiny Face Detector" : "SSD MobileNet v1";
+            const diagModelVal = document.getElementById('diag-model-val');
+            const diagModelStatus = document.getElementById('diag-model-status');
+            diagModelVal.textContent = isTiny ? "Tiny Face" : "SSD MobileNet";
+
+            if (modelNet && modelNet.isLoaded) {
+                diagModelStatus.className = "diag-badge pass";
+                diagModelStatus.textContent = "✓ جاهز";
+                logLines.push(`[Model] نموذج ${modelName}: الأوزان محملة بالذاكرة وجاهزة للمعالجة`);
+            } else {
+                allPassed = false;
+                diagModelStatus.className = "diag-badge fail";
+                diagModelStatus.textContent = "✗ غير محمل";
+                logLines.push(`[Model] خطأ: أوزان ${modelName} غير متوفرة`);
+            }
+
+            // ج. فحص مطابقة دقة الإدخال لمواصفات الشبكة
+            const diagResVal = document.getElementById('diag-res-val');
+            const diagResStatus = document.getElementById('diag-res-status');
+            diagResVal.textContent = `${Engine.liveInputSize} px`;
+            const isDiv32 = (Engine.liveInputSize % 32 === 0);
+            if (isDiv32) {
+                diagResStatus.className = "diag-badge pass";
+                diagResStatus.textContent = "✓ مُطبقة";
+                logLines.push(`[Resolution] دقة الإدخال: ${Engine.liveInputSize}px مطابقة لاشتراطات الشبكات (DIV32 = صحيح)`);
+            } else {
+                diagResStatus.className = "diag-badge warn";
+                diagResStatus.textContent = "! تنبيه";
+                logLines.push(`[Resolution] تنبيه: دقة ${Engine.liveInputSize}px ليست من مضاعفات 32`);
+            }
+
+            // د. فحص مسار التقسيم الهرمي
+            const diagHierarchicalVal = document.getElementById('diag-hierarchical-val');
+            const diagHierarchicalStatus = document.getElementById('diag-hierarchical-status');
+            if (Engine.enableHierarchical) {
+                diagHierarchicalVal.textContent = "مفعل (9 قطاعات)";
+                diagHierarchicalStatus.className = "diag-badge pass";
+                diagHierarchicalStatus.textContent = "✓ نشط";
+                logLines.push(`[Hierarchical] التقسيم الهرمي: مفعل (9 قطاعات + كشف شامل لمدى 7 أمتار)`);
+            } else {
+                diagHierarchicalVal.textContent = "معطل (كشف مباشر)";
+                diagHierarchicalStatus.className = "diag-badge warn";
+                diagHierarchicalStatus.textContent = "○ معطل";
+                logLines.push(`[Hierarchical] التقسيم الهرمي: معطل (كشف مباشر سريع على الصورة كاملة)`);
+            }
+
+            // هـ. شبكات المعالم والتعرف
+            const lmLoaded = faceapi.nets.faceLandmark68Net && faceapi.nets.faceLandmark68Net.isLoaded;
+            const recLoaded = faceapi.nets.faceRecognitionNet && faceapi.nets.faceRecognitionNet.isLoaded;
+            logLines.push(`[Networks] المعالم 68 نقطة: ${lmLoaded ? 'جاهز ✓' : 'معطل ✗'} | مطابقة الهوية 128D: ${recLoaded ? 'جاهز ✓' : 'معطل ✗'}`);
+            const refCount = Engine.referencePersons ? Engine.referencePersons.length : 0;
+            logLines.push(`[Reference] بنك الهويات المرجعية: ${refCount > 0 ? `${refCount} شخص مسجل ومفعل ✓` : 'لا توجد هوية مرجعية بعد (المقارنة بانتظار مرجع)'}`);
+
+            const tTotal = (performance.now() - t0).toFixed(1);
+            logLines.push(`[Summary] استغرق الفحص الكامل: ${tTotal}ms | حالة المنظومة: ${allPassed ? 'ممتازة 100% وتعمل بكفاءة ✓' : 'تحتاج مراجعة ✗'}`);
+
+            diagBox.className = allPassed ? "status-box status-success" : "status-box status-fail";
+            diagBox.textContent = logLines.join('\n');
+
+            // تحديث شارة الترويسة الرئيسية وشريط القياسات
+            const headerBadge = document.getElementById('engine-status');
+            headerBadge.textContent = `${backend.toUpperCase()} | ${isTiny ? 'Tiny' : 'SSD'} | ${Engine.liveInputSize}px`;
+            headerBadge.style.borderColor = allPassed ? "var(--accent-match)" : "var(--accent-unmatch)";
+            headerBadge.style.color = allPassed ? "var(--accent-match)" : "var(--accent-unmatch)";
+
+            document.getElementById('t-backend').textContent = backend.toUpperCase();
+            document.getElementById('t-model').textContent = isTiny ? 'Tiny Face' : 'SSD MobileNet';
+            document.getElementById('t-input-res').textContent = `${Engine.liveInputSize} px`;
+
+            return allPassed;
+        }
+
+        document.getElementById('btn-run-diag').addEventListener('click', async () => {
+            await runHealthCheck(true);
+        });
+
+        sliderMinConf.addEventListener('input', (e) => {
+            Engine.minConfidence = parseFloat(e.target.value);
+            valMinConf.textContent = Engine.minConfidence.toFixed(2);
+            if (!isCameraRunning) notifySettingsChanged(`تم تعديل حساسية الكشف إلى ${Engine.minConfidence.toFixed(2)}`);
+        });
+
+        sliderMatchThresh.addEventListener('input', (e) => {
+            Engine.matchThreshold = parseFloat(e.target.value);
+            valMatchThresh.textContent = Engine.matchThreshold.toFixed(2);
+            if (!isCameraRunning) notifySettingsChanged(`تم تعديل عتبة التطابق إلى ${Engine.matchThreshold.toFixed(2)}`);
+        });
+
+        sliderPadding.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            Engine.paddingRatio = val / 100;
+            valPadding.textContent = `+${val}%`;
+            if (!isCameraRunning) notifySettingsChanged(`تم تعديل هامش الاقتصاص إلى +${val}%`);
+        });
+
+        chkAlignFace.addEventListener('change', (e) => {
+            Engine.enableAlignment = e.target.checked;
+            if (!isCameraRunning) notifySettingsChanged(Engine.enableAlignment ? "تم تفعيل محاذاة الوجه" : "تم تعطيل محاذاة الوجه");
+        });
+
+        // إشعار المستخدم بتغيير الإعدادات وتنبيهه لإعادة التحليل يدوياً
+        function notifySettingsChanged(msg = "تم تعديل الإعدادات") {
+            const btnRe = document.getElementById('btn-reanalyze');
+            if (btnRe) {
+                btnRe.classList.add('btn-pulse');
+            }
+            const hasImage = (currentNormalizedSource || (testImgEl && testImgEl.style.display !== 'none' && testImgEl.src));
+            if (hasImage) {
+                detectStatusEl.textContent = `${msg} — اضغط على "إعادة تحليل الصورة" لتطبيق التغييرات 🔄`;
+                detectStatusEl.className = "status-box status-warn";
+            }
+        }
+
+        // تحديث إحصاءات الوقت المستغرق بدقة في كافة البطاقات والشارات
+        function updateTimingsUI(timings) {
+            if (!timings) return;
+            const elLoad = document.getElementById('t-load-time');
+            const elDetect = document.getElementById('t-detect-time');
+            const elMatch = document.getElementById('t-match-time');
+            const elTotal = document.getElementById('t-total-time');
+
+            const loadMs = (timings.modelLoadTime !== undefined ? timings.modelLoadTime : (Engine.lastModelLoadTime || 0));
+            const detectMs = (timings.detectTime !== undefined ? timings.detectTime : 0);
+            const idMs = (timings.idTime !== undefined ? timings.idTime : 0);
+            const totalMs = (timings.totalTime !== undefined ? timings.totalTime : (detectMs + idMs));
+
+            if (elLoad) elLoad.textContent = loadMs + " ms";
+            if (elDetect) elDetect.textContent = detectMs + " ms";
+            if (elMatch) elMatch.textContent = idMs + " ms";
+            if (elTotal) elTotal.textContent = totalMs + " ms";
+
+            const badge = document.getElementById('timing-breakdown-badge');
+            const tbModel = document.getElementById('tb-model');
+            const tbDetect = document.getElementById('tb-detect');
+            const tbId = document.getElementById('tb-id');
+            const tbTotal = document.getElementById('tb-total');
+
+            if (badge) badge.style.display = 'inline-flex';
+            if (tbModel) tbModel.textContent = loadMs + " ms";
+            if (tbDetect) tbDetect.textContent = detectMs + " ms";
+            if (tbId) tbId.textContent = idMs + " ms";
+            if (tbTotal) tbTotal.textContent = totalMs + " ms";
+        }
+
+        // تنفيذ تحليل / إعادة تحليل الصورة يدوياً بالإعدادات الحالية مع مؤشر تحميل لمنع التجميد
+        async function triggerReAnalysis() {
+            const btnRe = document.getElementById('btn-reanalyze');
+            const btnBench = document.getElementById('btn-benchmark-10');
+            if (Engine.isAnalyzing) return; // حماية ضد النقر المتعدد أثناء المعالجة
+
+            const source = currentNormalizedSource || ((testImgEl && testImgEl.style.display !== 'none' && testImgEl.src) ? testImgEl : null);
+
+            if (!source) {
+                detectStatusEl.textContent = "يرجى اختيار أو رفع صورة أولاً قبل بدء التحليل 📷";
+                detectStatusEl.className = "status-box status-warn";
+                return;
+            }
+
+            Engine.isAnalyzing = true;
+            if (btnRe) {
+                btnRe.classList.remove('btn-pulse');
+                btnRe.disabled = true;
+                btnRe.innerHTML = '<span class="spinner-inline"></span> <span>⏳ جاري التحليل والمعالجة...</span>';
+            }
+            if (btnBench) btnBench.disabled = true;
+
+            const testFileInput = document.getElementById('test-file');
+            if (testFileInput) testFileInput.disabled = true;
+
+            detectStatusEl.textContent = Engine.enableHierarchical 
+                ? "جاري التقطيع الهرمي والتحليل الشامل للوجوه..." 
+                : "جاري الفحص المباشر والتحليل الشامل للوجوه...";
+            detectStatusEl.className = "status-box";
+
+            try {
+                // إتاحة فرصة لتحديث الواجهة والزر قبل تشغيل المعالجة الثقيلة
+                await new Promise(r => setTimeout(r, 50));
+
+                const result = await Engine.processHierarchicalDetection(source);
+                lastAnalysisResult = result;
+                renderAnalysis(result);
+                renderCroppedFacesUI(result.croppedFaces);
+
+                updateTimingsUI(result.timings);
+
+                document.getElementById('t-final-count').textContent = result.croppedFaces.length;
+
+                const slicesBlock = document.getElementById('slices-block');
+                if (Engine.enableHierarchical) {
+                    if (slicesBlock) slicesBlock.style.display = 'block';
+                    renderSlicesUI(result.sliceResults);
+                } else {
+                    if (slicesBlock) slicesBlock.style.display = 'none';
+                    renderSlicesUI([]);
+                }
+
+                detectStatusEl.textContent = `اكتمل التحليل بنجاح: تم كشف ${result.croppedFaces.length} وجوه (إجمالي الوقت: ${result.timings.totalTime} ms)`;
+                detectStatusEl.className = "status-box status-success";
+            } catch (err) {
+                console.error(err);
+                detectStatusEl.textContent = `خطأ أثناء التحليل: ${err.message}`;
+                detectStatusEl.className = "status-box status-fail";
+            } finally {
+                Engine.isAnalyzing = false;
+                if (testFileInput) testFileInput.disabled = false;
+                if (btnRe) {
+                    btnRe.disabled = false;
+                    btnRe.innerHTML = '<span>🔄 إعادة تحليل الصورة</span>';
+                }
+                if (btnBench) btnBench.disabled = false;
+                const btnComp = document.getElementById('btn-compare-backends');
+                if (btnComp) btnComp.disabled = false;
+            }
+        }
+
+        const btnReanalyze = document.getElementById('btn-reanalyze');
+        if (btnReanalyze) {
+            btnReanalyze.addEventListener('click', triggerReAnalysis);
+        }
+
+        // =========================================================================
+        // اختبار ومقارنة التقنيات (WebGL vs WASM بـ 5 دورات مع استبعاد الدورة الأولى)
+        // =========================================================================
+        async function runBackendComparisonTest() {
+            if (Engine.isAnalyzing) return;
+
+            const source = currentNormalizedSource || ((testImgEl && testImgEl.style.display !== 'none' && testImgEl.src) ? testImgEl : null);
+
+            if (!source) {
+                detectStatusEl.textContent = "يرجى اختيار أو رفع صورة أولاً قبل بدء اختبار التقنية 📷";
+                detectStatusEl.className = "status-box status-warn";
+                return;
+            }
+
+            // رسالة تأكيد مسبقة للمستخدم
+            const isConfirmed = confirm(
+                "هل أنت متأكد من رغبتك في تشغيل اختبار ومقارنة التقنيات (WebGL مقابل WASM)؟\n\n" +
+                "• سيقوم النظام بتحليل الصورة الحالية 5 مرات بكل تقنية (إجمالي 10 دورات).\n" +
+                "• سيتم استبعاد الدورة الأولى لكل تقنية كفحص تسخين (Warm-up) واحتساب متوسط الـ 4 دورات اللاحقة بدقة.\n" +
+                "• سيحدد النظام التقنية الفائزة والأسرع على جهازك ويعتمدها تلقائياً."
+            );
+
+            if (!isConfirmed) return;
+
+            const btnCompare = document.getElementById('btn-compare-backends');
+            const btnBench = document.getElementById('btn-benchmark-10');
+            const btnRe = document.getElementById('btn-reanalyze');
+            const testFileInput = document.getElementById('test-file');
+            const refFileInput = document.getElementById('ref-file');
+            const btnCam = document.getElementById('btn-camera');
+            const selModel = document.getElementById('select-model');
+            const selBackend = document.getElementById('select-backend');
+            const selSize = document.getElementById('select-live-size');
+
+            Engine.isAnalyzing = true;
+
+            if (btnCompare) {
+                btnCompare.disabled = true;
+                btnCompare.innerHTML = '<span class="spinner-inline" style="border-top-color:#38bdf8;"></span> <span>⏳ جاري التحضير للاختبار...</span>';
+            }
+            if (btnBench) btnBench.disabled = true;
+            if (btnRe) btnRe.disabled = true;
+            if (testFileInput) testFileInput.disabled = true;
+            if (refFileInput) refFileInput.disabled = true;
+            if (btnCam) btnCam.disabled = true;
+            if (selModel) selModel.disabled = true;
+            if (selBackend) selBackend.disabled = true;
+            if (selSize) selSize.disabled = true;
+
+            const backends = ['webgl', 'wasm'];
+            const results = {
+                webgl: { runs: [], totalAvg: 0, detectAvg: 0, idAvg: 0, minTotal: 0, maxTotal: 0, warmupTime: 0 },
+                wasm: { runs: [], totalAvg: 0, detectAvg: 0, idAvg: 0, minTotal: 0, maxTotal: 0, warmupTime: 0 }
+            };
+            const RUNS_PER_BACKEND = 5;
+
+            try {
+                for (const backend of backends) {
+                    const bNameAr = (backend === 'webgl') ? 'WebGL (كرت الشاشة GPU)' : 'WASM (المعالج CPU SIMD)';
+
+                    // تبديل التقنية النشطة
+                    await Engine.switchBackend(backend);
+                    if (selBackend) selBackend.value = backend;
+                    const valActiveBackend = document.getElementById('val-active-backend');
+                    if (valActiveBackend) valActiveBackend.textContent = backend.toUpperCase();
+                    const tBackend = document.getElementById('t-backend');
+                    if (tBackend) tBackend.textContent = backend.toUpperCase();
+
+                    for (let i = 1; i <= RUNS_PER_BACKEND; i++) {
+                        const isWarmup = (i === 1);
+                        if (btnCompare) {
+                            btnCompare.innerHTML = `<span class="spinner-inline" style="border-top-color:#38bdf8;"></span> <span>⏳ ${backend.toUpperCase()} (${i}/${RUNS_PER_BACKEND})${isWarmup ? ' [تسخين]' : ''}</span>`;
+                        }
+                        detectStatusEl.textContent = `⏳ جاري اختبار تقنية ${bNameAr}: دورة (${i}/${RUNS_PER_BACKEND})${isWarmup ? ' [دورة تسخين مستبعدة]' : ''}...`;
+                        detectStatusEl.className = "status-box";
+                        document.getElementById('t-mode-status').textContent = `اختبار ${backend.toUpperCase()} (${i}/${RUNS_PER_BACKEND})`;
+
+                        // إتاحة فرصة لتحديث وتصيير شاشة المتصفح
+                        await new Promise(r => setTimeout(r, 30));
+
+                        const res = await Engine.processHierarchicalDetection(source);
+                        lastAnalysisResult = res;
+
+                        // تحديث الكانفاس والبطاقات والقياسات
+                        renderAnalysis(res);
+                        renderCroppedFacesUI(res.croppedFaces);
+                        updateTimingsUI(res.timings);
+                        document.getElementById('t-final-count').textContent = res.croppedFaces.length;
+
+                        results[backend].runs.push({
+                            totalTime: res.timings.totalTime,
+                            detectTime: res.timings.detectTime,
+                            idTime: res.timings.idTime
+                        });
+                    }
+
+                    // استبعاد الدورة الأولى وحساب متوسط الـ 4 دورات اللاحقة بدقة
+                    const validRuns = results[backend].runs.slice(1);
+                    const sum = arr => arr.reduce((acc, v) => acc + v, 0);
+                    results[backend].totalAvg = Math.round(sum(validRuns.map(r => r.totalTime)) / validRuns.length);
+                    results[backend].detectAvg = Math.round(sum(validRuns.map(r => r.detectTime)) / validRuns.length);
+                    results[backend].idAvg = Math.round(sum(validRuns.map(r => r.idTime)) / validRuns.length);
+                    results[backend].minTotal = Math.min(...validRuns.map(r => r.totalTime));
+                    results[backend].maxTotal = Math.max(...validRuns.map(r => r.totalTime));
+                    results[backend].warmupTime = results[backend].runs[0].totalTime;
+                }
+
+                // المقارنة وتحديد التقنية الفائزة
+                const webglAvg = results.webgl.totalAvg;
+                const wasmAvg = results.wasm.totalAvg;
+                const winner = (webglAvg <= wasmAvg) ? 'webgl' : 'wasm';
+                const diffMs = Math.abs(webglAvg - wasmAvg);
+                const minAvg = Math.min(webglAvg, wasmAvg);
+                const maxAvg = Math.max(webglAvg, wasmAvg);
+                const speedupRatio = (maxAvg / Math.max(1, minAvg)).toFixed(1);
+                const speedupPercent = Math.round(((maxAvg - minAvg) / Math.max(1, minAvg)) * 100);
+
+                // تثبيت وتفعيل التقنية الفائزة
+                await Engine.switchBackend(winner);
+                if (selBackend) selBackend.value = winner;
+                const valActiveBackend = document.getElementById('val-active-backend');
+                if (valActiveBackend) valActiveBackend.textContent = winner.toUpperCase();
+                const tBackend = document.getElementById('t-backend');
+                if (tBackend) tBackend.textContent = winner.toUpperCase();
+
+                try {
+                    localStorage.setItem('hodoori_fastest_backend_v3', winner);
+                    localStorage.setItem('hodoori_fastest_backend_v2', winner);
+                    localStorage.setItem('hodoori_fastest_backend', winner);
+                } catch (_) {}
+
+                // تحديث شريط القياسات العلوي بقيم الفائز
+                const elDetect = document.getElementById('t-detect-time');
+                const elMatch = document.getElementById('t-match-time');
+                const elTotal = document.getElementById('t-total-time');
+                const elFps = document.getElementById('t-fps');
+                const elMode = document.getElementById('t-mode-status');
+
+                if (elDetect) elDetect.textContent = `${results[winner].detectAvg} ms (${winner.toUpperCase()})`;
+                if (elMatch) elMatch.textContent = `${results[winner].idAvg} ms (${winner.toUpperCase()})`;
+                if (elTotal) elTotal.textContent = `${results[winner].totalAvg} ms (${winner.toUpperCase()})`;
+                if (elFps) elFps.textContent = (1000 / Math.max(1, results[winner].totalAvg)).toFixed(1);
+                if (elMode) elMode.textContent = `الفائز: ${winner.toUpperCase()} 🏆`;
+
+                // عرض بطاقة مقارنة شاملة في صندوق الحالة
+                detectStatusEl.innerHTML = `
+                    <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; color: #ffffff;">
+                        ⚔️ نتيجة اختبار ومقارنة التقنيات (5 دورات - باستبعاد الدورة الأولى لكل تقنية):
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; text-align: right; font-size: 0.78rem;">
+                        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid ${winner === 'webgl' ? 'var(--accent-match)' : 'var(--border)'}; border-radius: 4px; padding: 6px 8px;">
+                            <div style="font-weight: 700; color: #38bdf8; display:flex; justify-content:space-between;">
+                                <span>🌐 WebGL (GPU)</span>
+                                ${winner === 'webgl' ? '<span style="color:var(--accent-match); font-weight:800;">👑 الفائز</span>' : ''}
+                            </div>
+                            <div>• <strong>المتوسط (4 دورات):</strong> <span style="font-family:monospace; font-weight:700; color:${winner === 'webgl' ? 'var(--accent-match)' : '#fff'};">${webglAvg} ms</span></div>
+                            <div style="color:var(--text-muted);">• كشف: ${results.webgl.detectAvg}ms | بصمة: ${results.webgl.idAvg}ms</div>
+                            <div style="color:var(--text-muted); font-size:0.7rem;">• التسخين المستبعد: ${results.webgl.warmupTime}ms</div>
+                        </div>
+                        <div style="background: rgba(192, 132, 252, 0.08); border: 1px solid ${winner === 'wasm' ? 'var(--accent-match)' : 'var(--border)'}; border-radius: 4px; padding: 6px 8px;">
+                            <div style="font-weight: 700; color: #c084fc; display:flex; justify-content:space-between;">
+                                <span>⚡ WASM (CPU SIMD)</span>
+                                ${winner === 'wasm' ? '<span style="color:var(--accent-match); font-weight:800;">👑 الفائز</span>' : ''}
+                            </div>
+                            <div>• <strong>المتوسط (4 دورات):</strong> <span style="font-family:monospace; font-weight:700; color:${winner === 'wasm' ? 'var(--accent-match)' : '#fff'};">${wasmAvg} ms</span></div>
+                            <div style="color:var(--text-muted);">• كشف: ${results.wasm.detectAvg}ms | بصمة: ${results.wasm.idAvg}ms</div>
+                            <div style="color:var(--text-muted); font-size:0.7rem;">• التسخين المستبعد: ${results.wasm.warmupTime}ms</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.82rem; line-height: 1.5; color: #ffffff;">
+                        🏆 <strong>التقنية الفائزة على جهازك:</strong> 
+                        <span style="color: var(--accent-match); font-weight: 800;">${winner.toUpperCase()}</span> 
+                        (أسرع بفارق <span style="color:#f59e0b; font-weight:700;">${diffMs} ms</span> أي أسرع بحوالي <span style="color:var(--accent-match); font-weight:700;">${speedupRatio}x / ${speedupPercent}%</span>). تم تفعيلها تلقائياً ✓
+                    </div>
+                `;
+                detectStatusEl.className = "status-box status-success";
+
+            } catch (err) {
+                console.error("خطأ أثناء اختبار التقنية:", err);
+                detectStatusEl.textContent = `خطأ أثناء تنفيذ اختبار التقنية: ${err.message}`;
+                detectStatusEl.className = "status-box status-fail";
+            } finally {
+                Engine.isAnalyzing = false;
+                if (btnCompare) {
+                    btnCompare.disabled = false;
+                    btnCompare.innerHTML = '<span>⚔️ اختبار التقنية (WebGL vs WASM)</span>';
+                }
+                if (btnBench) btnBench.disabled = false;
+                if (btnRe) btnRe.disabled = false;
+                if (testFileInput) testFileInput.disabled = false;
+                if (refFileInput) refFileInput.disabled = false;
+                if (btnCam) btnCam.disabled = false;
+                if (selModel) selModel.disabled = false;
+                if (selBackend) selBackend.disabled = false;
+                if (selSize) selSize.disabled = false;
+            }
+        }
+
+        const btnCompareBackends = document.getElementById('btn-compare-backends');
+        if (btnCompareBackends) {
+            btnCompareBackends.addEventListener('click', runBackendComparisonTest);
+        }
+
+        // =========================================================================
+        // فحص الأداء المكثف (10 دورات متتالية مع حساب المتوسط الإجمالي ورسالة تأكيد)
+        // =========================================================================
+        async function runBenchmark10Iterations() {
+            if (Engine.isAnalyzing) return; // حماية ضد التكرار أثناء المعالجة
+
+            const source = currentNormalizedSource || ((testImgEl && testImgEl.style.display !== 'none' && testImgEl.src) ? testImgEl : null);
+
+            if (!source) {
+                detectStatusEl.textContent = "يرجى اختيار أو رفع صورة أولاً قبل بدء الفحص المكثف 📷";
+                detectStatusEl.className = "status-box status-warn";
+                return;
+            }
+
+            // رسالة تأكيد مسبقة للمستخدم
+            const isConfirmed = confirm(
+                "هل أنت متأكد من رغبتك في تشغيل الفحص المكثف للأداء؟\n\n" +
+                "• سيقوم النظام بتحليل الصورة الحالية 10 مرات متتالية.\n" +
+                "• سيتم قياس وحساب متوسط زمن المعالجة الفعلي (كشف الوجه + استخراج البصمات) ومعدل الإطارات (FPS) بدقة."
+            );
+
+            if (!isConfirmed) return;
+
+            const btnCompare = document.getElementById('btn-compare-backends');
+            const btnBench = document.getElementById('btn-benchmark-10');
+            const btnRe = document.getElementById('btn-reanalyze');
+            const testFileInput = document.getElementById('test-file');
+            const refFileInput = document.getElementById('ref-file');
+            const btnCam = document.getElementById('btn-camera');
+            const selModel = document.getElementById('select-model');
+            const selBackend = document.getElementById('select-backend');
+            const selSize = document.getElementById('select-live-size');
+
+            Engine.isAnalyzing = true;
+
+            if (btnBench) {
+                btnBench.disabled = true;
+                btnBench.innerHTML = '<span class="spinner-inline" style="border-top-color:#f59e0b;"></span> <span>⏳ جاري الفحص (0/10)...</span>';
+            }
+            if (btnCompare) btnCompare.disabled = true;
+            if (btnRe) btnRe.disabled = true;
+            if (testFileInput) testFileInput.disabled = true;
+            if (refFileInput) refFileInput.disabled = true;
+            if (btnCam) btnCam.disabled = true;
+            if (selModel) selModel.disabled = true;
+            if (selBackend) selBackend.disabled = true;
+            if (selSize) selSize.disabled = true;
+
+            const totalTimes = [];
+            const detectTimes = [];
+            const idTimes = [];
+            const ITERATIONS = 10;
+
+            try {
+                for (let i = 1; i <= ITERATIONS; i++) {
+                    if (btnBench) {
+                        btnBench.innerHTML = `<span class="spinner-inline" style="border-top-color:#f59e0b;"></span> <span>⏳ دورة (${i}/${ITERATIONS})...</span>`;
+                    }
+                    detectStatusEl.textContent = `⏳ جاري تنفيذ فحص الأداء المكثف: الدورة (${i}/${ITERATIONS})...`;
+                    detectStatusEl.className = "status-box";
+                    document.getElementById('t-mode-status').textContent = `فحص مكثف (${i}/${ITERATIONS})`;
+
+                    // إتاحة فرصة لتحديث وتصيير شاشة المتصفح ومنع تجمد واجهة المستخدم
+                    await new Promise(r => setTimeout(r, 25));
+
+                    const result = await Engine.processHierarchicalDetection(source);
+                    lastAnalysisResult = result;
+
+                    totalTimes.push(result.timings.totalTime);
+                    detectTimes.push(result.timings.detectTime);
+                    idTimes.push(result.timings.idTime);
+
+                    // تحديث الكانفاس والبطاقات والقياسات مباشرة لإظهار التفاعل اللحظي
+                    renderAnalysis(result);
+                    renderCroppedFacesUI(result.croppedFaces);
+                    updateTimingsUI(result.timings);
+                    document.getElementById('t-final-count').textContent = result.croppedFaces.length;
+
+                    const slicesBlock = document.getElementById('slices-block');
+                    if (Engine.enableHierarchical) {
+                        if (slicesBlock) slicesBlock.style.display = 'block';
+                        renderSlicesUI(result.sliceResults);
+                    } else {
+                        if (slicesBlock) slicesBlock.style.display = 'none';
+                        renderSlicesUI([]);
+                    }
+                }
+
+                // حساب المتوسطات والإحصائيات الإجمالية
+                const sum = arr => arr.reduce((acc, v) => acc + v, 0);
+                const avgTotal = Math.round(sum(totalTimes) / ITERATIONS);
+                const minTotal = Math.min(...totalTimes);
+                const maxTotal = Math.max(...totalTimes);
+                const avgDetect = Math.round(sum(detectTimes) / ITERATIONS);
+                const avgId = Math.round(sum(idTimes) / ITERATIONS);
+                const avgFps = (1000 / Math.max(1, avgTotal)).toFixed(1);
+                const finalFaces = (lastAnalysisResult && lastAnalysisResult.croppedFaces) ? lastAnalysisResult.croppedFaces.length : 0;
+
+                // تحديث شريط القياسات (Telemetry) بالقيم المتوسطة
+                const elDetect = document.getElementById('t-detect-time');
+                const elMatch = document.getElementById('t-match-time');
+                const elTotal = document.getElementById('t-total-time');
+                const elFps = document.getElementById('t-fps');
+                const elMode = document.getElementById('t-mode-status');
+
+                if (elDetect) elDetect.textContent = `${avgDetect} ms (متوسط)`;
+                if (elMatch) elMatch.textContent = `${avgId} ms (متوسط)`;
+                if (elTotal) elTotal.textContent = `${avgTotal} ms (متوسط)`;
+                if (elFps) elFps.textContent = avgFps;
+                if (elMode) elMode.textContent = `مكتمل (${ITERATIONS} دورات)`;
+
+                // تحديث صندوق الحالة برسالة شاملة ومنسقة بدقة
+                detectStatusEl.innerHTML = `
+                    <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 4px; color: #ffffff;">
+                        📊 نتيجة الفحص المكثف (10 دورات متتالية):
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 0.8rem; line-height: 1.6;">
+                        <span>⚡ <strong>متوسط الوقت الإجمالي:</strong> <span style="color:#f59e0b; font-weight:800; font-family:monospace;">${avgTotal} ms</span> (الأسرع: ${minTotal}ms / الأبطأ: ${maxTotal}ms)</span>
+                        <span>🔍 <strong>متوسط الكشف:</strong> <span style="color:var(--accent-match); font-family:monospace;">${avgDetect} ms</span></span>
+                        <span>👤 <strong>متوسط البصمة:</strong> <span style="color:#c084fc; font-family:monospace;">${avgId} ms</span></span>
+                        <span>🎯 <strong>الوجوه:</strong> <span style="font-family:monospace;">${finalFaces}</span></span>
+                        <span>🚀 <strong>السرعة التقديرية:</strong> <span style="color:#38bdf8; font-weight:700; font-family:monospace;">${avgFps} FPS</span></span>
+                    </div>
+                `;
+                detectStatusEl.className = "status-box status-success";
+
+            } catch (err) {
+                console.error("خطأ أثناء الفحص المكثف:", err);
+                detectStatusEl.textContent = `خطأ أثناء تنفيذ الفحص المكثف: ${err.message}`;
+                detectStatusEl.className = "status-box status-fail";
+            } finally {
+                Engine.isAnalyzing = false;
+                if (btnBench) {
+                    btnBench.disabled = false;
+                    btnBench.innerHTML = '<span>📊 فحص أداء مكثف (10 دورات)</span>';
+                }
+                if (btnCompare) btnCompare.disabled = false;
+                if (btnRe) btnRe.disabled = false;
+                if (testFileInput) testFileInput.disabled = false;
+                if (refFileInput) refFileInput.disabled = false;
+                if (btnCam) btnCam.disabled = false;
+                if (selModel) selModel.disabled = false;
+                if (selBackend) selBackend.disabled = false;
+                if (selSize) selSize.disabled = false;
+            }
+        }
+
+        const btnBenchmark10 = document.getElementById('btn-benchmark-10');
+        if (btnBenchmark10) {
+            btnBenchmark10.addEventListener('click', runBenchmark10Iterations);
+        }
+
+        // دالة موحدة لمعالجة وتطبيع صور الهواتف (تدوير EXIF التلقائي + ضبط أبعاد WebGL بأمان)
+        async function loadAndNormalizeImage(file, maxDimension = 1600) {
+            let sourceBitmap = null;
+            try {
+                if ('createImageBitmap' in window) {
+                    sourceBitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                }
+            } catch (e) {
+                console.warn("createImageBitmap fallback", e);
+            }
+
+            if (!sourceBitmap) {
+                sourceBitmap = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = reject;
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            let w = sourceBitmap.width || sourceBitmap.naturalWidth;
+            let h = sourceBitmap.height || sourceBitmap.naturalHeight;
+
+            if (w > maxDimension || h > maxDimension) {
+                if (w > h) {
+                    h = Math.round((h * maxDimension) / w);
+                    w = maxDimension;
+                } else {
+                    w = Math.round((w * maxDimension) / h);
+                    h = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(sourceBitmap, 0, 0, w, h);
+
+            return canvas;
+        }
+
+        // 1. رفع الصورة المرجعية (تدعم عدة أشخاص داخل نفس الصورة وصور متعددة)
+        document.getElementById('ref-file').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (!files || files.length === 0) return;
+
+            const refStatusEl = document.getElementById('ref-status');
+            refStatusEl.textContent = `جاري استخراج بصمات الأشخاص المرجعيين من ${files.length} صورة...`;
+            refStatusEl.className = "status-box";
+
+            let totalNewFaces = 0;
+
+            try {
+                for (const file of files) {
+                    const normalizedCanvas = await loadAndNormalizeImage(file, 1600);
+                    const extractedFaces = await Engine.extractAllReferenceFaces(normalizedCanvas);
+
+                    for (const face of extractedFaces) {
+                        totalNewFaces++;
+                        const personNum = Engine.referencePersons.length + 1;
+                        Engine.addReferencePerson({
+                            label: `شخص مرجعي #${personNum}`,
+                            descriptor: face.descriptor,
+                            cropUrl: face.cropUrl,
+                            box: face.box
+                        });
+                    }
+                }
+
+                if (totalNewFaces > 0) {
+                    refStatusEl.textContent = `تم تسجيل ${totalNewFaces} وجه مرجعي بنجاح (الإجمالي: ${Engine.referencePersons.length} شخص مسجل)`;
+                    refStatusEl.className = "status-box status-success";
+                } else if (Engine.referencePersons.length === 0) {
+                    refStatusEl.textContent = "لم يتم كشف أي وجه في الصورة المرجعية (يرجى التأكد من وضوح الوجوه)";
+                    refStatusEl.className = "status-box status-fail";
+                } else {
+                    refStatusEl.textContent = `لم يتم اكتشاف وجوه جديدة. المسجلون حالياً: ${Engine.referencePersons.length} شخص`;
+                    refStatusEl.className = "status-box status-warn";
+                }
+
+                renderReferencePersonsUI();
+
+                // تحديث مقارنة الهوية على الصورة المفتوحة حالياً فوراً
+                if (lastAnalysisResult && !isCameraRunning) {
+                    lastAnalysisResult.croppedFaces.forEach(f => {
+                        if (f.descriptor) {
+                            f.matchResult = Engine.matchIdentity(f.descriptor);
+                        }
+                    });
+                    renderAnalysis(lastAnalysisResult);
+                    renderCroppedFacesUI(lastAnalysisResult.croppedFaces);
+                }
+            } catch (err) {
+                console.error("خطأ في معالجة الصورة المرجعية:", err);
+                refStatusEl.textContent = "خطأ في قراءة الصورة المرجعية: " + err.message;
+                refStatusEl.className = "status-box status-fail";
+            } finally {
+                e.target.value = ''; // تصفير لاختيار ملفات جديدة أو نفس الملف
+            }
+        });
+
+        // دالة تحديث وعرض كروت الأشخاص المرجعيين في لوحة التحكم
+        function renderReferencePersonsUI() {
+            const container = document.getElementById('ref-persons-container');
+            const listEl = document.getElementById('ref-persons-list');
+            const countBadge = document.getElementById('ref-count-badge');
+            const refStatusEl = document.getElementById('ref-status');
+
+            if (!container || !listEl) return;
+
+            const persons = Engine.referencePersons || [];
+            if (countBadge) countBadge.textContent = persons.length;
+
+            if (persons.length === 0) {
+                container.style.display = 'none';
+                listEl.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'block';
+            listEl.innerHTML = '';
+
+            persons.forEach(person => {
+                const item = document.createElement('div');
+                item.className = 'ref-person-item';
+                item.innerHTML = `
+                    <img class="ref-person-thumb" src="${person.cropUrl || ''}" alt="${person.label}">
+                    <div class="ref-person-info">
+                        <span class="ref-person-title">${person.label}</span>
+                        <span class="ref-person-subtitle">بصمة 128D نشطة ✓</span>
+                    </div>
+                    <button type="button" class="ref-person-del" title="حذف هذا الشخص">
+                        حذف
+                    </button>
+                `;
+
+                // زر حذف شخص معين
+                item.querySelector('.ref-person-del').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    Engine.removeReferencePerson(person.id);
+                    renderReferencePersonsUI();
+
+                    if (Engine.referencePersons.length === 0) {
+                        refStatusEl.textContent = "لم تُرفع صورة مرجعية بعد";
+                        refStatusEl.className = "status-box";
+                    } else {
+                        refStatusEl.textContent = `المتبقي: ${Engine.referencePersons.length} شخص مرجعي مسجل`;
+                        refStatusEl.className = "status-box status-success";
+                    }
+
+                    if (lastAnalysisResult && !isCameraRunning) {
+                        lastAnalysisResult.croppedFaces.forEach(f => {
+                            f.matchResult = f.descriptor ? Engine.matchIdentity(f.descriptor) : null;
+                        });
+                        renderAnalysis(lastAnalysisResult);
+                        renderCroppedFacesUI(lastAnalysisResult.croppedFaces);
+                    }
+                });
+
+                listEl.appendChild(item);
+            });
+        }
+
+        // مسح كافة الأشخاص المرجعيين
+        const btnClearRefs = document.getElementById('btn-clear-refs');
+        if (btnClearRefs) {
+            btnClearRefs.addEventListener('click', () => {
+                Engine.clearReferencePersons();
+                renderReferencePersonsUI();
+                const refStatusEl = document.getElementById('ref-status');
+                refStatusEl.textContent = "تم تفريغ كافة الأشخاص المرجعيين";
+                refStatusEl.className = "status-box";
+
+                if (lastAnalysisResult && !isCameraRunning) {
+                    lastAnalysisResult.croppedFaces.forEach(f => {
+                        f.matchResult = null;
+                    });
+                    renderAnalysis(lastAnalysisResult);
+                    renderCroppedFacesUI(lastAnalysisResult.croppedFaces);
+                }
+            });
+        }
+
+        // 2. رفع صورة الفحص (تحميل ومعاينة الصورة فقط دون التحليل التلقائي)
+        document.getElementById('test-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            stopCamera();
+            videoEl.style.display = 'none';
+            document.getElementById('slices-block').style.display = 'none';
+            document.getElementById('t-mode-status').textContent = "صورة ثابتة (جاهزة للتحليل)";
+            document.getElementById('t-fps').textContent = "--";
+
+            try {
+                detectStatusEl.textContent = "جاري تحميل وتجهيز الصورة للمعاينة...";
+                detectStatusEl.className = "status-box";
+
+                const normalizedCanvas = await loadAndNormalizeImage(file, 2048);
+                currentNormalizedSource = normalizedCanvas;
+                testImgEl.src = normalizedCanvas.toDataURL('image/jpeg', 0.95);
+                testImgEl.style.display = 'block';
+
+                testImgEl.onload = () => {
+                    const naturalW = testImgEl.naturalWidth || normalizedCanvas.width;
+                    const naturalH = testImgEl.naturalHeight || normalizedCanvas.height;
+
+                    canvasEl.width = naturalW;
+                    canvasEl.height = naturalH;
+                    document.getElementById('canvas-dims').textContent = `${naturalW} × ${naturalH} px`;
+
+                    // مسح أي رسومات سابقة من الكانفاس لتظهر الصورة نقية وجاهزة
+                    if (ctx) {
+                        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                    }
+                    renderCroppedFacesUI([]);
+                    renderSlicesUI([]);
+                    document.getElementById('t-final-count').textContent = "0";
+
+                    // تنبيه المستخدم بالضغط على زر بدء التحليل
+                    const fileNameDisplay = file.name ? (file.name.length > 25 ? file.name.substring(0, 22) + '...' : file.name) : 'الصورة';
+                    detectStatusEl.textContent = `تم تجهيز الصورة بنجاح (${fileNameDisplay}). اضغط على زر "بدء تحليل الصورة" أدناه ⚡`;
+                    detectStatusEl.className = "status-box status-warn";
+
+                    const btnRe = document.getElementById('btn-reanalyze');
+                    if (btnRe) {
+                        btnRe.classList.add('btn-pulse');
+                        btnRe.innerHTML = '<span>⚡ بدء تحليل الصورة</span>';
+                        btnRe.disabled = false;
+                    }
+                    const btnComp = document.getElementById('btn-compare-backends');
+                    if (btnComp) btnComp.disabled = false;
+                    const btnBench = document.getElementById('btn-benchmark-10');
+                    if (btnBench) btnBench.disabled = false;
+
+                    const lbl = document.getElementById('lbl-test-file');
+                    if (lbl) {
+                        lbl.textContent = `📁 تغيير الصورة (${fileNameDisplay})`;
+                    }
+                };
+            } catch (err) {
+                console.error(err);
+                detectStatusEl.textContent = "خطأ في تحميل الصورة: " + err.message;
+                detectStatusEl.className = "status-box status-fail";
+            }
+        });
+
+        // 3. تشغيل الكاميرا المباشرة (المسار فائق السرعة < 30ms)
+        document.getElementById('btn-camera').addEventListener('click', async () => {
+            try {
+                testImgEl.style.display = 'none';
+                videoEl.style.display = 'block';
+                document.getElementById('slices-block').style.display = 'none'; // إخفاء الشرائح في البث لتوفير المساحة
+                document.getElementById('t-mode-status').textContent = "بث حي فائق (< 30ms)";
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+                });
+                videoEl.srcObject = stream;
+
+                videoEl.onloadedmetadata = () => {
+                    canvasEl.width = videoEl.videoWidth;
+                    canvasEl.height = videoEl.videoHeight;
+                    document.getElementById('canvas-dims').textContent = `${videoEl.videoWidth} × ${videoEl.videoHeight} px`;
+
+                    document.getElementById('btn-camera').style.display = 'none';
+                    document.getElementById('btn-stop-cam').style.display = 'block';
+                    isCameraRunning = true;
+                    liveFrameCounter = 0;
+                    cachedDescriptors = {};
+
+                    runHighSpeedCameraLoop();
+                };
+            } catch (err) {
+                alert("تعذر الوصول إلى الكاميرا: " + err.message);
+            }
+        });
+
+        function stopCamera() {
+            isCameraRunning = false;
+            if (videoEl.srcObject) {
+                videoEl.srcObject.getTracks().forEach(t => t.stop());
+            }
+            videoEl.style.display = 'none';
+            document.getElementById('btn-camera').style.display = 'block';
+            document.getElementById('btn-stop-cam').style.display = 'none';
+            document.getElementById('t-mode-status').textContent = "خامل";
+            document.getElementById('t-fps').textContent = "--";
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        }
+
+        document.getElementById('btn-stop-cam').addEventListener('click', stopCamera);
+
+        async function runHighSpeedCameraLoop() {
+            if (!isCameraRunning) return;
+
+            if (Engine.isSwitching) {
+                requestAnimationFrame(runHighSpeedCameraLoop);
+                return;
+            }
+
+            if (videoEl.readyState >= 2 && !videoEl.paused) {
+                const t0 = performance.now();
+                liveFrameCounter++;
+
+                // استخراج البصمة مرة كل 4 إطارات لتوفير معالجة GPU ومضاعفة السرعة
+                const shouldExtractDescriptor = (liveFrameCounter % 4 === 0) || !cachedDescriptors[1];
+                
+                const detections = await Engine.processLiveCameraFrame(videoEl, shouldExtractDescriptor);
+                const t1 = performance.now();
+                const latency = t1 - t0;
+
+                // تحديث زمن المعالجة والـ FPS
+                document.getElementById('t-detect-time').textContent = latency.toFixed(1) + " ms";
+                document.getElementById('t-total-time').textContent = latency.toFixed(1) + " ms";
+                updateFPS();
+
+                if (detections && detections.length > 0) {
+                    detections.forEach((d, idx) => {
+                        if (d.descriptor) {
+                            cachedDescriptors[idx] = {
+                                descriptor: d.descriptor,
+                                matchResult: d.matchResult
+                            };
+                        } else if (cachedDescriptors[idx]) {
+                            d.descriptor = cachedDescriptors[idx].descriptor;
+                            d.matchResult = cachedDescriptors[idx].matchResult;
+                        }
+                    });
+                }
+
+                renderAnalysis({ croppedFaces: detections });
+                document.getElementById('t-final-count').textContent = detections.length;
+
+                // تنظيف الذاكرة دورياً
+                if (liveFrameCounter % 60 === 0 && faceapi.tf && faceapi.tf.memory().numTensors > 120) {
+                    faceapi.tf.disposeVariables();
+                }
+            }
+
+            if (isCameraRunning) {
+                requestAnimationFrame(runHighSpeedCameraLoop);
+            }
+        }
+
+        function updateFPS() {
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 1000) {
+                document.getElementById('t-fps').textContent = frameCount;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+        }
+
+        // =========================================================================
+        // 4. الرسم المباشر والمحاذاة 100%
+        // =========================================================================
+        function renderAnalysis(analysis) {
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+            const { croppedFaces } = analysis;
+
+            if (!croppedFaces || croppedFaces.length === 0) {
+                detectStatusEl.textContent = "لم يتم كشف أي وجه";
+                detectStatusEl.className = "status-box status-fail";
+                matchStatusEl.textContent = "غير متاح";
+                matchStatusEl.className = "status-box";
+                return;
+            }
+
+            detectStatusEl.textContent = `تم كشف ${croppedFaces.length} وجه بنجاح`;
+            detectStatusEl.className = "status-box status-success";
+
+            if (croppedFaces[0].descriptor) {
+                vectorOutputEl.textContent = JSON.stringify(croppedFaces[0].descriptor, null, 2);
+            }
+
+            let hasAnyMatch = false;
+
+            croppedFaces.forEach((face) => {
+                const box = face.box;
+                const isCurrentMatch = face.matchResult && face.matchResult.isMatch;
+                if (isCurrentMatch) hasAnyMatch = true;
+
+                if (chkDrawBoxes.checked) {
+                    ctx.strokeStyle = isCurrentMatch ? "#00e676" : "#ffffff";
+                    ctx.lineWidth = Math.max(2, Math.round(canvasEl.width / 400));
+                    ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+                    let labelText = `وجه #${face.id} (${Math.round(face.score * 100)}%)`;
+                    if (isCurrentMatch) {
+                        const personName = (face.matchResult && face.matchResult.personLabel) 
+                            ? face.matchResult.personLabel 
+                            : `#${face.id}`;
+                        const conf = (face.matchResult && face.matchResult.confidencePercent !== undefined)
+                            ? face.matchResult.confidencePercent
+                            : Math.round(face.score * 100);
+                        labelText = `مطابق: ${personName} (${conf}%)`;
+                    }
+
+                    ctx.font = "bold 13px system-ui, sans-serif";
+                    const textMetrics = ctx.measureText(labelText);
+                    const pad = 4;
+
+                    ctx.fillStyle = isCurrentMatch ? "#00e676" : "#222222";
+                    ctx.fillRect(box.x, Math.max(0, box.y - 24), textMetrics.width + pad * 2, 22);
+
+                    ctx.fillStyle = isCurrentMatch ? "#000000" : "#ffffff";
+                    ctx.fillText(labelText, box.x + pad, Math.max(16, box.y - 8));
+                }
+
+                if (chkDrawLandmarks.checked && face.landmarks) {
+                    ctx.fillStyle = isCurrentMatch ? "#00e676" : "#ffffff";
+                    const ptRadius = Math.max(1.8, Math.round(canvasEl.width / 550));
+
+                    face.landmarks.forEach(pt => {
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, ptRadius, 0, 2 * Math.PI);
+                        ctx.fill();
+                    });
+
+                    drawLandmarkConnections(ctx, face.landmarks, isCurrentMatch ? "#00e676" : "rgba(255,255,255,0.6)");
+                }
+            });
+
+            const hasRef = (Engine.referencePersons && Engine.referencePersons.length > 0) || Engine.referenceDescriptor;
+            if (hasRef) {
+                if (hasAnyMatch) {
+                    const matchedNames = [...new Set(croppedFaces
+                        .filter(f => f.matchResult && f.matchResult.isMatch)
+                        .map(f => (f.matchResult && f.matchResult.personLabel) ? f.matchResult.personLabel : `شخص #${f.id}`))];
+                    matchStatusEl.textContent = `تم التعرف على: ${matchedNames.join('، ')} (مطابق)`;
+                    matchStatusEl.className = "status-box status-success";
+                } else {
+                    const totalRefs = Engine.referencePersons.length || 1;
+                    matchStatusEl.textContent = `لا يوجد وجه مطابق لأي من الأشخاص المرجعيين المسجلين (${totalRefs})`;
+                    matchStatusEl.className = "status-box status-fail";
+                }
+            } else {
+                matchStatusEl.textContent = "ارفع صورة مرجعية للمقارنة الفورية";
+                matchStatusEl.className = "status-box";
+            }
+        }
+
+        function drawLandmarkConnections(c, pts, color) {
+            c.strokeStyle = color;
+            c.lineWidth = 1;
+
+            const drawPath = (start, end, close = false) => {
+                c.beginPath();
+                c.moveTo(pts[start].x, pts[start].y);
+                for (let i = start + 1; i <= end; i++) {
+                    c.lineTo(pts[i].x, pts[i].y);
+                }
+                if (close) c.closePath();
+                c.stroke();
+            };
+
+            drawPath(0, 16);
+            drawPath(17, 21);
+            drawPath(22, 26);
+            drawPath(27, 30);
+            drawPath(31, 35, true);
+            drawPath(36, 41, true);
+            drawPath(42, 47, true);
+            drawPath(48, 59, true);
+            drawPath(60, 67, true);
+        }
+
+        function renderCroppedFacesUI(croppedFaces) {
+            facesGridEl.innerHTML = '';
+            facesBadgeEl.textContent = `${croppedFaces.length} وجه مقتطع`;
+
+            if (!croppedFaces || croppedFaces.length === 0) {
+                facesGridEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">لا توجد وجوه مقتطعة.</div>';
+                return;
+            }
+
+            croppedFaces.forEach(face => {
+                if (!face.crop) return;
+                const card = document.createElement('div');
+                const isMatched = face.matchResult && face.matchResult.isMatch;
+                card.className = `face-card ${isMatched ? 'is-matched' : ''}`;
+
+                let matchBadge = '<span style="color: var(--text-muted);">بانتظار المرجع</span>';
+                const hasRef = (Engine.referencePersons && Engine.referencePersons.length > 0) || Engine.referenceDescriptor;
+                if (hasRef && face.matchResult) {
+                    const pLabel = face.matchResult.personLabel ? `${face.matchResult.personLabel}: ` : '';
+                    matchBadge = isMatched 
+                        ? `<span style="color: var(--accent-match); font-weight: 700;">مطابق (${pLabel}${face.matchResult.confidencePercent}%)</span>`
+                        : `<span style="color: var(--accent-unmatch); font-weight: 700;">غير مطابق (أقرب مسافة: ${face.matchResult.distance.toFixed(2)})</span>`;
+                }
+
+                card.innerHTML = `
+                    <div class="face-card-header">
+                        <span style="font-weight: 700;">وجه مقتطع #${face.id}</span>
+                        ${matchBadge}
+                    </div>
+                    <img class="face-crop-preview" src="${face.crop.dataUrl}" alt="وجه مقتطع #${face.id}">
+                    <div class="face-meta">
+                        <div class="face-meta-row">
+                            <span>المقاس المقتطع:</span>
+                            <span class="face-meta-val">${face.crop.width} × ${face.crop.height} px</span>
+                        </div>
+                        <div class="face-meta-row">
+                            <span>هامش التوسيع:</span>
+                            <span class="face-meta-val" style="color:var(--accent-slice);">+${face.crop.padPercent}%</span>
+                        </div>
+                        <div class="face-meta-row">
+                            <span>نسبة ثقة الكشف:</span>
+                            <span class="face-meta-val">${Math.round(face.score * 100)}%</span>
+                        </div>
+                        <div class="face-meta-row">
+                            <span>المحاذاة المترية:</span>
+                            <span class="face-meta-val" style="color:${Engine.enableAlignment ? 'var(--accent-match)' : 'var(--text-muted)'};">
+                                ${Engine.enableAlignment ? 'مفعلة (Eye Leveling)' : 'معطلة'}
+                            </span>
+                        </div>
+                        <div class="face-meta-row">
+                            <span>مصدر الاكتشاف:</span>
+                            <span class="face-meta-val" style="font-size:0.65rem;">${face.sourceSlice}</span>
+                        </div>
+                    </div>
+                    <a href="${face.crop.dataUrl}" download="face_${face.id}_aligned.png" class="btn btn-outline" style="font-size: 0.75rem; padding: 6px;">
+                        تحميل هذا الوجه المقتطع
+                    </a>
+                `;
+                facesGridEl.appendChild(card);
+            });
+        }
+
+        function renderSlicesUI(sliceResults) {
+            slicesGridEl.innerHTML = '';
+            if (!sliceResults) return;
+
+            sliceResults.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'slice-card';
+
+                const detectedText = s.detectedCount > 0 
+                    ? `<span class="detection-tag">تم كشف (${s.detectedCount}) وجه</span>` 
+                    : `<span class="no-detection-tag">لا وجوه</span>`;
+
+                const header = document.createElement('div');
+                header.className = 'slice-card-header';
+                header.innerHTML = `
+                    <span style="font-weight:700;">#${s.sliceDef.id} ${s.sliceDef.name}</span>
+                    <span style="font-family:monospace;">${s.sliceDef.type}</span>
+                `;
+                card.appendChild(header);
+
+                if (s.canvas) {
+                    s.canvas.className = 'slice-thumb';
+                    card.appendChild(s.canvas);
+                } else if (s.dataUrl) {
+                    const img = document.createElement('img');
+                    img.className = 'slice-thumb';
+                    img.src = s.dataUrl;
+                    img.alt = s.sliceDef.name;
+                    card.appendChild(img);
+                }
+
+                const info = document.createElement('div');
+                info.className = 'slice-info';
+                info.innerHTML = `
+                    <span style="color:var(--text-muted);">${s.width}×${s.height}</span>
+                    ${detectedText}
+                `;
+                card.appendChild(info);
+
+                slicesGridEl.appendChild(card);
+            });
+        }
+
+        chkDrawLandmarks.addEventListener('change', () => {
+            if (lastAnalysisResult && !isCameraRunning) renderAnalysis(lastAnalysisResult);
+        });
+        chkDrawBoxes.addEventListener('change', () => {
+            if (lastAnalysisResult && !isCameraRunning) renderAnalysis(lastAnalysisResult);
+        });
+    </script>
+</body>
+</html>

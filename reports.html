@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>السجلات والتقارير | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- SheetJS for Exporting Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-common.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Header ─── -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+            <div class="pr-10 sm:pr-0">
+                <h1 class="text-lg sm:text-[20px] font-black text-stone-900 dark:text-white leading-tight">تقارير الحضور والغياب</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block mt-0.5" id="school-name-display">مدرسة حضوري الذكية</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <button type="button" onclick="exportAllReportsToExcel()" class="header-action-btn justify-center text-emerald-600 dark:text-emerald-400 hover:border-emerald-300">
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    <span>تصدير إكسل</span>
+                </button>
+                <button type="button" onclick="window.print()" class="header-action-btn justify-center">
+                    <span class="material-symbols-outlined text-sm">print</span>
+                    <span>طباعة</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ─── 1. TOP KPI ROW ─── -->
+        <section class="kpi-segmented-card mb-5">
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي التقارير</span>
+                <span class="kpi-val" id="kpi-total-reports">--</span>
+                <span class="kpi-sub">تقرير مسجل</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">متوسط الحضور</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-avg-attendance">--%</span>
+                <span class="kpi-sub">في السجلات المحددة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الحضور</span>
+                <span class="kpi-val text-emerald-600 dark:text-emerald-400" id="kpi-present-students">--</span>
+                <span class="kpi-sub">حالة حضور</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الغياب</span>
+                <span class="kpi-val text-rose-600 dark:text-rose-400" id="kpi-absent-students">--</span>
+                <span class="kpi-sub">حالة غياب</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. ADVANCED FILTER TOOLBAR ─── -->
+        <section class="hodoori-card mb-5 p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                <!-- Filter Date -->
+                <div>
+                    <label class="block text-[11px] font-extrabold text-stone-700 dark:text-stone-300 mb-1">تصفية بالتاريخ</label>
+                    <input type="date" id="filter-date" onchange="renderReports()" class="flat-input text-xs" />
+                </div>
+
+                <!-- Filter Class -->
+                <div>
+                    <label class="block text-[11px] font-extrabold text-stone-700 dark:text-stone-300 mb-1">تصفية بالفصل / الشعبة</label>
+                    <select id="filter-class" onchange="renderReports()" class="flat-select text-xs">
+                        <option value="">كافة الفصول والشعب</option>
+                    </select>
+                </div>
+
+                <!-- Filter Teacher -->
+                <div>
+                    <label class="block text-[11px] font-extrabold text-stone-700 dark:text-stone-300 mb-1">تصفية بالمعلم</label>
+                    <select id="filter-teacher" onchange="renderReports()" class="flat-select text-xs">
+                        <option value="">كافة المعلمين</option>
+                    </select>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="clearFilters()" class="header-action-btn w-full justify-center text-stone-600 dark:text-stone-300">
+                        <span class="material-symbols-outlined text-sm">filter_alt_off</span>
+                        <span>مسح الفلاتر</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── 3. REPORTS GRID LIST ─── -->
+        <section id="reports-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="col-span-full p-12 text-center text-xs font-bold text-stone-400">جاري تحميل سجلات وتقارير الحضور...</div>
+        </section>
+    </main>
+
+    <!-- ═══ REPORT DETAIL & EDIT MODAL ═══ -->
+    <div id="report-detail-modal" class="hodoori-app-modal-backdrop" onclick="closeReportDetailModal(event)">
+        <div class="hodoori-app-dialog !max-w-2xl" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">assignment</span>
+                    </span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-stone-900 dark:text-white" id="detail-report-title">تفاصيل تقرير الحضور</h3>
+                        <span class="text-[11px] font-bold text-stone-400" id="detail-report-subtitle">--</span>
+                    </div>
+                </div>
+                <button type="button" onclick="closeReportDetailModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="app-dialog-body max-h-[60vh] overflow-y-auto">
+                <!-- Summary Chips -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-stone-50 dark:bg-neutral-900/60 border border-stone-200/60 dark:border-neutral-800 text-xs font-bold">
+                    <div class="flex items-center gap-2">
+                        <span class="text-stone-500">المعلم:</span>
+                        <span id="detail-teacher-name" class="text-stone-900 dark:text-white font-extrabold">--</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="badge-tag badge-status-present" id="detail-present-badge">0 حاضر</span>
+                        <span class="badge-tag badge-status-absent" id="detail-absent-badge">0 غائب</span>
+                    </div>
+                </div>
+
+                <!-- Students Table List -->
+                <div class="border border-stone-200/70 dark:border-neutral-800 rounded-xl overflow-hidden mt-1">
+                    <div class="p-2.5 px-4 bg-stone-50/70 dark:bg-neutral-900/50 border-b border-stone-200/70 dark:border-neutral-800 flex items-center justify-between text-[11px] font-black text-stone-400 uppercase">
+                        <span>اسم الطالب / السجل</span>
+                        <span>الحالة (اضغط للتغيير)</span>
+                    </div>
+                    <div id="detail-students-list" class="divide-y divide-stone-100 dark:divide-neutral-800/60 max-h-[300px] overflow-y-auto">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1">ملاحظات التقرير</label>
+                    <textarea id="detail-report-notes" rows="2" placeholder="ملاحظات المعلم أو الإدارة حول هذا التقرير..." class="flat-input text-xs"></textarea>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="app-dialog-footer">
+                <button type="button" id="detail-delete-btn" onclick="handleDeleteCurrentReport()" class="header-action-btn text-rose-600 hover:border-rose-300 mr-auto">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                    حذف التقرير
+                </button>
+                <button type="button" class="header-action-btn" onclick="closeReportDetailModal()">إلغاء</button>
+                <button type="button" onclick="saveCurrentReportChanges()" class="btn-primary-action">حفظ التعديلات</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script src="scripts/component-sidebar.js"></script>
+
+    <!-- Page Specific Controller Logic -->
+    <script>
+        let allReports = [];
+        let allClasses = [];
+        let allTeachers = [];
+        let currentViewingReport = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchoolMeta();
+
+            // 1. Instant paint from local cache (0ms latency)
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    if (instant.hasData) {
+                        allReports = instant.records || [];
+                        allClasses = instant.classes || [];
+                        allTeachers = instant.teachers || [];
+                        populateFilterSelects();
+                        renderReports();
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Realtime change reactivity
+            if (typeof DB !== 'undefined' && DB.onDataChange) {
+                DB.onDataChange(() => {
+                    reloadData();
+                });
+            }
+
+            await reloadData();
+        });
+
+        async function loadSchoolMeta() {
+            try {
+                const schoolName = localStorage.getItem('attendance_school_name') || 'مدرسة حضوري الذكية';
+                const el = document.getElementById('school-name-display');
+                if (el) el.textContent = schoolName;
+            } catch (_) {}
+        }
+
+        async function reloadData() {
+            try {
+                const [records, classes, teachers] = await Promise.all([
+                    DB.getRecords(),
+                    DB.getClasses(),
+                    DB.getTeachers()
+                ]);
+
+                allReports = records || [];
+                allClasses = classes || [];
+                allTeachers = teachers || [];
+
+                populateFilterSelects();
+                renderReports();
+            } catch (err) {
+                console.error('Error loading reports data:', err);
+            }
+        }
+
+        function populateFilterSelects() {
+            const classSelect = document.getElementById('filter-class');
+            if (classSelect) {
+                classSelect.innerHTML = '<option value="">كافة الفصول والشعب</option>' +
+                    allClasses.map(c => `<option value="${c.id}">${c.name} - ${c.section || ''}</option>`).join('');
+            }
+
+            const teacherSelect = document.getElementById('filter-teacher');
+            if (teacherSelect) {
+                teacherSelect.innerHTML = '<option value="">كافة المعلمين</option>' +
+                    allTeachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-date').value = '';
+            document.getElementById('filter-class').value = '';
+            document.getElementById('filter-teacher').value = '';
+            renderReports();
+        }
+
+        function renderReports() {
+            const container = document.getElementById('reports-grid-container');
+            if (!container) return;
+
+            const dateFilter = document.getElementById('filter-date').value;
+            const classFilter = document.getElementById('filter-class').value;
+            const teacherFilter = document.getElementById('filter-teacher').value;
+
+            let filtered = [...allReports];
+
+            if (dateFilter) {
+                filtered = filtered.filter(r => r.date === dateFilter);
+            }
+            if (classFilter) {
+                filtered = filtered.filter(r => r.classId === classFilter);
+            }
+            if (teacherFilter) {
+                filtered = filtered.filter(r => r.teacherId === teacherFilter);
+            }
+
+            // Sort newest first
+            filtered.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+
+            // Update Top KPIs
+            let totalStudentsPresent = 0;
+            let totalStudentsAbsent = 0;
+            let totalStudentsLate = 0;
+
+            filtered.forEach(r => {
+                const p = r.presentCount || (r.students ? r.students.filter(s => s.status === 'present').length : 0);
+                const a = r.absentCount || (r.students ? r.students.filter(s => s.status === 'absent').length : 0);
+                const l = r.lateCount || (r.students ? r.students.filter(s => s.status === 'late').length : 0);
+                totalStudentsPresent += p;
+                totalStudentsAbsent += a;
+                totalStudentsLate += l;
+            });
+
+            const totalSum = totalStudentsPresent + totalStudentsAbsent + totalStudentsLate;
+            const avgRate = totalSum > 0 ? Math.round((totalStudentsPresent / totalSum) * 100) : 0;
+
+            UI.animateNumber('kpi-total-reports', filtered.length);
+            UI.animateNumber('kpi-avg-attendance', avgRate + '%');
+            UI.animateNumber('kpi-present-students', totalStudentsPresent);
+            UI.animateNumber('kpi-absent-students', totalStudentsAbsent);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full hodoori-card text-center p-12">
+                        <span class="material-symbols-outlined text-5xl text-stone-300 dark:text-neutral-700 mb-3 block">search_off</span>
+                        <h3 class="text-base font-extrabold text-stone-900 dark:text-white">لا توجد سجلات تطابق خيارات التصفية</h3>
+                        <p class="text-xs text-stone-500 mt-1 mb-4">جرب تغيير التاريخ أو مسح الفلاتر لاستعراض كافة تقارير الحضور المسجلة.</p>
+                        <button type="button" onclick="clearFilters()" class="header-action-btn">
+                            <span class="material-symbols-outlined text-sm">filter_alt_off</span>
+                            <span>مسح الفلاتر</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(r => {
+                const cls = allClasses.find(c => c.id === r.classId);
+                const clsName = cls ? `${cls.name} (${cls.section || 'عامة'})` : (r.className || 'فصل غير محدد');
+                const teacher = allTeachers.find(t => t.id === r.teacherId);
+                const teacherName = teacher ? teacher.name : (r.teacherName || 'المعلم');
+
+                const present = r.presentCount || (r.students ? r.students.filter(s => s.status === 'present').length : 0);
+                const absent = r.absentCount || (r.students ? r.students.filter(s => s.status === 'absent').length : 0);
+                const late = r.lateCount || (r.students ? r.students.filter(s => s.status === 'late').length : 0);
+                const total = present + absent + late;
+                const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+                return `
+                    <div class="hodoori-card flex flex-col justify-between hover:border-amber-500/50 hover:shadow-md transition-all group">
+                        <div>
+                            <div class="flex items-start justify-between mb-2.5">
+                                <div>
+                                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white group-hover:text-amber-600 transition-colors">${clsName}</h3>
+                                    <span class="text-xs font-bold text-stone-400 block mt-0.5">المعلم: ${teacherName}</span>
+                                </div>
+                                <span class="badge-tag ${rate >= 90 ? 'badge-status-present' : (rate >= 75 ? 'badge-role-teacher' : 'badge-status-absent')}">
+                                    ${rate}% حضور
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-[11px] font-bold text-stone-500 dark:text-stone-400 mb-3">
+                                <span class="material-symbols-outlined text-xs">calendar_today</span>
+                                <span>${r.date || 'بدون تاريخ'}</span>
+                                ${r.time ? `<span>• ${r.time}</span>` : ''}
+                            </div>
+
+                            <!-- Progress Bar -->
+                            <div class="w-full bg-stone-100 dark:bg-neutral-800 h-2 rounded-full overflow-hidden flex mb-3.5">
+                                <div class="bg-emerald-500 h-full" style="width: ${rate}%" title="حاضر"></div>
+                                <div class="bg-rose-500 h-full" style="width: ${total > 0 ? (absent / total) * 100 : 0}%" title="غائب"></div>
+                            </div>
+
+                            <!-- Quick Stats Badges -->
+                            <div class="flex items-center gap-2">
+                                <span class="badge-tag badge-status-present text-[11px]">${present} حاضر</span>
+                                <span class="badge-tag badge-status-absent text-[11px]">${absent} غائب</span>
+                                ${late > 0 ? `<span class="badge-tag badge-status-late text-[11px]">${late} متأخر</span>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Card Footer Actions -->
+                        <div class="mt-4 pt-3 border-t border-stone-100 dark:border-neutral-800 flex items-center justify-between">
+                            <button type="button" onclick="showReportDetails('${r.id}')" class="btn-primary-action !py-1 !px-3 text-xs">
+                                <span class="material-symbols-outlined text-sm">visibility</span>
+                                <span>معاينة وتعديل</span>
+                            </button>
+                            <button type="button" onclick="exportSingleReport('${r.id}')" class="header-action-btn !p-1.5 text-xs text-emerald-600 dark:text-emerald-400" title="تصدير إكسل">
+                                <span class="material-symbols-outlined text-sm">file_download</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /* ─── Detail Modal ─── */
+        function showReportDetails(id) {
+            const r = allReports.find(x => x.id === id);
+            if (!r) return;
+
+            currentViewingReport = JSON.parse(JSON.stringify(r)); // Clone
+
+            const cls = allClasses.find(c => c.id === r.classId);
+            const clsName = cls ? `${cls.name} (${cls.section || 'عامة'})` : (r.className || 'فصل غير محدد');
+            const teacher = allTeachers.find(t => t.id === r.teacherId);
+            const teacherName = teacher ? teacher.name : (r.teacherName || 'المعلم');
+
+            document.getElementById('detail-report-title').textContent = `تقرير ${clsName}`;
+            document.getElementById('detail-report-subtitle').textContent = `التاريخ: ${r.date || '--'} • الوقت: ${r.time || '--'}`;
+            document.getElementById('detail-teacher-name').textContent = teacherName;
+            document.getElementById('detail-report-notes').value = r.notes || '';
+
+            renderDetailStudentsList();
+
+            const modal = document.getElementById('report-detail-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function renderDetailStudentsList() {
+            if (!currentViewingReport || !currentViewingReport.students) return;
+
+            const list = document.getElementById('detail-students-list');
+            const students = currentViewingReport.students;
+
+            const present = students.filter(s => s.status === 'present').length;
+            const absent = students.filter(s => s.status === 'absent').length;
+
+            document.getElementById('detail-present-badge').textContent = `${present} حاضر`;
+            document.getElementById('detail-absent-badge').textContent = `${absent} غائب`;
+
+            list.innerHTML = students.map((s, idx) => {
+                const isPresent = s.status === 'present';
+                const isAbsent = s.status === 'absent';
+                const isLate = s.status === 'late';
+
+                return `
+                    <div class="flex items-center justify-between p-2.5 px-4 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all">
+                        <div>
+                            <span class="text-xs font-black text-stone-900 dark:text-white block">${s.name || 'طالب'}</span>
+                            <span class="text-[10px] font-mono text-stone-400">ID: ${s.academicId || s.id || '--'}</span>
+                        </div>
+
+                        <!-- Status Switcher Segment -->
+                        <div class="flex items-center bg-stone-100 dark:bg-neutral-800 p-0.5 rounded-lg">
+                            <button type="button" onclick="setStudentStatusInModal(${idx}, 'present')" class="px-2 py-1 rounded-md text-[10px] font-black transition-all ${isPresent ? 'bg-emerald-500 text-white shadow-sm' : 'text-stone-600 dark:text-stone-400'}">
+                                حاضر
+                            </button>
+                            <button type="button" onclick="setStudentStatusInModal(${idx}, 'absent')" class="px-2 py-1 rounded-md text-[10px] font-black transition-all ${isAbsent ? 'bg-rose-500 text-white shadow-sm' : 'text-stone-600 dark:text-stone-400'}">
+                                غائب
+                            </button>
+                            <button type="button" onclick="setStudentStatusInModal(${idx}, 'late')" class="px-2 py-1 rounded-md text-[10px] font-black transition-all ${isLate ? 'bg-amber-500 text-white shadow-sm' : 'text-stone-600 dark:text-stone-400'}">
+                                متأخر
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setStudentStatusInModal(idx, status) {
+            if (!currentViewingReport || !currentViewingReport.students[idx]) return;
+            currentViewingReport.students[idx].status = status;
+            renderDetailStudentsList();
+        }
+
+        function closeReportDetailModal() {
+            const modal = document.getElementById('report-detail-modal');
+            if (modal) modal.classList.remove('active');
+            currentViewingReport = null;
+        }
+
+        async function saveCurrentReportChanges() {
+            if (!currentViewingReport) return;
+
+            const students = currentViewingReport.students || [];
+            const presentCount = students.filter(s => s.status === 'present').length;
+            const absentCount = students.filter(s => s.status === 'absent').length;
+            const lateCount = students.filter(s => s.status === 'late').length;
+            const notes = document.getElementById('detail-report-notes').value.trim();
+
+            currentViewingReport.presentCount = presentCount;
+            currentViewingReport.absentCount = absentCount;
+            currentViewingReport.lateCount = lateCount;
+            currentViewingReport.notes = notes;
+
+            try {
+                await DB.updateRecord(currentViewingReport.id, currentViewingReport);
+                UI.toast('تم حفظ التعديلات على التقرير بنجاح', 'success');
+                closeReportDetailModal();
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء حفظ التعديلات', 'error');
+            }
+        }
+
+        async function handleDeleteCurrentReport() {
+            if (!currentViewingReport) return;
+            const confirmed = await UI.confirm('حذف التقرير', 'هل أنت متأكد من حذف هذا التقرير نهائياً؟', { confirmText: 'نعم، احذف', type: 'error' });
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteRecord(currentViewingReport.id);
+                UI.toast('تم حذف التقرير بنجاح', 'success');
+                closeReportDetailModal();
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء الحذف', 'error');
+            }
+        }
+
+        /* ─── Export Logic ─── */
+        function exportSingleReport(id) {
+            const r = allReports.find(x => x.id === id);
+            if (!r) return;
+
+            const cls = allClasses.find(c => c.id === r.classId);
+            const clsName = cls ? `${cls.name}_${cls.section}` : 'Class';
+
+            const rows = [
+                ['اسم الطالب', 'الرقم الأكاديمي', 'الحالة', 'التاريخ', 'الفصل']
+            ];
+
+            (r.students || []).forEach(s => {
+                rows.push([
+                    s.name || '',
+                    s.academicId || '',
+                    s.status === 'present' ? 'حاضر' : (s.status === 'absent' ? 'غائب' : 'متأخر'),
+                    r.date || '',
+                    clsName
+                ]);
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحضور');
+            XLSX.writeFile(wb, `تقرير_${clsName}_${r.date || 'اليوم'}.xlsx`);
+        }
+
+        function exportAllReportsToExcel() {
+            if (allReports.length === 0) {
+                UI.toast('لا توجد تقارير لتصديرها', 'error');
+                return;
+            }
+
+            const rows = [
+                ['رقم التقرير', 'التاريخ', 'الفصل', 'المعلم', 'إجمالي الطلاب', 'حضور', 'غياب', 'نسبة الحضور']
+            ];
+
+            allReports.forEach((r, i) => {
+                const cls = allClasses.find(c => c.id === r.classId);
+                const clsName = cls ? `${cls.name} (${cls.section})` : (r.className || '');
+                const teacher = allTeachers.find(t => t.id === r.teacherId);
+                const teacherName = teacher ? teacher.name : '';
+
+                const p = r.presentCount || (r.students ? r.students.filter(s => s.status === 'present').length : 0);
+                const a = r.absentCount || (r.students ? r.students.filter(s => s.status === 'absent').length : 0);
+                const total = p + a;
+                const rate = total > 0 ? Math.round((p / total) * 100) : 0;
+
+                rows.push([
+                    i + 1,
+                    r.date || '',
+                    clsName,
+                    teacherName,
+                    total,
+                    p,
+                    a,
+                    rate + '%'
+                ]);
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, 'سجلات الحضور');
+            XLSX.writeFile(wb, 'سجلات_الحضور_حضوري.xlsx');
+            UI.toast('تم تصدير ملف الإكسل بنجاح', 'success');
+        }
+    </script>
+</body>
+</html>

@@ -2183,9 +2183,109 @@
         };
 
         /* ══════════════════════════════════════
-           DAILY INFO RENDERER
+           DAILY INFO RENDERER & INSTANT LOCAL STATS
         ══════════════════════════════════════ */
+        function applyDailyStatsUI(classes, todayRecs, allStudents, teachers) {
+            let totalPresent = 0, totalAbsent = 0;
+            todayRecs.forEach(r => {
+                (r.details || []).forEach(d => {
+                    if (d.status === 'present') totalPresent++;
+                    else totalAbsent++;
+                });
+            });
+            const total = totalPresent + totalAbsent;
+            const rate = total > 0 ? Math.round((totalPresent / total) * 100) : null;
+
+            // Update stat cards with Number Pop-in animation
+            UI.animateNumber('statStudents', allStudents.length);
+            const teachersStat = document.getElementById('statTeachers');
+            if (teachersStat) teachersStat.textContent = teachers.length;
+            const classesStat = document.getElementById('statClasses');
+            if (classesStat) classesStat.textContent = classes.length;
+            UI.animateNumber('statAttendanceRate', rate !== null ? `${rate}%` : '--%');
+            UI.animateNumber('statPresent', totalPresent);
+            UI.animateNumber('statAbsent', totalAbsent);
+
+            // Submitted / Not submitted
+            const submittedIds = [...new Set(todayRecs.map(r => r.classId))];
+            const submitted = classes.filter(c => submittedIds.includes(c.id));
+            const notSubmitted = classes.filter(c => !submittedIds.includes(c.id));
+
+            UI.animateNumber('notSubmittedCount', notSubmitted.length);
+            UI.animateNumber('submittedCount', submitted.length);
+
+            // Not submitted list
+            const notList = document.getElementById('notSubmittedList');
+            if (notList) {
+                if (notSubmitted.length === 0) {
+                    notList.innerHTML = `<p class="text-center py-2 text-xs font-bold" style="color:var(--color-success)">🎉 جميع الفصول سلّمت التقارير!</p>`;
+                } else {
+                    notList.innerHTML = notSubmitted.map(c => `
+                        <div class="class-chip class-chip-pending">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(244,67,54,0.12)">
+                                <span class="material-symbols-outlined text-error" style="font-size:15px">class</span>
+                            </div>
+                            <span class="font-bold text-gray-700 flex-1">${c.name} - ${c.section}</span>
+                            <span class="text-[9px] font-black uppercase tracking-wide" style="color:#f44336">لم يُسلَّم</span>
+                        </div>`).join('');
+                }
+            }
+
+            // Submitted list
+            const subList = document.getElementById('submittedList');
+            if (subList) {
+                if (submitted.length === 0) {
+                    subList.innerHTML = `<p class="text-gray-400 text-xs text-center py-2">لا توجد فصول سلّمت بعد</p>`;
+                } else {
+                    subList.innerHTML = submitted.map(c => {
+                        const rec = todayRecs.find(r => r.classId === c.id);
+                        const present = rec?.details?.filter(d => d.status === 'present').length ?? 0;
+                        const cnt = rec?.details?.length ?? 0;
+                        const teacher = teachers.find(t => t.id === rec?.teacherId);
+                        return `
+                            <div class="class-chip class-chip-done">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(76,175,80,0.12)">
+                                    <span class="material-symbols-outlined" style="font-size:15px;color:var(--color-success)">class</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-bold text-gray-700 truncate">${c.name} - ${c.section}</p>
+                                    ${teacher ? `<p class="text-[9px] text-gray-400">${teacher.name}</p>` : ''}
+                                </div>
+                                <span class="font-black text-xs shrink-0" style="color:var(--color-success)">${present}/${cnt}</span>
+                            </div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        // Try instant paint from local cache immediately on load
+        try {
+            if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                const instantStats = DB.getCachedDashboardData();
+                if (instantStats.hasData) {
+                    applyDailyStatsUI(instantStats.classes, instantStats.todayRecords, instantStats.students, instantStats.teachers);
+                }
+            }
+        } catch (_) {}
+
+        // Listen for realtime database changes across tabs / operations
+        if (typeof DB !== 'undefined' && DB.onDataChange) {
+            DB.onDataChange(() => {
+                renderDailyInfo();
+            });
+        }
+
         async function renderDailyInfo() {
+            // 1. Instant paint from local cache if available
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    if (instant.hasData) {
+                        applyDailyStatsUI(instant.classes, instant.todayRecords, instant.students, instant.teachers);
+                    }
+                }
+            } catch (_) {}
+
             const now = new Date();
             const pad = n => String(n).padStart(2, '0');
             const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -2199,71 +2299,7 @@
             ]);
 
             const todayRecs = allRecords.filter(r => r.date === todayStr);
-
-            let totalPresent = 0, totalAbsent = 0;
-            todayRecs.forEach(r => {
-                (r.details || []).forEach(d => {
-                    if (d.status === 'present') totalPresent++;
-                    else totalAbsent++;
-                });
-            });
-            const total = totalPresent + totalAbsent;
-            const rate = total > 0 ? Math.round((totalPresent / total) * 100) : null;
-
-            // Update stat cards
-            document.getElementById('statStudents').textContent = allStudents.length;
-            document.getElementById('statTeachers').textContent = teachers.length;
-            document.getElementById('statClasses').textContent = classes.length;
-            document.getElementById('statAttendanceRate').textContent = rate !== null ? `${rate}%` : '--%';
-            document.getElementById('statPresent').textContent = totalPresent;
-            document.getElementById('statAbsent').textContent = totalAbsent;
-
-            // Submitted / Not submitted
-            const submittedIds = [...new Set(todayRecs.map(r => r.classId))];
-            const submitted = classes.filter(c => submittedIds.includes(c.id));
-            const notSubmitted = classes.filter(c => !submittedIds.includes(c.id));
-
-            document.getElementById('notSubmittedCount').textContent = notSubmitted.length;
-            document.getElementById('submittedCount').textContent = submitted.length;
-
-            // Not submitted list
-            const notList = document.getElementById('notSubmittedList');
-            if (notSubmitted.length === 0) {
-                notList.innerHTML = `<p class="text-center py-2 text-xs font-bold" style="color:var(--color-success)">🎉 جميع الفصول سلّمت التقارير!</p>`;
-            } else {
-                notList.innerHTML = notSubmitted.map(c => `
-                    <div class="class-chip class-chip-pending">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(244,67,54,0.12)">
-                            <span class="material-symbols-outlined text-error" style="font-size:15px">class</span>
-                        </div>
-                        <span class="font-bold text-gray-700 flex-1">${c.name} - ${c.section}</span>
-                        <span class="text-[9px] font-black uppercase tracking-wide" style="color:#f44336">لم يُسلَّم</span>
-                    </div>`).join('');
-            }
-
-            // Submitted list
-            const subList = document.getElementById('submittedList');
-            if (submitted.length === 0) {
-                subList.innerHTML = `<p class="text-gray-400 text-xs text-center py-2">لا توجد فصول سلّمت بعد</p>`;
-            } else {
-                subList.innerHTML = submitted.map(c => {
-                    const rec = todayRecs.find(r => r.classId === c.id);
-                    const present = rec?.details?.filter(d => d.status === 'present').length ?? 0;
-                    const cnt = rec?.details?.length ?? 0;
-                    const teacher = teachers.find(t => t.id === rec?.teacherId);
-                    return `
-                        <div class="class-chip class-chip-done">
-                            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(76,175,80,0.12)">
-                                <span class="material-symbols-outlined" style="font-size:15px;color:var(--color-success)">class</span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="font-bold text-gray-700 truncate">${c.name} - ${c.section}</p>
-                                ${teacher ? `<p class="text-[9px] text-gray-400">${teacher.name}</p>` : ''}
-                            </div>
-                            <span class="font-black text-xs shrink-0" style="color:var(--color-success)">${present}/${cnt}</span>
-                        </div>`;
-                }).join('');
-            }
+            applyDailyStatsUI(classes, todayRecs, allStudents, teachers);
 
             // Today's reports grid
             const grid = document.getElementById('todayReportsGrid');
@@ -3371,7 +3407,11 @@
         }
         function updateStat(id, delta) {
             const el = document.getElementById(id);
-            if (el) el.innerText = Math.max(0, (parseInt(el.innerText) || 0) + delta);
+            if (el) {
+                const current = parseInt(el.textContent) || 0;
+                const next = Math.max(0, current + delta);
+                UI.animateNumber(el, next);
+            }
         }
 
         /* ══════════════════════════════════════
@@ -3699,6 +3739,20 @@
 
                 const user = Auth.checkAuth('admin');
                 if (!user) return;
+
+                // 0. Instant paint from local cache immediately on init (0ms latency, zero blocking splash)
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    try {
+                        const instant = DB.getCachedDashboardData();
+                        if (instant && instant.hasData) {
+                            applyDailyStatsUI(instant.classes, instant.todayRecords, instant.students, instant.teachers);
+                            if (splash) {
+                                splash.style.opacity = '0';
+                                splash.style.pointerEvents = 'none';
+                            }
+                        }
+                    } catch (_) {}
+                }
 
                 // 1. Connect DB
                 status.innerText = "جاري الاتصال بقاعدة البيانات...";

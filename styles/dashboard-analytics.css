@@ -166,17 +166,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  margin-bottom: 0.5rem;
+  border-radius: 12px;
+  margin-bottom: 0.45rem;
   font-size: 13px;
   font-weight: 700;
   transition: all 0.15s ease;
 }
 
 .class-status-row:hover {
+  background: #f1f5f9;
   border-color: #cbd5e1;
 }
 
@@ -186,6 +188,7 @@
 }
 
 .theme-dark-orange .class-status-row:hover {
+  background: #202024;
   border-color: #3f3f46;
 }
 
@@ -193,10 +196,13 @@
   background: #fef2f2;
   color: #e11d48;
   border: 1px solid #fecdd3;
-  border-radius: 6px;
-  padding: 2px 8px;
+  border-radius: 8px;
+  padding: 3px 8px;
   font-size: 11px;
   font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .theme-dark-orange .status-badge-pending {
@@ -209,10 +215,13 @@
   background: #ecfdf5;
   color: #059669;
   border: 1px solid #a7f3d0;
-  border-radius: 6px;
-  padding: 2px 8px;
+  border-radius: 8px;
+  padding: 3px 8px;
   font-size: 11px;
   font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .theme-dark-orange .status-badge-done {
@@ -225,15 +234,21 @@
 .header-action-btn {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.45rem 0.9rem;
-  font-size: 12px;
+  border-radius: 12px;
+  padding: 0 1rem;
+  height: 38px;
+  min-height: 38px;
+  font-size: 12.5px;
   font-weight: 800;
   color: #0f172a;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 

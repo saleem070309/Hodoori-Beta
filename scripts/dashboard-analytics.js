@@ -16,6 +16,22 @@
     let classesChartInstance = null;
 
     const AnalyticsDashboard = {
+        renderFromInstantCache() {
+            try {
+                if (typeof DB === 'undefined' || !DB.getCachedDashboardData) return;
+                const instant = DB.getCachedDashboardData();
+                if (instant.hasData) {
+                    allStudents = Array.isArray(instant.students) ? instant.students : [];
+                    allClasses = Array.isArray(instant.classes) ? instant.classes : [];
+                    allTeachers = Array.isArray(instant.teachers) ? instant.teachers : [];
+                    allRecords = Array.isArray(instant.records) ? instant.records : [];
+                    this.computeAndRenderAll();
+                }
+            } catch (e) {
+                console.warn('Analytics instant cache paint notice:', e);
+            }
+        },
+
         async init() {
             try {
                 // 1. Auth Guard
@@ -27,7 +43,17 @@
                     HodooriSidebar.mount({ activeItem: 'analytics' });
                 }
 
-                // 3. Initialize DB & load school name
+                // 3. Instant paint from local cache (0ms latency)
+                this.renderFromInstantCache();
+
+                // 4. Listen for realtime db changes
+                if (typeof DB !== 'undefined' && DB.onDataChange) {
+                    DB.onDataChange(() => {
+                        this.refreshData();
+                    });
+                }
+
+                // 5. Initialize DB & load school name
                 await DB.init();
                 if (user.schoolId) {
                     const school = await DB.getSchool(user.schoolId);
@@ -37,10 +63,10 @@
                     }
                 }
 
-                // 4. Load Real Data
+                // 6. Load / Validate Real Data (cached + delta sync)
                 await this.refreshData();
 
-                // 5. Initialize Theme
+                // 7. Initialize Theme
                 const savedTheme = localStorage.getItem('admin_theme_mode') || 'light-warm';
                 this.applyTheme(savedTheme);
 
@@ -54,12 +80,12 @@
 
         async refreshData() {
             try {
-                // Fetch Core Collections concurrently
+                // Fetch Core Collections concurrently using high-performance cached accessors
                 const [students, classes, teachers, records] = await Promise.all([
                     DB.getStudents(),
                     DB.getClasses(),
                     DB.getTeachers(),
-                    DB.getRecentRecords(30, null, { forceRefresh: true })
+                    DB.getRecentRecords(30)
                 ]);
 
                 allStudents = Array.isArray(students) ? students : [];
@@ -118,18 +144,25 @@
                 attendanceRateStr = `${rateVal}%`;
             }
 
-            // 1. Update 4 Top Segments (100% Real DB Data)
-            const totalEl = document.getElementById('kpi-total-students');
-            if (totalEl) totalEl.textContent = totalStudentsCount;
+            // 1. Update 4 Top Segments (100% Real DB Data with Number Pop-in Animation)
+            if (typeof UI !== 'undefined' && typeof UI.animateNumber === 'function') {
+                UI.animateNumber('kpi-total-students', totalStudentsCount);
+                UI.animateNumber('kpi-present-count', presentToday);
+                UI.animateNumber('kpi-absent-count', absentToday);
+                UI.animateNumber('kpi-attendance-rate', attendanceRateStr);
+            } else {
+                const totalEl = document.getElementById('kpi-total-students');
+                if (totalEl) totalEl.textContent = totalStudentsCount;
 
-            const presentEl = document.getElementById('kpi-present-count');
-            if (presentEl) presentEl.textContent = presentToday;
+                const presentEl = document.getElementById('kpi-present-count');
+                if (presentEl) presentEl.textContent = presentToday;
 
-            const absentEl = document.getElementById('kpi-absent-count');
-            if (absentEl) absentEl.textContent = absentToday;
+                const absentEl = document.getElementById('kpi-absent-count');
+                if (absentEl) absentEl.textContent = absentToday;
 
-            const rateEl = document.getElementById('kpi-attendance-rate');
-            if (rateEl) rateEl.textContent = attendanceRateStr;
+                const rateEl = document.getElementById('kpi-attendance-rate');
+                if (rateEl) rateEl.textContent = attendanceRateStr;
+            }
 
             // 2. Render Middle Row Charts
             this.renderClassesChart(latestClassRecordMap);
@@ -372,11 +405,11 @@
                         const teacher = allTeachers.find(t => t.id === c.teacherId) || { name: 'المعلم المسؤول' };
                         return `
                             <div class="class-status-row">
-                                <div>
-                                    <span class="block font-bold text-stone-900 dark:text-white">${c.name || c.grade}</span>
-                                    <span class="text-[10px] text-stone-500">${teacher.name}</span>
+                                <div class="min-w-0 flex-1 pr-1">
+                                    <span class="block text-xs sm:text-sm font-bold text-stone-900 dark:text-white truncate">${c.name || c.grade}</span>
+                                    <span class="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 block truncate">${teacher.name}</span>
                                 </div>
-                                <span class="status-badge-pending">لم يُسلم بعد</span>
+                                <span class="status-badge-pending">لم يُسلّم</span>
                             </div>
                         `;
                     }).join('');
@@ -406,11 +439,11 @@
                         const time = rec && rec.timestamp ? new Date(rec.timestamp).toLocaleTimeString('ar-JO', { hour: '2-digit', minute: '2-digit' }) : 'صباحاً';
                         return `
                             <div class="class-status-row">
-                                <div>
-                                    <span class="block font-bold text-stone-900 dark:text-white">${c.name || c.grade}</span>
-                                    <span class="text-[10px] text-stone-500">حاضر: ${p} | غائب: ${a} (استُلم ${time})</span>
+                                <div class="min-w-0 flex-1 pr-1">
+                                    <span class="block text-xs sm:text-sm font-bold text-stone-900 dark:text-white truncate">${c.name || c.grade}</span>
+                                    <span class="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 block truncate">حاضر: ${p} | غائب: ${a} (${time})</span>
                                 </div>
-                                <span class="status-badge-done">تم التسليم ✓</span>
+                                <span class="status-badge-done">تم التسليم</span>
                             </div>
                         `;
                     }).join('');

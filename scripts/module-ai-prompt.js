@@ -117,12 +117,72 @@ const AgentInstructions = {
     - **يُمنع منعاً باتاً وقطعياً** أن تكتب في نص ردك عبارات مثل "تم إضافة الطلاب" أو "تم حفظهم في جدول students" أو تسرد أسماء الطلاب زاعماً أنك قمت بحفظهم، ما لم تكن قد أصدرت بالفعل أمر |||COMMAND||| لحفظهم في قاعدة البيانات وتم تنفيذه!
     - تذكر أن مجرد كتابة أسماء الطلاب في الرد النصي لن يحفظهم في قاعدة البيانات إطلاقاً ويُعتبر ادعاءً باطلاً.
     - للحفظ الحقيقي، يجب دائماً إصدار أمر الإدخال الجماعي الفعلي:
-      |||COMMAND|||{"type":"database_action","action":"insert","table":"students","data":[{"name":"...","academicId":"...","classId":"..."}]}`,
+11. سياسة استئذان وموافقة المستخدم قبل تعديل البيانات (User Approval & Recommendation Card):
+    - النظام مزود بواجهة أمان تفاعلية واستئذان مسبق (Recommendation Card) تعرض التغييرات المقترحة على المستخدم للموافقة والاعتماد قبل تنفيذ أي كتابة أو تعديل أو حذف في قاعدة البيانات.
+    - عند طلب إضافة، تعديل، أو حذف بيانات، أخرج الأمر البرمجي المباشر |||COMMAND||| كالمعتاد وسيقوم النظام تلقائياً بعرض بطاقة التوصية والاستئذان للمستخدم لاعتمادها.
+    - لا تجزم في ردك النصي بأن البيانات تم إدخالها بالفعل، بل وضّح أنك قمت بتجهيز التعديلات/البيانات للمراجعة والاعتماد.`,
 
-    getTemplate() {
-        return this.template;
+    /**
+     * Generates the system prompt template based on whether face analysis is enabled or disabled.
+     * When face analysis is disabled (faceAnalysisEnabled === false), all references to Face ID,
+     * identify_student, and face descriptors are completely purged, and a strict rule is added
+     * forbidding face analysis and clarifying that the feature does not exist.
+     */
+    getTemplate(options = {}) {
+        let faceEnabled = true;
+        if (typeof options === 'boolean') {
+            faceEnabled = options;
+        } else if (options && typeof options.faceAnalysisEnabled !== 'undefined') {
+            faceEnabled = !!options.faceAnalysisEnabled;
+        } else if (typeof localStorage !== 'undefined') {
+            const saved = localStorage.getItem('hodoori_agent_face_analysis_enabled');
+            if (saved === 'false') faceEnabled = false;
+        }
+
+        if (faceEnabled) {
+            return this.template;
+        }
+
+        return this.getTemplateWithoutFace();
+    },
+
+    /**
+     * Stripped template where face analysis knowledge and commands are completely eradicated.
+     */
+    getTemplateWithoutFace() {
+        // Purge Face ID section and replace section header
+        let t = this.template;
+
+        // Replace section 3 header
+        t = t.replace(
+            '3. معالجة الصور واستخراج الوثائق بالرؤية البصرية (Vision Document OCR vs Face ID):',
+            '3. معالجة صور المستندات واستخراج الكشوفات بالرؤية البصرية (Vision Document & Roster OCR):'
+        );
+
+        // Remove Face ID block
+        const faceBlockRegex = /• صور وجوه الطلاب الحقيقية \(Face ID\):[\s\S]*?(?=4\. تصدير التقارير)/;
+        t = t.replace(faceBlockRegex, '');
+
+        // Add strict negative rule under behavioral rules
+        const strictRule = `
+12. سياسة عدم وجود تحليل الوجه (حظر وتجريد تحليل الوجه تماماً):
+    - هذا النظام لا يدعم ولا يمتلك أي خاصية أو أداة أو خوارزمية لتحليل الوجه أو مطابقة البصمة الوجهية على الإطلاق (Face Analysis & Recognition does not exist in this system).
+    - لا تقم باقتراح أو محاولة التعرف على وجوه الأشخاص إطلاقاً. إذا سُئلت عن التعرف على الوجوه أو تحليل وجه شخص بالصورة، أجب بحزم وبديهية بأن هذا النظام مخصص لإدارة السجلات والمستندات والجداول ولا يحتوي على أي خاصية لتحليل الوجوه.`;
+
+        t = t.trim() + '\n' + strictRule.trim();
+        return t;
     }
 };
+
+// Expose dynamic getter for template property when possible
+try {
+    Object.defineProperty(AgentInstructions, 'currentTemplate', {
+        get() {
+            return this.getTemplate();
+        },
+        configurable: true
+    });
+} catch (_) {}
 
 if (typeof window !== 'undefined') {
     window.AgentInstructions = AgentInstructions;
@@ -132,3 +192,4 @@ if (typeof window !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AgentInstructions;
 }
+

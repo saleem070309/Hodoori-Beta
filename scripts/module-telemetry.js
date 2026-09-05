@@ -117,6 +117,19 @@ const Telemetry = {
         };
 
         console.log("Hodoori: Telemetry & Error Tracking Engine initialized.");
+
+        // Periodic & Event-based Pending Logs Synchronization
+        if (typeof window !== 'undefined') {
+            window.addEventListener('online', () => {
+                this.flushPendingLogs();
+            });
+            if (typeof setTimeout === 'function') {
+                setTimeout(() => this.flushPendingLogs(), 2500);
+            }
+            if (typeof setInterval === 'function') {
+                setInterval(() => this.flushPendingLogs(), 60000);
+            }
+        }
     },
 
     addBreadcrumb(action) {
@@ -295,7 +308,10 @@ const Telemetry = {
             // 1. Save to Local Storage with smart grouping
             const finalRecord = this._saveLocal(errorRecord);
 
-            // 2. Asynchronously Sync with Firestore if online & available
+            // 2. Real-time Cross-tab and Dashboard Notification
+            this._broadcastError(finalRecord);
+
+            // 3. Asynchronously Sync with Firestore if online & available
             this._syncWithFirestore(finalRecord).catch(err => {
                 console.warn("Firestore error sync failed (kept local):", err);
             });
@@ -305,6 +321,20 @@ const Telemetry = {
             console.error("Telemetry failed to record error:", err);
             return null;
         }
+    },
+
+    _broadcastError(record) {
+        try {
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('hodoori:telemetry_error', { detail: record }));
+                if (typeof BroadcastChannel !== 'undefined') {
+                    if (!this._bc) {
+                        this._bc = new BroadcastChannel('hodoori_telemetry_channel');
+                    }
+                    this._bc.postMessage({ type: 'NEW_ERROR', record });
+                }
+            }
+        } catch (_) {}
     },
 
     _getBrowserInfo() {
@@ -330,6 +360,11 @@ const Telemetry = {
             const raw = localStorage.getItem(this.STORAGE_KEY);
             let list = raw ? JSON.parse(raw) : [];
 
+            // Mark initial sync state as pending
+            if (typeof record.synced === 'undefined') {
+                record.synced = false;
+            }
+
             // Check if identical error fingerprint exists -> group & increment counter
             const existingIndex = list.findIndex(item => item.fingerprint === record.fingerprint);
 
@@ -341,6 +376,7 @@ const Telemetry = {
                 existing.breadcrumbs = record.breadcrumbs;
                 existing.environment = record.environment;
                 existing.message = record.message;
+                existing.synced = false; // Needs re-sync due to updated occurrence count
                 if (record.stack) existing.stack = record.stack;
 
                 // Move updated grouped error to the top of the list
@@ -352,6 +388,7 @@ const Telemetry = {
                 record.occurrences = 1;
                 record.firstSeen = record.timestamp;
                 record.lastSeen = record.timestamp;
+                record.synced = false;
                 list.unshift(record);
                 if (list.length > this.MAX_LOCAL_LOGS) {
                     list = list.slice(0, this.MAX_LOCAL_LOGS);
@@ -366,12 +403,69 @@ const Telemetry = {
     },
 
     async _syncWithFirestore(record) {
-        if (typeof DB !== 'undefined' && DB.dbInstance) {
-            try {
-                await DB.dbInstance.collection(this.FIRESTORE_COLLECTION).doc(record.id).set(record, { merge: true });
-            } catch (e) {
-                // Keep local
+        if (!record || !record.id) return false;
+        try {
+            if (typeof DB !== 'undefined') {
+                if (!DB.dbInstance && typeof DB.init === 'function') {
+                    await DB.init();
+                }
+                if (DB.dbInstance) {
+                    await DB.dbInstance.collection(this.FIRESTORE_COLLECTION).doc(record.id).set(record, { merge: true });
+                    this._markSyncedLocal(record.id);
+                    return true;
+                }
             }
+        } catch (e) {
+            console.warn("Firestore error sync failed (kept local):", e);
+        }
+        return false;
+    },
+
+    _markSyncedLocal(id) {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            if (!raw) return;
+            const list = JSON.parse(raw);
+            const item = list.find(l => l.id === id);
+            if (item) {
+                item.synced = true;
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(list));
+            }
+        } catch (_) {}
+    },
+
+    async flushPendingLogs() {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            if (!raw) return;
+            const list = JSON.parse(raw);
+            const pending = list.filter(item => !item.synced);
+            if (pending.length === 0) return;
+
+            if (typeof DB !== 'undefined') {
+                if (!DB.dbInstance && typeof DB.init === 'function') {
+                    await DB.init();
+                }
+                if (DB.dbInstance) {
+                    const batch = DB.dbInstance.batch();
+                    const syncedIds = [];
+                    // Sync up to 25 pending logs in a batch
+                    pending.slice(0, 25).forEach(rec => {
+                        const ref = DB.dbInstance.collection(this.FIRESTORE_COLLECTION).doc(rec.id);
+                        batch.set(ref, rec, { merge: true });
+                        syncedIds.push(rec.id);
+                    });
+                    await batch.commit();
+
+                    const updatedList = list.map(item => {
+                        if (syncedIds.includes(item.id)) item.synced = true;
+                        return item;
+                    });
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedList));
+                }
+            }
+        } catch (err) {
+            console.warn("Telemetry: flushPendingLogs error:", err);
         }
     },
 
@@ -386,27 +480,73 @@ const Telemetry = {
         } catch (_) {}
 
         // Try getting remote Firestore logs if available
-        if (typeof DB !== 'undefined' && DB.dbInstance) {
+        if (typeof DB !== 'undefined') {
             try {
-                const snap = await DB.dbInstance.collection(this.FIRESTORE_COLLECTION)
-                    .orderBy('timestamp', 'desc')
-                    .limit(100)
-                    .get();
+                if (!DB.dbInstance && typeof DB.init === 'function') {
+                    await DB.init();
+                }
+            } catch (_) {}
 
-                const remoteLogs = [];
-                snap.forEach(doc => remoteLogs.push(doc.data()));
+            if (DB.dbInstance) {
+                try {
+                    const snap = await DB.dbInstance.collection(this.FIRESTORE_COLLECTION)
+                        .orderBy('timestamp', 'desc')
+                        .limit(100)
+                        .get();
 
-                // Merge and deduplicate by ID
-                const logMap = new Map();
-                [...remoteLogs, ...localLogs].forEach(item => {
-                    if (item && item.id && !logMap.has(item.id)) {
-                        logMap.set(item.id, item);
-                    }
-                });
+                    const remoteLogs = [];
+                    snap.forEach(doc => remoteLogs.push(doc.data()));
 
-                return Array.from(logMap.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            } catch (err) {
-                console.warn("Telemetry: Could not load remote Firestore logs, using local:", err);
+                    // Merge and deduplicate by ID
+                    const logMap = new Map();
+                    [...remoteLogs, ...localLogs].forEach(item => {
+                        if (item && item.id && !logMap.has(item.id)) {
+                            logMap.set(item.id, item);
+                        }
+                    });
+
+                    // Seamlessly include any previous v2_agentic_logs records
+                    try {
+                        const agenticSnap = await DB.dbInstance.collection('v2_agentic_logs')
+                            .orderBy('timestamp', 'desc')
+                            .limit(50)
+                            .get();
+                        agenticSnap.forEach(doc => {
+                            const d = doc.data();
+                            const id = (doc.id && String(doc.id).startsWith('agentic_')) ? String(doc.id) : ('agentic_' + doc.id);
+                            if (!logMap.has(id)) {
+                                logMap.set(id, {
+                                    id: id,
+                                    category: 'AI_AGENT',
+                                    severity: 'HIGH',
+                                    occurrences: 1,
+                                    timestamp: d.timestamp || new Date().toISOString(),
+                                    dateDisplay: d.timestamp ? new Date(d.timestamp).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'medium' }) : '',
+                                    message: d.error || d.message || 'خطأ في معالجة الوكيل الذكي',
+                                    page: 'agent.html',
+                                    stack: d.error || d.stack || '',
+                                    user: d.user || { role: 'admin', schoolId: 'unknown' },
+                                    environment: {
+                                        browser: 'متصفح النظام',
+                                        screen: 'غير محدد',
+                                        online: true,
+                                        memory: 'N/A'
+                                    },
+                                    extra: {
+                                        userPrompt: d.userPrompt,
+                                        provider: d.provider,
+                                        source: 'v2_agentic_logs'
+                                    },
+                                    synced: true
+                                });
+                            }
+                        });
+                    } catch (_) {}
+
+                    return Array.from(logMap.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                } catch (err) {
+                    console.warn("Telemetry: Could not load remote Firestore logs, using local:", err);
+                }
             }
         }
 
@@ -571,5 +711,9 @@ const Telemetry = {
 
 // Initialize immediately
 if (typeof window !== 'undefined') {
+    window.Telemetry = Telemetry;
     Telemetry.init();
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Telemetry;
 }

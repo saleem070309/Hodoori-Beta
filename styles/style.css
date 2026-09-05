@@ -45,11 +45,87 @@
   --transition-fast: all 0.15s ease;
   --transition-normal: all 0.25s ease;
 
+  /* Transitions.dev — Number pop-in variables */
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+
   /* Layout Variables */
   --header-h: 56px;
   --nav-h: 68px;
 
   color-scheme: light !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Transitions.dev — Number Pop-in Animation
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes t-digit-pop-in {
+  0% {
+    transform: translate(
+      calc(var(--digit-distance) * var(--digit-dir-x)),
+      calc(var(--digit-distance) * var(--digit-dir-y))
+    );
+    opacity: 0;
+    filter: blur(var(--digit-blur));
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.t-digit-group {
+  display: inline-flex;
+  align-items: baseline;
+  direction: ltr; /* Keeps digit sequence stable in RTL */
+  unicode-bidi: isolate;
+  vertical-align: baseline;
+}
+
+.t-digit {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+  white-space: pre;
+}
+
+.t-digit-group.is-animating .t-digit {
+  animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+}
+
+/* Dynamic Stagger Delays */
+.t-digit-group.is-animating .t-digit[data-stagger="1"] { animation-delay: var(--digit-stagger); }
+.t-digit-group.is-animating .t-digit[data-stagger="2"] { animation-delay: calc(var(--digit-stagger) * 2); }
+.t-digit-group.is-animating .t-digit[data-stagger="3"] { animation-delay: calc(var(--digit-stagger) * 3); }
+.t-digit-group.is-animating .t-digit[data-stagger="4"] { animation-delay: calc(var(--digit-stagger) * 4); }
+.t-digit-group.is-animating .t-digit[data-stagger="5"] { animation-delay: calc(var(--digit-stagger) * 5); }
+.t-digit-group.is-animating .t-digit[data-stagger="6"] { animation-delay: calc(var(--digit-stagger) * 6); }
+.t-digit-group.is-animating .t-digit[data-stagger="7"] { animation-delay: calc(var(--digit-stagger) * 7); }
+.t-digit-group.is-animating .t-digit[data-stagger="8"] { animation-delay: calc(var(--digit-stagger) * 8); }
+.t-digit-group.is-animating .t-digit[data-stagger="9"] { animation-delay: calc(var(--digit-stagger) * 9); }
+.t-digit-group.is-animating .t-digit[data-stagger="10"] { animation-delay: calc(var(--digit-stagger) * 10); }
+.t-digit-group.is-animating .t-digit[data-stagger="11"] { animation-delay: calc(var(--digit-stagger) * 11); }
+.t-digit-group.is-animating .t-digit[data-stagger="12"] { animation-delay: calc(var(--digit-stagger) * 12); }
+.t-digit-group.is-animating .t-digit[data-stagger="13"] { animation-delay: calc(var(--digit-stagger) * 13); }
+.t-digit-group.is-animating .t-digit[data-stagger="14"] { animation-delay: calc(var(--digit-stagger) * 14); }
+.t-digit-group.is-animating .t-digit[data-stagger="15"] { animation-delay: calc(var(--digit-stagger) * 15); }
+.t-digit-group.is-animating .t-digit[data-stagger="16"] { animation-delay: calc(var(--digit-stagger) * 16); }
+.t-digit-group.is-animating .t-digit[data-stagger="17"] { animation-delay: calc(var(--digit-stagger) * 17); }
+.t-digit-group.is-animating .t-digit[data-stagger="18"] { animation-delay: calc(var(--digit-stagger) * 18); }
+.t-digit-group.is-animating .t-digit[data-stagger="19"] { animation-delay: calc(var(--digit-stagger) * 19); }
+.t-digit-group.is-animating .t-digit[data-stagger="20"] { animation-delay: calc(var(--digit-stagger) * 20); }
+
+.t-digit-group.is-animating .t-digit[style*="--stagger-index"] {
+  animation-delay: calc(var(--digit-stagger) * var(--stagger-index, 0));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-digit-group .t-digit { animation: none !important; }
 }
 
 html, body {
@@ -1953,13 +2029,25 @@ body {
   animation: tabSlideLeft 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
+.hide-scrollbar::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.no-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.hide-scrollbar,
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 @keyframes fade-in {

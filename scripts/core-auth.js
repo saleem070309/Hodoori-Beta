@@ -43,6 +43,9 @@ const Auth = {
             if (typeof CryptoEngine !== 'undefined') {
                 await CryptoEngine.initSessionKey(ministryUser.id, ministryUser.loginAt);
             }
+            if (typeof DB !== 'undefined' && DB.unlockAndRestore) {
+                await DB.unlockAndRestore();
+            }
 
             return { success: true, user: ministryUser };
         }
@@ -68,6 +71,9 @@ const Auth = {
             if (typeof CryptoEngine !== 'undefined') {
                 await CryptoEngine.initSessionKey(sessionUser.id, sessionUser.password || sessionUser.loginAt);
             }
+            if (typeof DB !== 'undefined' && DB.unlockAndRestore) {
+                await DB.unlockAndRestore();
+            }
 
             return { success: true, user: sessionUser };
         }
@@ -78,15 +84,17 @@ const Auth = {
     async logout() {
         console.log("🔒 Hodoori Auth: Initiating secure logout protocol...");
 
-        // 1. Clear session key from localStorage
-        localStorage.removeItem(DB.KEYS.CURRENT_USER);
-
-        // 2. Perform complete database lockdown, L1 cache wipe, and broadcast lockdown
+        // 1. Perform complete database lockdown, L1 cache wipe, and broadcast lockdown BEFORE wiping user session
         if (typeof DB !== 'undefined' && DB.lockAndPurge) {
             try {
                 await DB.lockAndPurge();
-            } catch (_) {}
+            } catch (lockErr) {
+                console.warn("Hodoori Auth: lockAndPurge notice during logout:", lockErr);
+            }
         }
+
+        // 2. Clear session user from localStorage
+        localStorage.removeItem(DB.KEYS.CURRENT_USER);
 
         // 3. Destroy session cryptographic key (Locks all encrypted data on disk)
         if (typeof CryptoEngine !== 'undefined') {
@@ -131,6 +139,9 @@ const Auth = {
             // Ensure crypto session key is initialized if user is active
             if (typeof CryptoEngine !== 'undefined' && !CryptoEngine.hasActiveKey()) {
                 CryptoEngine.initSessionKey(user.id || user.ministryId, user.password || user.loginAt);
+                if (typeof DB !== 'undefined' && DB.unlockAndRestore) {
+                    DB.unlockAndRestore();
+                }
             }
 
             return user;
@@ -156,6 +167,7 @@ const Auth = {
             // Admin & Assistant roles can access admin and teacher pages
             if (requiredRole === 'admin' && (user.role === 'admin' || user.role === 'assistant')) return user;
             if (requiredRole === 'teacher' && (user.role === 'admin' || user.role === 'assistant' || user.role === 'teacher')) return user;
+            if (requiredRole === 'ministry' && (user.role === 'ministry' || user.role === 'admin')) return user;
             
             // Exact role match
             if (user.role !== requiredRole) {

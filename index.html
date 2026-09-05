@@ -311,7 +311,7 @@
                         window.location.href = "dashboard-ministry.html";
                         return;
                     } else if (user.role === "admin" || user.role === "assistant") {
-                        window.location.href = "dashboard-admin.html";
+                        window.location.href = "dashboard-analytics.html";
                         return;
                     } else if (user.role === "teacher") {
                         window.location.href = "dashboard-teacher.html";
@@ -359,7 +359,7 @@
                 document.getElementById("teacherForm").style.opacity =
                     type === "teacher" ? "1" : "0.3";
                 document.getElementById("studentForm").style.opacity =
-                    type === "student" ? "1" : "0.3";
+                    type === "student" ? "0.3" : "1";
             }
 
             async function handleLogin() {
@@ -378,7 +378,7 @@
                         if (result.user.role === "ministry") {
                             window.location.href = "dashboard-ministry.html";
                         } else if (result.user.role === "admin" || result.user.role === "assistant") {
-                            window.location.href = "dashboard-admin.html";
+                            window.location.href = "dashboard-analytics.html";
                         } else {
                             window.location.href = "dashboard-teacher.html";
                         }

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>جدول الحصص الدراسي | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-common.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Header ─── -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+            <div class="pr-10 sm:pr-0">
+                <h1 class="text-lg sm:text-[20px] font-black text-stone-900 dark:text-white leading-tight">جدول الحصص الدراسي</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block mt-0.5" id="school-name-display">مدرسة حضوري الذكية</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <button type="button" onclick="window.print()" class="header-action-btn justify-center">
+                    <span class="material-symbols-outlined text-sm">print</span>
+                    <span>طباعة الجدول</span>
+                </button>
+                <button type="button" onclick="showAddScheduleModal()" class="btn-primary-action justify-center">
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    <span>إضافة حصة</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ─── 1. TOP KPI ROW ─── -->
+        <section class="kpi-segmented-card mb-5">
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الحصص الأسبوعية</span>
+                <span class="kpi-val" id="kpi-total-slots">--</span>
+                <span class="kpi-sub">حصة مجدولة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">المعلمون المجدولون</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-active-teachers">--</span>
+                <span class="kpi-sub">معلم لديه حصص</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">الشعب المغطاة</span>
+                <span class="kpi-val text-sky-600 dark:text-sky-400" id="kpi-active-classes">--</span>
+                <span class="kpi-sub">شعبة مضافة بالجدول</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">متوسط الحصص اليومي</span>
+                <span class="kpi-val text-purple-600 dark:text-purple-400" id="kpi-daily-avg">--</span>
+                <span class="kpi-sub">حصة في اليوم</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. DAY & FILTER TOOLBAR ─── -->
+        <section class="hodoori-card mb-5 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <!-- Day Filter Pills -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto no-scrollbar" id="days-filter-bar">
+                <button type="button" class="header-action-btn active border-amber-500 text-amber-600 dark:text-amber-400 shrink-0" id="filter-day-all" onclick="filterByDay('')">كافة الأيام</button>
+                <button type="button" class="header-action-btn shrink-0" id="filter-day-sun" onclick="filterByDay('الأحد')">الأحد</button>
+                <button type="button" class="header-action-btn shrink-0" id="filter-day-mon" onclick="filterByDay('الاثنين')">الاثنين</button>
+                <button type="button" class="header-action-btn shrink-0" id="filter-day-tue" onclick="filterByDay('الثلاثاء')">الثلاثاء</button>
+                <button type="button" class="header-action-btn shrink-0" id="filter-day-wed" onclick="filterByDay('الأربعاء')">الأربعاء</button>
+                <button type="button" class="header-action-btn shrink-0" id="filter-day-thu" onclick="filterByDay('الخميس')">الخميس</button>
+            </div>
+
+            <!-- Teacher / Class Filter -->
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <select id="schedule-class-filter" onchange="handleEntityFilter()" class="flat-select text-xs !py-1.5 w-full sm:w-44">
+                    <option value="">كافة الفصول</option>
+                </select>
+                <select id="schedule-teacher-filter" onchange="handleEntityFilter()" class="flat-select text-xs !py-1.5 w-full sm:w-44">
+                    <option value="">كافة المعلمين</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- ─── 3. SCHEDULE TIMELINE & GRID ─── -->
+        <section id="schedule-container" class="space-y-6">
+            <div class="p-12 text-center text-xs font-bold text-stone-400">جاري تحميل جدول الحصص...</div>
+        </section>
+    </main>
+
+    <!-- ═══ ADD / EDIT SCHEDULE MODAL ═══ -->
+    <div id="schedule-modal" class="hodoori-app-modal-backdrop" onclick="closeScheduleModal(event)">
+        <div class="hodoori-app-dialog" onclick="event.stopPropagation()">
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">calendar_add_on</span>
+                    </span>
+                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white" id="schedule-modal-title">إضافة حصة جديدة</h3>
+                </div>
+                <button type="button" onclick="closeScheduleModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form id="schedule-form" onsubmit="handleSaveSchedule(event)" class="flex flex-col m-0 p-0">
+                <div class="app-dialog-body">
+                    <input type="hidden" id="modal-schedule-id" />
+
+                    <!-- Day & Period -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اليوم *</label>
+                            <select id="modal-sch-day" required class="flat-select">
+                                <option value="الأحد">الأحد</option>
+                                <option value="الاثنين">الاثنين</option>
+                                <option value="الثلاثاء">الثلاثاء</option>
+                                <option value="الأربعاء">الأربعاء</option>
+                                <option value="الخميس">الخميس</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">رقم الحصة *</label>
+                            <select id="modal-sch-period" required class="flat-select">
+                                <option value="1">الحصة 1</option>
+                                <option value="2">الحصة 2</option>
+                                <option value="3">الحصة 3</option>
+                                <option value="4">الحصة 4</option>
+                                <option value="5">الحصة 5</option>
+                                <option value="6">الحصة 6</option>
+                                <option value="7">الحصة 7</option>
+                                <option value="8">الحصة 8</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Start & End Time -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">وقت البدء</label>
+                            <input type="time" id="modal-sch-start" class="flat-input" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">وقت الانتهاء</label>
+                            <input type="time" id="modal-sch-end" class="flat-input" />
+                        </div>
+                    </div>
+
+                    <!-- Subject -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اسم المادة الدراسية *</label>
+                        <input type="text" id="modal-sch-subject" required placeholder="مثال: الرياضيات، لغتي، العلوم، الحاسب..." class="flat-input" />
+                    </div>
+
+                    <!-- Teacher Select -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">المعلم المسند له *</label>
+                        <select id="modal-sch-teacher" required class="flat-select">
+                            <option value="">-- اختر المعلم --</option>
+                        </select>
+                    </div>
+
+                    <!-- Class Select -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الفصل / الشعبة *</label>
+                        <select id="modal-sch-class" required class="flat-select">
+                            <option value="">-- اختر الفصل --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="app-dialog-footer">
+                    <button type="button" id="modal-sch-delete-btn" onclick="handleDeleteSchedule()" class="header-action-btn text-rose-600 hover:border-rose-300 mr-auto hidden">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                        حذف الحصة
+                    </button>
+                    <button type="button" class="header-action-btn" onclick="closeScheduleModal()">إلغاء</button>
+                    <button type="submit" class="btn-primary-action">حفظ الحصة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script src="scripts/component-sidebar.js"></script>
+
+    <!-- Page Specific Controller Logic -->
+    <script>
+        let allSchedule = [];
+        let allTeachers = [];
+        let allClasses = [];
+        let currentDayFilter = '';
+        let currentClassFilter = '';
+        let currentTeacherFilter = '';
+
+        const DAYS_ORDER = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchoolMeta();
+
+            // 1. Instant paint from local cache (0ms latency)
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    const cachedSched = DB._getL1(`${DB.KEYS.SCHEDULE}::${DB.getCurrentUserSchoolId() || 'global'}::all`) || [];
+                    if (instant.hasData || (cachedSched && cachedSched.length > 0)) {
+                        allSchedule = cachedSched;
+                        allTeachers = instant.teachers || [];
+                        allClasses = instant.classes || [];
+                        populateSelects();
+                        renderSchedule();
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Realtime change reactivity
+            if (typeof DB !== 'undefined' && DB.onDataChange) {
+                DB.onDataChange(() => {
+                    reloadData();
+                });
+            }
+
+            await reloadData();
+        });
+
+        async function loadSchoolMeta() {
+            try {
+                const schoolName = localStorage.getItem('attendance_school_name') || 'مدرسة حضوري الذكية';
+                const el = document.getElementById('school-name-display');
+                if (el) el.textContent = schoolName;
+            } catch (_) {}
+        }
+
+        async function reloadData() {
+            try {
+                const [sched, teachers, classes] = await Promise.all([
+                    DB.getSchedule(),
+                    DB.getTeachers(),
+                    DB.getClasses()
+                ]);
+
+                allSchedule = sched || [];
+                allTeachers = teachers || [];
+                allClasses = classes || [];
+
+                populateSelects();
+                renderSchedule();
+            } catch (err) {
+                console.error('Error loading schedule data:', err);
+            }
+        }
+
+        function populateSelects() {
+            // Filter dropdowns
+            const fClass = document.getElementById('schedule-class-filter');
+            if (fClass) {
+                fClass.innerHTML = '<option value="">كافة الفصول</option>' +
+                    allClasses.map(c => `<option value="${c.id}">${c.name} - ${c.section || ''}</option>`).join('');
+            }
+
+            const fTeacher = document.getElementById('schedule-teacher-filter');
+            if (fTeacher) {
+                fTeacher.innerHTML = '<option value="">كافة المعلمين</option>' +
+                    allTeachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            }
+
+            // Modal dropdowns
+            const mTeacher = document.getElementById('modal-sch-teacher');
+            if (mTeacher) {
+                mTeacher.innerHTML = '<option value="">-- اختر المعلم --</option>' +
+                    allTeachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            }
+
+            const mClass = document.getElementById('modal-sch-class');
+            if (mClass) {
+                mClass.innerHTML = '<option value="">-- اختر الفصل --</option>' +
+                    allClasses.map(c => `<option value="${c.id}">${c.name} - ${c.section || ''}</option>`).join('');
+            }
+        }
+
+        function renderSchedule() {
+            const container = document.getElementById('schedule-container');
+            if (!container) return;
+
+            // Calculate KPIs
+            const totalSlots = allSchedule.length;
+            const activeTeacherIds = [...new Set(allSchedule.map(s => s.teacherId).filter(Boolean))].length;
+            const activeClassIds = [...new Set(allSchedule.map(s => s.classId).filter(Boolean))].length;
+            const dailyAvg = totalSlots > 0 ? Math.round(totalSlots / 5) : 0;
+
+            UI.animateNumber('kpi-total-slots', totalSlots);
+            UI.animateNumber('kpi-active-teachers', activeTeacherIds);
+            UI.animateNumber('kpi-active-classes', activeClassIds);
+            UI.animateNumber('kpi-daily-avg', dailyAvg);
+
+            let filtered = [...allSchedule];
+
+            if (currentDayFilter) {
+                filtered = filtered.filter(s => s.day === currentDayFilter);
+            }
+            if (currentClassFilter) {
+                filtered = filtered.filter(s => s.classId === currentClassFilter);
+            }
+            if (currentTeacherFilter) {
+                filtered = filtered.filter(s => s.teacherId === currentTeacherFilter);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="hodoori-card text-center p-12">
+                        <span class="material-symbols-outlined text-5xl text-stone-300 dark:text-neutral-700 mb-3 block">calendar_today</span>
+                        <h3 class="text-base font-extrabold text-stone-900 dark:text-white">لا توجد حصص مجدولة حالياً</h3>
+                        <p class="text-xs text-stone-500 mt-1 mb-4">أضف حصص اليوم الدراسي لتوزيع المواد والمعلمين على الشعب والفصول بسهولة.</p>
+                        <button type="button" onclick="showAddScheduleModal()" class="btn-primary-action">
+                            <span class="material-symbols-outlined text-sm">add</span>
+                            <span>إضافة حصة الآن</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Group by Day
+            const byDay = {};
+            DAYS_ORDER.forEach(d => { byDay[d] = []; });
+
+            filtered.forEach(item => {
+                const day = item.day || 'الأحد';
+                if (!byDay[day]) byDay[day] = [];
+                byDay[day].push(item);
+            });
+
+            // Sort slots within each day by periodNumber
+            Object.keys(byDay).forEach(d => {
+                byDay[d].sort((a, b) => (parseInt(a.periodNumber) || 0) - (parseInt(b.periodNumber) || 0));
+            });
+
+            const daysToRender = currentDayFilter ? [currentDayFilter] : DAYS_ORDER;
+
+            container.innerHTML = daysToRender.map(day => {
+                const slots = byDay[day] || [];
+                if (slots.length === 0 && !currentDayFilter) return '';
+
+                return `
+                    <div>
+                        <!-- Day Header -->
+                        <div class="flex items-center gap-2.5 mb-3">
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                            <h3 class="text-base font-black text-stone-900 dark:text-white">${day}</h3>
+                            <div class="flex-1 h-px bg-stone-200/70 dark:border-neutral-800"></div>
+                            <span class="text-xs font-bold text-stone-400">${slots.length} حصص</span>
+                        </div>
+
+                        <!-- Slots Grid -->
+                        ${slots.length === 0 ? `
+                            <div class="p-4 text-center text-xs text-stone-400 bg-stone-50 dark:bg-neutral-900/30 rounded-xl border border-dashed border-stone-200 dark:border-neutral-800">
+                                لا توجد حصص مضافة لهذا اليوم
+                            </div>
+                        ` : `
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                ${slots.map(s => {
+                                    const teacher = allTeachers.find(t => t.id === s.teacherId);
+                                    const teacherName = teacher ? teacher.name : 'غير محدد';
+                                    const cls = allClasses.find(c => c.id === s.classId);
+                                    const clsName = cls ? `${cls.name} (${cls.section || 'عامة'})` : 'فصل غير محدد';
+
+                                    return `
+                                        <div class="hodoori-card !p-3.5 flex items-center justify-between hover:border-amber-500/50 transition-all cursor-pointer group" onclick="showEditScheduleModal('${s.id}')">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <div class="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex flex-col items-center justify-center shrink-0">
+                                                    <span class="font-black text-xs leading-none">ح${s.periodNumber || 1}</span>
+                                                    ${s.startTime ? `<span class="text-[9px] font-bold text-stone-400 mt-0.5 leading-none">${s.startTime}</span>` : ''}
+                                                </div>
+
+                                                <div class="min-w-0">
+                                                    <h4 class="font-black text-sm text-stone-900 dark:text-white leading-tight truncate group-hover:text-amber-600 transition-colors">${s.subject || 'مادة'}</h4>
+                                                    <p class="text-[11px] font-bold text-stone-500 dark:text-stone-400 mt-1 truncate">
+                                                        ${teacherName} • ${clsName}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-center gap-1 shrink-0">
+                                                <button type="button" class="agent-icon-btn text-amber-600 dark:text-amber-400" title="تعديل">
+                                                    <span class="material-symbols-outlined text-sm">edit</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterByDay(day) {
+            currentDayFilter = day;
+            const buttons = [
+                { id: 'filter-day-all', val: '' },
+                { id: 'filter-day-sun', val: 'الأحد' },
+                { id: 'filter-day-mon', val: 'الاثنين' },
+                { id: 'filter-day-tue', val: 'الثلاثاء' },
+                { id: 'filter-day-wed', val: 'الأربعاء' },
+                { id: 'filter-day-thu', val: 'الخميس' }
+            ];
+
+            buttons.forEach(b => {
+                const el = document.getElementById(b.id);
+                if (!el) return;
+                if (b.val === day) {
+                    el.classList.add('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                } else {
+                    el.classList.remove('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                }
+            });
+
+            renderSchedule();
+        }
+
+        function handleEntityFilter() {
+            currentClassFilter = document.getElementById('schedule-class-filter').value;
+            currentTeacherFilter = document.getElementById('schedule-teacher-filter').value;
+            renderSchedule();
+        }
+
+        function showAddScheduleModal() {
+            document.getElementById('schedule-modal-title').textContent = 'إضافة حصة جديدة';
+            document.getElementById('modal-schedule-id').value = '';
+            document.getElementById('schedule-form').reset();
+            document.getElementById('modal-sch-day').value = currentDayFilter || 'الأحد';
+            document.getElementById('modal-sch-delete-btn').classList.add('hidden');
+            const modal = document.getElementById('schedule-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function showEditScheduleModal(id) {
+            const entry = allSchedule.find(s => s.id === id);
+            if (!entry) return;
+
+            document.getElementById('schedule-modal-title').textContent = 'تعديل الحصة المجدولة';
+            document.getElementById('modal-schedule-id').value = entry.id;
+            document.getElementById('modal-sch-day').value = entry.day || 'الأحد';
+            document.getElementById('modal-sch-period').value = entry.periodNumber || 1;
+            document.getElementById('modal-sch-start').value = entry.startTime || '';
+            document.getElementById('modal-sch-end').value = entry.endTime || '';
+            document.getElementById('modal-sch-subject').value = entry.subject || '';
+            document.getElementById('modal-sch-teacher').value = entry.teacherId || '';
+            document.getElementById('modal-sch-class').value = entry.classId || '';
+            document.getElementById('modal-sch-delete-btn').classList.remove('hidden');
+
+            const modal = document.getElementById('schedule-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeScheduleModal() {
+            const modal = document.getElementById('schedule-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        async function handleSaveSchedule(e) {
+            e.preventDefault();
+            const id = document.getElementById('modal-schedule-id').value;
+            const day = document.getElementById('modal-sch-day').value;
+            const periodNumber = parseInt(document.getElementById('modal-sch-period').value) || 1;
+            const startTime = document.getElementById('modal-sch-start').value;
+            const endTime = document.getElementById('modal-sch-end').value;
+            const subject = document.getElementById('modal-sch-subject').value.trim();
+            const teacherId = document.getElementById('modal-sch-teacher').value;
+            const classId = document.getElementById('modal-sch-class').value;
+
+            if (!subject || !teacherId || !classId) {
+                UI.toast('يرجى ملء جميع الحقول المطلوبة', 'error');
+                return;
+            }
+
+            const data = { day, periodNumber, startTime, endTime, subject, teacherId, classId };
+
+            try {
+                if (id) {
+                    await DB.updateScheduleEntry(id, data);
+                    UI.toast('تم تحديث الحصة بنجاح', 'success');
+                } else {
+                    await DB.saveScheduleEntry(data);
+                    UI.toast('تمت إضافة الحصة بنجاح', 'success');
+                }
+
+                closeScheduleModal();
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء حفظ الحصة', 'error');
+            }
+        }
+
+        async function handleDeleteSchedule() {
+            const id = document.getElementById('modal-schedule-id').value;
+            if (!id) return;
+
+            const confirmed = await UI.confirm('حذف الحصة', 'هل أنت متأكد من حذف هذه الحصة من الجدول؟', { confirmText: 'نعم، احذف', type: 'error' });
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteScheduleEntry(id);
+                UI.toast('تم حذف الحصة بنجاح', 'success');
+                closeScheduleModal();
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء الحذف', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

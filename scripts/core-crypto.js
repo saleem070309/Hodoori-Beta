@@ -217,6 +217,10 @@ if (typeof window !== 'undefined') {
     window.CryptoEngine = CryptoEngine;
 }
 
+if (typeof global !== 'undefined') {
+    global.CryptoEngine = CryptoEngine;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CryptoEngine;
 }

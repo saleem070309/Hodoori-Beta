@@ -787,8 +787,8 @@
             const total = students.length;
             const present = Object.values(attendance).filter(v => v === 'present').length;
 
-            document.getElementById('totalStudents').innerText = total;
-            document.getElementById('presentCount').innerText = present;
+            UI.animateNumber('totalStudents', total);
+            UI.animateNumber('presentCount', present);
             document.getElementById('presentProgress').style.width = `${(present / (total || 1)) * 100}%`;
 
             if (total === 0) {
@@ -848,7 +848,7 @@
             // تحديث شريط التقدم والإحصائيات
             const total = students.length;
             const present = Object.values(attendance).filter(v => v === 'present').length;
-            document.getElementById('presentCount').innerText = present;
+            UI.animateNumber('presentCount', present);
             document.getElementById('presentProgress').style.width = `${(present / (total || 1)) * 100}%`;
         }
 

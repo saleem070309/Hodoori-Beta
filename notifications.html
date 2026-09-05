@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>مركز الإشعارات والتنبيهات | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-common.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Header ─── -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+            <div class="pr-10 sm:pr-0">
+                <h1 class="text-lg sm:text-[20px] font-black text-stone-900 dark:text-white leading-tight">مركز الإشعارات</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block mt-0.5" id="school-name-display">مدرسة حضوري الذكية</span>
+            </div>
+
+            <div class="w-full sm:w-auto">
+                <button type="button" onclick="showAddNotificationModal()" class="btn-primary-action w-full sm:w-auto justify-center">
+                    <span class="material-symbols-outlined text-sm">send</span>
+                    <span>إرسال إشعار جديد</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ─── Permission Banner (If Not Granted) ─── -->
+        <div id="permission-banner" class="hidden mb-5 p-4 px-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5 text-right w-full sm:w-auto">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined">notifications</span>
+                </div>
+                <div>
+                    <h4 class="font-black text-sm text-stone-900 dark:text-white">تفعيل تنبيهات المتصفح الفورية</h4>
+                    <p class="text-xs text-stone-500 dark:text-stone-400 font-medium">احصل على تنبيهات فورية عند وصول تقارير الحضور أو الإشعارات الهامة.</p>
+                </div>
+            </div>
+            <button type="button" onclick="requestBrowserPermission()" class="btn-primary-action shrink-0 !py-1.5 text-xs">
+                تفعيل التنبيهات الآن
+            </button>
+        </div>
+
+        <!-- ─── 1. TOP KPI ROW ─── -->
+        <section class="kpi-segmented-card mb-5">
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الإشعارات</span>
+                <span class="kpi-val" id="kpi-total-notifs">--</span>
+                <span class="kpi-sub">إشعار مرسل</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">إشعارات عامة</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-all-notifs">--</span>
+                <span class="kpi-sub">لكافة المدرسة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">إشعارات الفصول</span>
+                <span class="kpi-val text-sky-600 dark:text-sky-400" id="kpi-class-notifs">--</span>
+                <span class="kpi-sub">موجهة لفصول محددة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">إشعارات الطلاب</span>
+                <span class="kpi-val text-purple-600 dark:text-purple-400" id="kpi-student-notifs">--</span>
+                <span class="kpi-sub">تنبيهات فردية</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. FILTER TOOLBAR ─── -->
+        <section class="hodoori-card mb-5 p-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                <button type="button" class="header-action-btn active border-amber-500 text-amber-600 dark:text-amber-400" id="filter-notif-all" onclick="filterNotifications('')">كافة الإشعارات</button>
+                <button type="button" class="header-action-btn" id="filter-notif-general" onclick="filterNotifications('all')">عامة</button>
+                <button type="button" class="header-action-btn" id="filter-notif-class" onclick="filterNotifications('class')">الفصول</button>
+                <button type="button" class="header-action-btn" id="filter-notif-student" onclick="filterNotifications('student')">الطلاب</button>
+            </div>
+
+            <div class="relative w-full sm:w-64">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
+                    <span class="material-symbols-outlined text-sm">search</span>
+                </span>
+                <input type="text" id="notif-search-input" placeholder="بحث في الإشعارات..." oninput="handleNotifSearch(this.value)" class="flat-input pr-9 !py-1.5 text-xs" />
+            </div>
+        </section>
+
+        <!-- ─── 3. NOTIFICATIONS LIST ─── -->
+        <section id="notifications-container" class="space-y-3.5">
+            <div class="p-12 text-center text-xs font-bold text-stone-400">جاري تحميل الإشعارات...</div>
+        </section>
+    </main>
+
+    <!-- ═══ SEND NOTIFICATION MODAL ═══ -->
+    <div id="notification-modal" class="hodoori-app-modal-backdrop" onclick="closeNotificationModal(event)">
+        <div class="hodoori-app-dialog" onclick="event.stopPropagation()">
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">send</span>
+                    </span>
+                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white">إرسال إشعار جديد</h3>
+                </div>
+                <button type="button" onclick="closeNotificationModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form id="notif-form" onsubmit="handleSendNotification(event)" class="flex flex-col m-0 p-0">
+                <div class="app-dialog-body">
+                    <!-- Title -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">عنوان الإشعار *</label>
+                        <input type="text" id="notif-title" required placeholder="مثال: تنبيه بخصوص موعد الاختبارات الفصلية" class="flat-input" />
+                    </div>
+
+                    <!-- Target Type -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الفئة المستهدفة *</label>
+                        <select id="notif-target-type" onchange="handleTargetTypeChange(this.value)" class="flat-select">
+                            <option value="all">جميع منسوبي المدرسة (عام)</option>
+                            <option value="class">فصل / شعبة محددة</option>
+                            <option value="student">طالب محدد (ولي أمر)</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Target Select (Class/Student) -->
+                    <div id="target-class-wrap" class="hidden">
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اختر الفصل المستهدف *</label>
+                        <select id="notif-target-class" class="flat-select">
+                            <option value="">-- اختر الفصل --</option>
+                        </select>
+                    </div>
+
+                    <div id="target-student-wrap" class="hidden">
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اختر الطالب المستهدف *</label>
+                        <select id="notif-target-student" class="flat-select">
+                            <option value="">-- اختر الطالب --</option>
+                        </select>
+                    </div>
+
+                    <!-- Body / Message -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">نص الإشعار / الرسالة *</label>
+                        <textarea id="notif-body" required rows="3" placeholder="اكتب نص التنبيه أو التعليمات هنا..." class="flat-input"></textarea>
+                    </div>
+
+                    <!-- Image Attachment -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">إرفاق صورة أو جدول (اختياري)</label>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="document.getElementById('notif-image-input').click()" class="header-action-btn text-xs">
+                                <span class="material-symbols-outlined text-sm">add_photo_alternate</span>
+                                <span>اختيار صورة</span>
+                            </button>
+                            <span id="notif-image-name" class="text-xs text-stone-400 truncate max-w-[200px]">لم يتم اختيار صورة</span>
+                            <button type="button" id="notif-clear-img" onclick="clearNotifImage()" class="agent-icon-btn text-rose-500 hidden" title="إلغاء الصورة">
+                                <span class="material-symbols-outlined text-sm">close</span>
+                            </button>
+                        </div>
+                        <input type="file" id="notif-image-input" accept="image/*" class="hidden" onchange="handleNotifImageSelect(this)" />
+                    </div>
+                </div>
+
+                <div class="app-dialog-footer">
+                    <button type="button" class="header-action-btn" onclick="closeNotificationModal()">إلغاء</button>
+                    <button type="submit" class="btn-primary-action">
+                        <span class="material-symbols-outlined text-sm">send</span>
+                        <span>إرسال الآن</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ IMAGE LIGHTBOX MODAL ═══ -->
+    <div id="image-lightbox-modal" class="hodoori-app-modal-backdrop" onclick="this.classList.remove('active')">
+        <div class="max-w-3xl max-h-[85vh] p-2" onclick="event.stopPropagation()">
+            <img id="lightbox-img" class="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl" />
+        </div>
+    </div>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script src="scripts/component-sidebar.js"></script>
+
+    <!-- Page Specific Controller Logic -->
+    <script>
+        let allNotifications = [];
+        let allClasses = [];
+        let allStudents = [];
+        let currentFilter = '';
+        let searchQuery = '';
+        let selectedImageBase64 = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchoolMeta();
+            checkPermissionBanner();
+
+            // 1. Instant paint from local cache (0ms latency)
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    const cachedNotifs = DB._getL1(`${DB.KEYS.NOTIFICATIONS}::${DB.getCurrentUserSchoolId() || 'global'}::all`) || [];
+                    if (cachedNotifs.length > 0 || instant.hasData) {
+                        allNotifications = cachedNotifs;
+                        allClasses = instant.classes || [];
+                        allStudents = instant.students || [];
+                        populateTargetSelects();
+                        renderNotificationsList();
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Realtime change reactivity
+            if (typeof DB !== 'undefined' && DB.onDataChange) {
+                DB.onDataChange(() => {
+                    reloadData();
+                });
+            }
+
+            await reloadData();
+        });
+
+        async function loadSchoolMeta() {
+            try {
+                const schoolName = localStorage.getItem('attendance_school_name') || 'مدرسة حضوري الذكية';
+                const el = document.getElementById('school-name-display');
+                if (el) el.textContent = schoolName;
+            } catch (_) {}
+        }
+
+        function checkPermissionBanner() {
+            const banner = document.getElementById('permission-banner');
+            if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        async function requestBrowserPermission() {
+            if (typeof Notification !== 'undefined') {
+                const perm = await Notification.requestPermission();
+                if (perm === 'granted') {
+                    UI.toast('تم تفعيل التنبيهات بنجاح!', 'success');
+                    checkPermissionBanner();
+                } else {
+                    UI.toast('لم يتم منح الإذن', 'error');
+                }
+            }
+        }
+
+        async function reloadData() {
+            try {
+                const [notifs, classes, students] = await Promise.all([
+                    DB.getNotifications('all_admin'),
+                    DB.getClasses(),
+                    DB.getStudents()
+                ]);
+
+                allNotifications = notifs || [];
+                allClasses = classes || [];
+                allStudents = students || [];
+
+                populateTargetSelects();
+                renderNotificationsList();
+            } catch (err) {
+                console.error('Error loading notifications:', err);
+            }
+        }
+
+        function populateTargetSelects() {
+            const classSel = document.getElementById('notif-target-class');
+            if (classSel) {
+                classSel.innerHTML = '<option value="">-- اختر الفصل --</option>' +
+                    allClasses.map(c => `<option value="${c.id}">${c.name} - ${c.section || ''}</option>`).join('');
+            }
+
+            const studentSel = document.getElementById('notif-target-student');
+            if (studentSel) {
+                studentSel.innerHTML = '<option value="">-- اختر الطالب --</option>' +
+                    allStudents.map(s => `<option value="${s.id}">${s.name} (${s.academicId || 'بدون رقم'})` + '</option>').join('');
+            }
+        }
+
+        function renderNotificationsList() {
+            const container = document.getElementById('notifications-container');
+            if (!container) return;
+
+            // Update KPI cards
+            const total = allNotifications.length;
+            const generalCount = allNotifications.filter(n => !n.targetType || n.targetType === 'all').length;
+            const classCount = allNotifications.filter(n => n.targetType === 'class').length;
+            const studentCount = allNotifications.filter(n => n.targetType === 'student').length;
+
+            UI.animateNumber('kpi-total-notifs', total);
+            UI.animateNumber('kpi-all-notifs', generalCount);
+            UI.animateNumber('kpi-class-notifs', classCount);
+            UI.animateNumber('kpi-student-notifs', studentCount);
+
+            let filtered = [...allNotifications];
+
+            if (currentFilter) {
+                filtered = filtered.filter(n => (n.targetType || 'all') === currentFilter);
+            }
+
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                filtered = filtered.filter(n => 
+                    (n.title && n.title.toLowerCase().includes(q)) || 
+                    (n.body && n.body.toLowerCase().includes(q)) ||
+                    (n.message && n.message.toLowerCase().includes(q))
+                );
+            }
+
+            filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="hodoori-card text-center p-12">
+                        <span class="material-symbols-outlined text-5xl text-stone-300 dark:text-neutral-700 mb-3 block">notifications_off</span>
+                        <h3 class="text-base font-extrabold text-stone-900 dark:text-white">لا توجد إشعارات حالياً</h3>
+                        <p class="text-xs text-stone-500 mt-1 mb-4">اضغط على زر "إرسال إشعار جديد" لإرسال تنبيهات للطلاب أو الفصول أو المدرسة.</p>
+                        <button type="button" onclick="showAddNotificationModal()" class="btn-primary-action">
+                            <span class="material-symbols-outlined text-sm">send</span>
+                            <span>إرسال إشعار جديد</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(n => {
+                let targetBadge = '';
+                if (!n.targetType || n.targetType === 'all') {
+                    targetBadge = '<span class="badge-tag badge-role-admin"><span class="material-symbols-outlined text-[12px]">public</span> عام للمدرسة</span>';
+                } else if (n.targetType === 'class') {
+                    const cls = allClasses.find(c => c.id === n.targetId);
+                    const name = cls ? `${cls.name} (${cls.section})` : (n.targetId || 'فصل');
+                    targetBadge = `<span class="badge-tag badge-role-assistant"><span class="material-symbols-outlined text-[12px]">meeting_room</span> فصل: ${name}</span>`;
+                } else if (n.targetType === 'student') {
+                    const st = allStudents.find(s => s.id === n.targetId);
+                    const name = st ? st.name : (n.targetId || 'طالب');
+                    targetBadge = `<span class="badge-tag badge-role-teacher"><span class="material-symbols-outlined text-[12px]">person</span> طالب: ${name}</span>`;
+                }
+
+                const timeStr = n.timestamp ? new Date(n.timestamp).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+                return `
+                    <div class="hodoori-card flex flex-col sm:flex-row items-start gap-4 hover:border-amber-500/40 transition-all">
+                        ${n.image ? `
+                            <div class="w-full sm:w-28 h-24 rounded-xl overflow-hidden shrink-0 border border-stone-200/70 dark:border-neutral-800 cursor-pointer group/img" onclick="openLightbox('${n.image}')">
+                                <img src="${n.image}" class="w-full h-full object-cover group-hover/img:scale-105 transition-transform" />
+                            </div>
+                        ` : ''}
+
+                        <div class="flex-1 min-w-0 w-full">
+                            <div class="flex items-start justify-between gap-2 mb-1.5">
+                                <div>
+                                    <h3 class="text-base font-black text-stone-900 dark:text-white leading-tight">${n.title || 'إشعار'}</h3>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        ${targetBadge}
+                                        ${timeStr ? `<span class="text-[11px] font-bold text-stone-400">• ${timeStr}</span>` : ''}
+                                    </div>
+                                </div>
+
+                                <button type="button" onclick="handleDeleteNotification('${n.id}')" class="agent-icon-btn text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30" title="حذف الإشعار">
+                                    <span class="material-symbols-outlined text-sm">delete</span>
+                                </button>
+                            </div>
+
+                            <p class="text-xs text-stone-600 dark:text-stone-300 font-medium leading-relaxed mt-2 whitespace-pre-line">
+                                ${n.body || n.message || ''}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterNotifications(type) {
+            currentFilter = type;
+            const buttons = [
+                { id: 'filter-notif-all', val: '' },
+                { id: 'filter-notif-general', val: 'all' },
+                { id: 'filter-notif-class', val: 'class' },
+                { id: 'filter-notif-student', val: 'student' }
+            ];
+
+            buttons.forEach(b => {
+                const el = document.getElementById(b.id);
+                if (!el) return;
+                if (b.val === type) {
+                    el.classList.add('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                } else {
+                    el.classList.remove('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+                }
+            });
+
+            renderNotificationsList();
+        }
+
+        function handleNotifSearch(q) {
+            searchQuery = q.trim();
+            renderNotificationsList();
+        }
+
+        function showAddNotificationModal() {
+            document.getElementById('notif-form').reset();
+            handleTargetTypeChange('all');
+            clearNotifImage();
+            const modal = document.getElementById('notification-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeNotificationModal() {
+            const modal = document.getElementById('notification-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function handleTargetTypeChange(val) {
+            const classWrap = document.getElementById('target-class-wrap');
+            const studentWrap = document.getElementById('target-student-wrap');
+
+            if (val === 'class') {
+                classWrap.classList.remove('hidden');
+                studentWrap.classList.add('hidden');
+            } else if (val === 'student') {
+                classWrap.classList.add('hidden');
+                studentWrap.classList.remove('hidden');
+            } else {
+                classWrap.classList.add('hidden');
+                studentWrap.classList.add('hidden');
+            }
+        }
+
+        function handleNotifImageSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const nameEl = document.getElementById('notif-image-name');
+            const clearBtn = document.getElementById('notif-clear-img');
+
+            nameEl.textContent = file.name;
+            clearBtn.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                selectedImageBase64 = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearNotifImage() {
+            selectedImageBase64 = null;
+            document.getElementById('notif-image-input').value = '';
+            document.getElementById('notif-image-name').textContent = 'لم يتم اختيار صورة';
+            document.getElementById('notif-clear-img').classList.add('hidden');
+        }
+
+        async function handleSendNotification(e) {
+            e.preventDefault();
+            const title = document.getElementById('notif-title').value.trim();
+            const targetType = document.getElementById('notif-target-type').value;
+            const body = document.getElementById('notif-body').value.trim();
+
+            let targetId = 'all';
+            if (targetType === 'class') {
+                targetId = document.getElementById('notif-target-class').value;
+                if (!targetId) {
+                    UI.toast('يرجى اختيار الفصل المستهدف', 'error');
+                    return;
+                }
+            } else if (targetType === 'student') {
+                targetId = document.getElementById('notif-target-student').value;
+                if (!targetId) {
+                    UI.toast('يرجى اختيار الطالب المستهدف', 'error');
+                    return;
+                }
+            }
+
+            const notifData = {
+                title,
+                body,
+                message: body,
+                targetType,
+                targetId,
+                image: selectedImageBase64 || null,
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                await DB.saveNotification(notifData);
+                UI.toast('تم إرسال الإشعار بنجاح', 'success');
+                closeNotificationModal();
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء إرسال الإشعار', 'error');
+            }
+        }
+
+        async function handleDeleteNotification(id) {
+            const confirmed = await UI.confirm('حذف الإشعار', 'هل أنت متأكد من حذف هذا الإشعار؟', { confirmText: 'نعم، احذف', type: 'error' });
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteNotification(id);
+                UI.toast('تم حذف الإشعار', 'success');
+                await reloadData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء الحذف', 'error');
+            }
+        }
+
+        function openLightbox(src) {
+            const modal = document.getElementById('image-lightbox-modal');
+            const img = document.getElementById('lightbox-img');
+            if (modal && img) {
+                img.src = src;
+                modal.classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -363,7 +363,7 @@ async function main() {
         assert.strictEqual(recsToday.length, 1);
         assert.strictEqual(recsToday[0].date, todayStr);
 
-        const recsRange = await DB.getRecordsRange('2026-08-01', '2026-08-31', 'c2');
+        const recsRange = await DB.getRecordsRange('2026-01-01', '2026-12-31', 'c2');
         assert.strictEqual(recsRange.length, 1);
 
         // 6. Test Settings caching (15-min TTL)
@@ -549,8 +549,9 @@ async function main() {
         DB.clearAllCaches();
         localStorage.setItem(DB.KEYS.CURRENT_USER, JSON.stringify({ schoolId: 's1' }));
 
-        await DB.saveAttendance('2026-08-28', 'c1', [{ studentId: 's1', status: 'present' }], 't1', 1);
-        const recs = await DB.getRecords('2026-08-28', 'c1');
+        const todayStr = new Date().toISOString().split('T')[0];
+        await DB.saveAttendance(todayStr, 'c1', [{ studentId: 's1', status: 'present' }], 't1', 1);
+        const recs = await DB.getRecords(todayStr, 'c1');
         assert.strictEqual(recs.length, 1);
 
         const recId = recs[0].id;

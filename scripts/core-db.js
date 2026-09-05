@@ -45,6 +45,10 @@ const DB = {
     _l1Cache: new Map(),           // CacheKey -> L1CacheEntry
     _inflightQueries: new Map(),   // CacheKey -> Promise
     _syncMetaCache: new Map(),     // MetaKey -> SyncMetadata
+    _l2StorageKey: '__hodoori_l2_cache__',
+    _l2LockdownKey: '__hodoori_encrypted_cache_lockdown__',
+    _l2Store: null,
+    _l2Hydrated: false,
 
     _stats: {
         hits: 0,
@@ -60,7 +64,7 @@ const DB = {
     // ==========================================
 
     async loadFirebaseScripts() {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
         if (window.firebase && typeof window.firebase.firestore === 'function') return;
         const loadScript = (src) => new Promise((resolve, reject) => {
             const existing = document.querySelector(`script[src="${src}"]`);
@@ -220,8 +224,9 @@ const DB = {
 
     async init() {
         this._initBroadcast();
+        this._initL2();
 
-        if (this.dbInstance && this._persistenceConfigured) return;
+        if (this.dbInstance && (this._persistenceConfigured || typeof document === 'undefined')) return;
         if (this._initPromise) return this._initPromise;
 
         this._initPromise = (async () => {
@@ -314,28 +319,485 @@ const DB = {
     },
 
     /**
-     * Reads from L1 in-memory cache with TTL check and defensive cloning.
+     * Initializes and synchronizes L2 persistent cache with in-memory L1 cache.
+     * Keeps cached data persistent across page reloads and browser sessions.
+     * @private
+     */
+    _initL2() {
+        if (this._l2Hydrated) return;
+        this._l2Hydrated = true;
+        try {
+            if (typeof localStorage === 'undefined') return;
+            const raw = localStorage.getItem(this._l2StorageKey);
+            if (!raw) {
+                this._l2Store = {};
+                return;
+            }
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') {
+                this._l2Store = {};
+                return;
+            }
+            this._l2Store = {};
+            for (const [key, entry] of Object.entries(parsed)) {
+                if (entry && typeof entry === 'object' && entry.data !== undefined) {
+                    this._l2Store[key] = entry;
+                    if (!this._l1Cache.has(key)) {
+                        this._l1Cache.set(key, entry);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Hodoori DB: L2 cache hydration notice:", e);
+            this._l2Store = {};
+        }
+    },
+
+    /**
+     * Retrieves an entry from L2 storage if available.
+     * @private
+     */
+    _getL2Entry(key) {
+        if (!this._l2Hydrated) this._initL2();
+        if (!this._l2Store) return null;
+        const entry = this._l2Store[key];
+        if (!entry || entry.data === undefined) return null;
+
+        // Populate in memory L1
+        this._l1Cache.set(key, entry);
+        return entry;
+    },
+
+    /**
+     * Persists an entry to L2 storage (localStorage with defensive trimming).
+     * @private
+     */
+    _persistL2(key, entry) {
+        try {
+            if (typeof localStorage === 'undefined') return;
+            if (!this._l2Store) this._l2Store = {};
+            this._l2Store[key] = entry;
+
+            // Trim oldest entries if count exceeds 250 to avoid quota limits
+            const keys = Object.keys(this._l2Store);
+            if (keys.length > 250) {
+                keys.sort((a, b) => (this._l2Store[a].cachedAt || 0) - (this._l2Store[b].cachedAt || 0));
+                for (let i = 0; i < keys.length - 250; i++) {
+                    delete this._l2Store[keys[i]];
+                }
+            }
+            localStorage.setItem(this._l2StorageKey, JSON.stringify(this._l2Store));
+        } catch (err) {
+            // QuotaExceeded fallback: purge oldest half
+            try {
+                if (this._l2Store) {
+                    const keys = Object.keys(this._l2Store);
+                    for (let i = 0; i < Math.floor(keys.length / 2); i++) {
+                        delete this._l2Store[keys[i]];
+                    }
+                    localStorage.setItem(this._l2StorageKey, JSON.stringify(this._l2Store));
+                }
+            } catch (_) {}
+        }
+    },
+
+    /**
+     * Removes matching keys from L2 storage.
+     * @private
+     */
+    _removeFromL2(keyOrPredicate) {
+        try {
+            if (typeof localStorage === 'undefined') return;
+            if (!this._l2Store) {
+                const raw = localStorage.getItem(this._l2StorageKey);
+                this._l2Store = raw ? JSON.parse(raw) : {};
+            }
+            if (typeof keyOrPredicate === 'string') {
+                delete this._l2Store[keyOrPredicate];
+            } else if (typeof keyOrPredicate === 'function') {
+                for (const k of Object.keys(this._l2Store)) {
+                    if (keyOrPredicate(k, this._l2Store[k])) {
+                        delete this._l2Store[k];
+                    }
+                }
+            }
+            localStorage.setItem(this._l2StorageKey, JSON.stringify(this._l2Store));
+        } catch (_) {}
+    },
+
+    /**
+     * Completely wipes all unencrypted persistent caches from disk and storage.
+     * @private
+     */
+    _purgeAllPlaintextPersistence() {
+        this._l2Store = {};
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(this._l2StorageKey);
+                localStorage.removeItem('__hodoori_sync_meta__');
+                localStorage.removeItem('__hodoori_cache_inval__');
+            }
+        } catch (_) {}
+    },
+
+    /**
+     * IndexedDB secure vault helper: save
+     * @private
+     */
+    async _idbVaultSave(key, value) {
+        if (typeof indexedDB === 'undefined') return;
+        return new Promise((resolve) => {
+            try {
+                const req = indexedDB.open('hodoori_secure_vault', 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('vault')) {
+                        db.createObjectStore('vault');
+                    }
+                };
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const tx = db.transaction('vault', 'readwrite');
+                    tx.objectStore('vault').put(value, key);
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onerror = () => { db.close(); resolve(); };
+                };
+                req.onerror = () => resolve();
+            } catch (_) { resolve(); }
+        });
+    },
+
+    /**
+     * IndexedDB secure vault helper: get
+     * @private
+     */
+    async _idbVaultGet(key) {
+        if (typeof indexedDB === 'undefined') return null;
+        return new Promise((resolve) => {
+            try {
+                const req = indexedDB.open('hodoori_secure_vault', 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('vault')) {
+                        db.createObjectStore('vault');
+                    }
+                };
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const tx = db.transaction('vault', 'readonly');
+                    const getReq = tx.objectStore('vault').get(key);
+                    getReq.onsuccess = () => { db.close(); resolve(getReq.result || null); };
+                    getReq.onerror = () => { db.close(); resolve(null); };
+                };
+                req.onerror = () => resolve(null);
+            } catch (_) { resolve(null); }
+        });
+    },
+
+    /**
+     * IndexedDB secure vault helper: delete
+     * @private
+     */
+    async _idbVaultDelete(key) {
+        if (typeof indexedDB === 'undefined') return;
+        return new Promise((resolve) => {
+            try {
+                const req = indexedDB.open('hodoori_secure_vault', 1);
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const tx = db.transaction('vault', 'readwrite');
+                    tx.objectStore('vault').delete(key);
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onerror = () => { db.close(); resolve(); };
+                };
+                req.onerror = () => resolve();
+            } catch (_) { resolve(); }
+        });
+    },
+
+    /**
+     * Performs Complete Zero-Knowledge Lockdown & Cache Encryption on Logout.
+     * Encrypts all locally cached collections and metadata in IndexedDB/localStorage with AES-GCM 256-bit,
+     * clears plaintext from disk and RAM, and broadcasts lockdown across open tabs.
+     * @returns {Promise<{ locked: boolean, encrypted: boolean }>}
+     */
+    async lockAndPurge() {
+        console.log("🔒 Hodoori DB: Executing Zero-Knowledge Lockdown & Cache Encryption...");
+        try {
+            const rawL2 = {};
+            for (const [k, v] of this._l1Cache.entries()) {
+                rawL2[k] = v;
+            }
+            if (typeof localStorage !== 'undefined') {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(this._l2StorageKey) || '{}');
+                    Object.assign(rawL2, saved);
+                } catch (_) {}
+            }
+
+            let allSyncMeta = {};
+            if (typeof localStorage !== 'undefined') {
+                try {
+                    allSyncMeta = JSON.parse(localStorage.getItem('__hodoori_sync_meta__') || '{}');
+                } catch (_) {}
+            }
+            for (const [k, v] of this._syncMetaCache.entries()) {
+                allSyncMeta[k] = v;
+            }
+
+            const payload = {
+                l2: rawL2,
+                syncMeta: allSyncMeta,
+                lockedAt: Date.now()
+            };
+
+            const cryptoEngine = typeof CryptoEngine !== 'undefined' ? CryptoEngine : (typeof window !== 'undefined' && window.CryptoEngine ? window.CryptoEngine : (typeof global !== 'undefined' && global.CryptoEngine ? global.CryptoEngine : null));
+
+            let encryptedSuccessfully = false;
+            if (cryptoEngine && cryptoEngine.hasActiveKey()) {
+                const cipher = await cryptoEngine.encrypt(payload);
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(this._l2LockdownKey, cipher);
+                }
+                await this._idbVaultSave('lockdown', cipher);
+                encryptedSuccessfully = true;
+                console.log("🔒 Hodoori DB: All local caches encrypted with AES-GCM 256-bit ciphertext.");
+            }
+
+            this._purgeAllPlaintextPersistence();
+            this._l1Cache.clear();
+            this._inflightQueries.clear();
+            this._syncMetaCache.clear();
+
+            if (typeof PageLifecycle !== 'undefined' && PageLifecycle.cleanupAll) {
+                try { PageLifecycle.cleanupAll(); } catch (_) {}
+            }
+
+            if (this._broadcastChannel) {
+                try {
+                    this._broadcastChannel.postMessage({
+                        type: 'GLOBAL_SECURITY_LOCKDOWN',
+                        senderTabId: this._tabId,
+                        timestamp: Date.now()
+                    });
+                } catch (_) {}
+            }
+
+            return { locked: true, encrypted: encryptedSuccessfully };
+        } catch (err) {
+            console.error("Hodoori DB: Lockdown encryption error:", err);
+            this._purgeAllPlaintextPersistence();
+            this._l1Cache.clear();
+            return { locked: true, encrypted: false };
+        }
+    },
+
+    /**
+     * Unlocks and restores encrypted cached collections upon user login.
+     * Decrypts ciphertext with derived session key and repopulates L1/L2 caches.
+     * @returns {Promise<boolean>}
+     */
+    async unlockAndRestore() {
+        try {
+            const cryptoEngine = typeof CryptoEngine !== 'undefined' ? CryptoEngine : (typeof window !== 'undefined' && window.CryptoEngine ? window.CryptoEngine : (typeof global !== 'undefined' && global.CryptoEngine ? global.CryptoEngine : null));
+            if (!cryptoEngine || !cryptoEngine.hasActiveKey()) {
+                return false;
+            }
+
+            let ciphertext = null;
+            if (typeof localStorage !== 'undefined') {
+                ciphertext = localStorage.getItem(this._l2LockdownKey);
+            }
+            if (!ciphertext) {
+                ciphertext = await this._idbVaultGet('lockdown');
+            }
+
+            if (!ciphertext || typeof ciphertext !== 'string' || !ciphertext.startsWith('ENC:v1:')) {
+                return false;
+            }
+
+            console.log("🔓 Hodoori DB: Unlocking AES-GCM encrypted cache for authenticated session...");
+            const decrypted = await cryptoEngine.decrypt(ciphertext);
+            if (decrypted && typeof decrypted === 'object' && decrypted.l2) {
+                this._l2Store = decrypted.l2;
+                const now = Date.now();
+                for (const [key, entry] of Object.entries(decrypted.l2)) {
+                    if (entry && typeof entry === 'object' && entry.data !== undefined) {
+                        const col = entry.collection || key.split('::')[0] || 'default';
+                        const ttl = this._getTTL(col);
+                        entry.expiresAt = now + ttl;
+                        entry.cachedAt = now;
+                        this._l1Cache.set(key, entry);
+                        this._l2Store[key] = entry;
+                    }
+                }
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(this._l2StorageKey, JSON.stringify(this._l2Store));
+                    if (decrypted.syncMeta) {
+                        localStorage.setItem('__hodoori_sync_meta__', JSON.stringify(decrypted.syncMeta));
+                        for (const [k, v] of Object.entries(decrypted.syncMeta)) {
+                            this._syncMetaCache.set(k, v);
+                        }
+                    }
+                    localStorage.removeItem(this._l2LockdownKey);
+                }
+                await this._idbVaultDelete('lockdown');
+                this._l2Hydrated = true;
+                console.log("🔓 Hodoori DB: Cache unlocked and restored successfully.");
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.warn("Hodoori DB: Could not restore encrypted cache:", err);
+            return false;
+        }
+    },
+
+    /**
+     * Synchronously computes and returns current dashboard statistics from local cache.
+     * Provides 0ms instant display of numbers, percentages, and submitted classes.
+     * @returns {Object}
+     */
+    getCachedDashboardData() {
+        this._initL2();
+        const schoolId = this.getCurrentUserSchoolId();
+        const effectiveSchool = (schoolId && schoolId !== 'ministry') ? schoolId : 'global';
+
+        let students = this._getL1(`${this.KEYS.STUDENTS}::${effectiveSchool}::all`, true);
+        if (!Array.isArray(students)) {
+            const l2Entry = this._getL2Entry(`${this.KEYS.STUDENTS}::${effectiveSchool}::all`);
+            students = (l2Entry && Array.isArray(l2Entry.data)) ? l2Entry.data : [];
+        }
+
+        let teachers = this._getL1(`${this.KEYS.TEACHERS}::${effectiveSchool}::all`, true);
+        if (!Array.isArray(teachers)) {
+            const l2Entry = this._getL2Entry(`${this.KEYS.TEACHERS}::${effectiveSchool}::all`);
+            teachers = (l2Entry && Array.isArray(l2Entry.data)) ? l2Entry.data : [];
+        }
+
+        let classes = this._getL1(`${this.KEYS.CLASSES}::${effectiveSchool}::all`, true);
+        if (!Array.isArray(classes)) {
+            const l2Entry = this._getL2Entry(`${this.KEYS.CLASSES}::${effectiveSchool}::all`);
+            classes = (l2Entry && Array.isArray(l2Entry.data)) ? l2Entry.data : [];
+        }
+
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        const allRecordCandidates = [];
+        for (const [k, v] of this._l1Cache.entries()) {
+            if (k.startsWith(`${this.KEYS.RECORDS}::${effectiveSchool}`) && Array.isArray(v.data)) {
+                allRecordCandidates.push(...v.data);
+            }
+        }
+        if (this._l2Store) {
+            for (const [k, v] of Object.entries(this._l2Store)) {
+                if (k.startsWith(`${this.KEYS.RECORDS}::${effectiveSchool}`) && v && Array.isArray(v.data)) {
+                    allRecordCandidates.push(...v.data);
+                }
+            }
+        }
+
+        const recordMap = new Map();
+        allRecordCandidates.forEach(r => {
+            if (r && (r.id || (r.date && r.classId))) {
+                const id = r.id || `${r.date}_${r.classId}_${r.periodNumber || 0}`;
+                if (!recordMap.has(id) || (r.timestamp && new Date(r.timestamp) > new Date(recordMap.get(id).timestamp || 0))) {
+                    recordMap.set(id, r);
+                }
+            }
+        });
+        const records = Array.from(recordMap.values());
+        const todayRecs = records.filter(r => r.date === todayStr);
+
+        let totalPresent = 0, totalAbsent = 0;
+        todayRecs.forEach(r => {
+            (r.details || []).forEach(d => {
+                const st = (d.status || '').toLowerCase();
+                if (st === 'present') totalPresent++;
+                else if (st === 'absent') totalAbsent++;
+            });
+        });
+        const totalMarked = totalPresent + totalAbsent;
+        const rate = totalMarked > 0 ? Math.round((totalPresent / totalMarked) * 100) : null;
+
+        const submittedIds = new Set(todayRecs.map(r => r.classId).filter(Boolean));
+        const submitted = classes.filter(c => submittedIds.has(c.id));
+        const notSubmitted = classes.filter(c => !submittedIds.has(c.id));
+
+        const isPrimed = this._l1Cache.has(`${this.KEYS.STUDENTS}::${effectiveSchool}::all`) ||
+                         this._l1Cache.has(`${this.KEYS.CLASSES}::${effectiveSchool}::all`) ||
+                         Boolean(this._l2Store && (this._l2Store[`${this.KEYS.STUDENTS}::${effectiveSchool}::all`] !== undefined || this._l2Store[`${this.KEYS.CLASSES}::${effectiveSchool}::all`] !== undefined));
+
+        return {
+            hasData: isPrimed || students.length > 0 || classes.length > 0 || teachers.length > 0 || records.length > 0,
+            students,
+            teachers,
+            classes,
+            records,
+            todayRecords: todayRecs,
+            totalStudents: students.length,
+            totalTeachers: teachers.length,
+            totalClasses: classes.length,
+            totalPresent,
+            totalAbsent,
+            attendanceRate: rate,
+            submittedClasses: submitted,
+            notSubmittedClasses: notSubmitted
+        };
+    },
+
+    /**
+     * Subscribes to database change notifications across tabs and within the window.
+     * @param {Function} callback
+     * @returns {Function} Unsubscribe function
+     */
+    onDataChange(callback) {
+        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
+        const handler = (e) => {
+            if (typeof callback === 'function') {
+                callback(e.detail);
+            }
+        };
+        window.addEventListener('hodoori:db:invalidated', handler);
+        return () => {
+            window.removeEventListener('hodoori:db:invalidated', handler);
+        };
+    },
+
+    /**
+     * Reads from L1 in-memory cache with TTL check, defensive cloning, and persistent retention.
      * @param {string} key
+     * @param {boolean} [allowStale=false] - When true, returns cached data even if TTL expired
      * @returns {any|null}
      */
-    _getL1(key) {
+    _getL1(key, allowStale = false) {
+        if (!this._l2Hydrated) {
+            this._initL2();
+        }
+
         if (!this._l1Cache.has(key)) {
             this._stats.misses++;
             return null;
         }
 
         const entry = this._l1Cache.get(key);
-        const now = Date.now();
+        if (!entry || entry.data === undefined) {
+            this._stats.misses++;
+            return null;
+        }
 
-        // Verify TTL Expiration
-        if (now > entry.expiresAt) {
+        const now = Date.now();
+        if (!allowStale && entry.expiresAt && now > entry.expiresAt) {
             this._l1Cache.delete(key);
+            this._removeFromL2(key);
             this._stats.misses++;
             this._stats.expirations++;
             return null;
         }
 
-        entry.hits++;
+        entry.hits = (entry.hits || 0) + 1;
         this._stats.hits++;
 
         // Defensive clone on read to prevent consumer mutation of cached arrays/objects
@@ -349,7 +811,7 @@ const DB = {
     },
 
     /**
-     * Writes to L1 in-memory cache with defensive cloning and metadata tracking.
+     * Writes to L1 in-memory cache and L2 persistent storage with defensive cloning and metadata tracking.
      * @param {string} key
      * @param {any} data
      * @param {string} [collectionName=null]
@@ -383,11 +845,12 @@ const DB = {
         };
 
         this._l1Cache.set(key, entry);
+        this._persistL2(key, entry);
         return data;
     },
 
     /**
-     * Purges entries from local L1 cache matching a collection name or pattern.
+     * Purges entries from local L1 and L2 persistent caches matching a collection name or pattern.
      * @private
      */
     _purgeL1Local(collectionName = null, schoolId = null, docId = null) {
@@ -397,6 +860,7 @@ const DB = {
             this._l1Cache.clear();
             this._stats.invalidations += count;
             this._syncMetaCache.clear();
+            this._removeFromL2(() => true);
             return count;
         }
 
@@ -419,6 +883,16 @@ const DB = {
                 count++;
             }
         }
+
+        this._removeFromL2((k, e) => {
+            if (k.startsWith(prefix) || k.includes(canonicalCol)) {
+                if (!schoolId || schoolId === 'global' || schoolId === 'ministry' || !e || e.schoolId === schoolId || e.schoolId === 'global' || !e.schoolId) {
+                    return true;
+                }
+            }
+            if (docId && k === `${canonicalCol}::doc_${docId}`) return true;
+            return false;
+        });
 
         this._stats.invalidations += count;
         return count;
@@ -447,9 +921,17 @@ const DB = {
 
         // 1. Return fresh L1 cache result if available
         if (!forceRefresh && !bypassCache) {
-            const cached = this._getL1(cacheKey);
-            if (cached !== null && cached !== undefined) {
-                return cached;
+            if (this._l1Cache.has(cacheKey)) {
+                const entry = this._l1Cache.get(cacheKey);
+                const now = Date.now();
+                if (entry && (!entry.expiresAt || now <= entry.expiresAt)) {
+                    return this._getL1(cacheKey);
+                }
+            } else {
+                const cached = this._getL1(cacheKey);
+                if (cached !== null && cached !== undefined) {
+                    return cached;
+                }
             }
         }
 
@@ -563,9 +1045,28 @@ const DB = {
         const metaKey = `${collectionName}::${schoolId || 'global'}`;
         const baselineCacheKey = `${metaKey}::baseline`;
 
-        const meta = this._getSyncMeta(metaKey);
+        let meta = this._getSyncMeta(metaKey);
         const cachedBaseline = this._getL1(baselineCacheKey);
         const queryStartTime = new Date().toISOString();
+
+        // If cached baseline exists without sync meta, bootstrap meta from baseline
+        if ((!meta || !meta.lastSync) && Array.isArray(cachedBaseline) && cachedBaseline.length > 0) {
+            const maxDocTimestamp = this._extractMaxTimestamp(cachedBaseline, queryStartTime);
+            meta = {
+                lastSync: maxDocTimestamp,
+                updatedAt: Date.now(),
+                docCount: cachedBaseline.length,
+                version: 1
+            };
+            this._setSyncMeta(metaKey, meta);
+        }
+
+        // If baseline is cached and fresh within TTL, return immediately with 0 queries
+        const entry = this._l1Cache.get(baselineCacheKey);
+        const now = Date.now();
+        if (!options.forceRefresh && entry && entry.data && (now <= entry.expiresAt || (meta && meta.updatedAt && (now - meta.updatedAt) < this.TTL.RECORDS))) {
+            return cachedBaseline;
+        }
 
         if (!meta || !meta.lastSync || !cachedBaseline || cachedBaseline.length === 0 || options.forceFullSync) {
             let fullQuery = this.dbInstance.collection(collectionName);
@@ -577,15 +1078,16 @@ const DB = {
             const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
             const maxDocTimestamp = this._extractMaxTimestamp(docs, queryStartTime);
-            this._setL1(baselineCacheKey, docs, collectionName, schoolId, this.TTL.RECORDS);
+            const finalDocs = (docs.length === 0 && Array.isArray(cachedBaseline) && cachedBaseline.length > 0) ? cachedBaseline : docs;
+            this._setL1(baselineCacheKey, finalDocs, collectionName, schoolId, this.TTL.RECORDS);
             this._setSyncMeta(metaKey, {
                 lastSync: maxDocTimestamp,
                 updatedAt: Date.now(),
-                docCount: docs.length,
+                docCount: finalDocs.length,
                 version: 1
             });
 
-            return docs;
+            return finalDocs;
         }
 
         const safeLastSync = this._computeSafeTimestamp(meta.lastSync, 5000);
@@ -781,7 +1283,7 @@ const DB = {
         const schoolId = this.getCurrentUserSchoolId();
         const effectiveSchool = (schoolId && schoolId !== 'ministry') ? schoolId : 'global';
 
-        if (!date && !classId && options.useDeltaSync) {
+        if (!date && !classId && options.useDeltaSync !== false) {
             return await this._syncDeltaCollection(this.KEYS.RECORDS, effectiveSchool, options);
         }
 
@@ -921,19 +1423,49 @@ const DB = {
     },
 
     /**
-     * Fetches attendance records for the last N calendar days.
+     * Fetches attendance records for the last N calendar days using delta sync and in-memory windowing.
+     * Consumes 0 Firestore document reads when no changes occurred since last sync.
      * @param {number} [days=30]
      * @param {string|null} [classId=null]
      * @param {Object} [options={}]
      * @returns {Promise<Array<Object>>}
      */
     async getRecentRecords(days = 30, classId = null, options = {}) {
+        await this.init();
+        const schoolId = this.getCurrentUserSchoolId();
+        const effectiveSchool = (schoolId && schoolId !== 'ministry') ? schoolId : 'global';
+
         const now = new Date();
         const pad = n => String(n).padStart(2, '0');
         const endDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-        
         const past = new Date(now.getTime() - (Math.max(1, days) * 24 * 60 * 60 * 1000));
         const startDate = `${past.getFullYear()}-${pad(past.getMonth() + 1)}-${pad(past.getDate())}`;
+
+        // Delta-sync cached baseline (0 network reads if no updates occurred)
+        let allRecords = [];
+        try {
+            allRecords = await this._syncDeltaCollection(this.KEYS.RECORDS, effectiveSchool, options);
+        } catch (deltaErr) {
+            console.warn("Hodoori DB: Delta sync fallback in getRecentRecords:", deltaErr);
+            return await this.getRecordsRange(startDate, endDate, classId, options);
+        }
+
+        if (Array.isArray(allRecords)) {
+            let filtered = allRecords.filter(r => {
+                if (!r || !r.date) return false;
+                if (r.date < startDate || r.date > endDate) return false;
+                if (classId && r.classId !== classId) return false;
+                return true;
+            });
+
+            filtered.sort((a, b) => {
+                const dateCmp = (b.date || '').localeCompare(a.date || '');
+                if (dateCmp !== 0) return dateCmp;
+                return (b.periodNumber || 0) - (a.periodNumber || 0);
+            });
+
+            return filtered;
+        }
 
         return await this.getRecordsRange(startDate, endDate, classId, options);
     },
@@ -1204,6 +1736,23 @@ const DB = {
 
         await this.dbInstance.collection(this.KEYS.TEACHERS).doc(id).set(teacher);
         this.invalidateCache(this.KEYS.TEACHERS, id);
+        return { id, ...teacher };
+    },
+
+    async saveTeacher(teacher) {
+        return await this.addTeacher(teacher);
+    },
+
+    async saveStudent(student) {
+        return await this.addStudent(student);
+    },
+
+    async saveClass(cls) {
+        return await this.addClass(cls);
+    },
+
+    async saveSchool(school) {
+        return await this.addSchool(school);
     },
 
     async deleteTeacher(id) {
@@ -1626,18 +2175,25 @@ const DB = {
             this._purgeL1Local(canonicalExtra, schoolId);
         }
 
+        const payload = {
+            type: 'INVALIDATE',
+            collection: canonicalCol,
+            docId: documentId,
+            schoolId: schoolId,
+            extraCollections: extraCollections.map(c => this.KEYS[String(c).toUpperCase()] || c),
+            senderTabId: this._tabId,
+            timestamp: Date.now()
+        };
+
+        // Dispatch DOM CustomEvent for UI reactivity on the current window immediately
+        try {
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('hodoori:db:invalidated', { detail: payload }));
+            }
+        } catch (_) {}
+
         // 2. Broadcast to other tabs
         if (broadcast) {
-            const payload = {
-                type: 'INVALIDATE',
-                collection: canonicalCol,
-                docId: documentId,
-                schoolId: schoolId,
-                extraCollections: extraCollections.map(c => this.KEYS[String(c).toUpperCase()] || c),
-                senderTabId: this._tabId,
-                timestamp: Date.now()
-            };
-
             this._stats.broadcastsSent++;
 
             try {
@@ -1666,6 +2222,7 @@ const DB = {
         this._l1Cache.clear();
         this._inflightQueries.clear();
         this._syncMetaCache.clear();
+        this._removeFromL2(() => true);
 
         if (broadcast) {
             const payload = {
@@ -1846,40 +2403,6 @@ const DB = {
 
     matchArabicNames(targetName, query) {
         return this.scoreArabicMatch(targetName, query) >= 75;
-    },
-
-    /**
-     * Complete Security Lockdown & Memory Purge on Logout
-     * Wipes L1 caches, inflight queries, metadata, active listeners, and destroys session encryption keys.
-     */
-    async lockAndPurge() {
-        console.log("🔒 Hodoori Security: Executing full database lockdown and memory purge...");
-        
-        // 1. Flush in-memory L1 cache and inflight promises
-        this._l1Cache.clear();
-        this._inflightQueries.clear();
-        this._syncMetaCache.clear();
-
-        // 2. Destroy cryptographic session key
-        if (typeof CryptoEngine !== 'undefined' && CryptoEngine.destroySessionKey) {
-            CryptoEngine.destroySessionKey();
-        }
-
-        // 3. Teardown all page lifecycle intervals and listeners
-        if (typeof PageLifecycle !== 'undefined' && PageLifecycle.cleanupAll) {
-            PageLifecycle.cleanupAll();
-        }
-
-        // 4. Notify all other open tabs to lockdown immediately
-        if (this._broadcastChannel) {
-            try {
-                this._broadcastChannel.postMessage({
-                    type: 'GLOBAL_SECURITY_LOCKDOWN',
-                    senderTabId: this._tabId,
-                    timestamp: Date.now()
-                });
-            } catch (_) {}
-        }
     }
 };
 
@@ -2031,6 +2554,7 @@ const PageLifecycle = {
 };
 
 DB.PageLifecycle = PageLifecycle;
+try { DB._initL2(); } catch (_) {}
 
 if (typeof window !== 'undefined') {
     window.DB = DB;

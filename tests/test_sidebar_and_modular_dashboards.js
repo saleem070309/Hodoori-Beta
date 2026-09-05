@@ -20,7 +20,12 @@ async function runTests() {
         'agent.html',
         'styles/dashboard-analytics.css',
         'scripts/dashboard-analytics.js',
-        'dashboard-analytics.html'
+        'dashboard-analytics.html',
+        'teachers.html',
+        'students.html',
+        'reports.html',
+        'notifications.html',
+        'schedule.html'
     ];
 
     for (const relPath of requiredFiles) {

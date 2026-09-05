@@ -357,10 +357,10 @@
             document.getElementById('currentMonthLabel').innerText = monthLabel;
 
             const presentDays = studentRecordsDetailed.filter(r => r.status === 'present').length;
-            const totalDaysRecorded = studentRecordsDetailed.length;
-            document.getElementById('attendanceRate').innerText = totalDaysRecorded > 0 
+            const rateVal = totalDaysRecorded > 0 
                 ? `${Math.round((presentDays / totalDaysRecorded) * 100)}%`
                 : '0%';
+            UI.animateNumber('attendanceRate', rateVal);
 
             const year = viewDate.getFullYear();
             const month = viewDate.getMonth();

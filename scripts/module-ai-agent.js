@@ -220,6 +220,22 @@ const Agent = {
     isOpen: false,
     isStreaming: false,
     currentMatchedStudent: null,
+    requireConfirmation: true,
+
+    isConfirmationRequired() {
+        if (typeof this.requireConfirmation !== 'undefined') {
+            return !!this.requireConfirmation;
+        }
+        if (typeof localStorage !== 'undefined') {
+            const saved = localStorage.getItem('agent_require_confirmation');
+            if (saved === 'false') return false;
+        }
+        return true;
+    },
+
+    isMutativeDbAction(cmd) {
+        return !!(cmd && cmd.type === 'database_action' && ['insert', 'update', 'delete'].includes(cmd.action));
+    },
 
     scrollToBottom(force = false) {
         const messages = document.getElementById('agent-messages');
@@ -440,18 +456,73 @@ const Agent = {
         this.chatHistory = [{ role: 'system', content: await this.getSystemContext() }];
     },
 
+    isFaceAnalysisEnabledSync() {
+        if (typeof localStorage !== 'undefined') {
+            const localPref = localStorage.getItem('hodoori_agent_face_analysis_enabled');
+            if (localPref === 'false') return false;
+        }
+        if (typeof this._cachedFaceAnalysisEnabled === 'boolean') {
+            return this._cachedFaceAnalysisEnabled;
+        }
+        return true;
+    },
+
+    async isFaceAnalysisEnabled() {
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const localPref = localStorage.getItem('hodoori_agent_face_analysis_enabled');
+                if (localPref === 'false') {
+                    this._cachedFaceAnalysisEnabled = false;
+                    return false;
+                }
+            }
+
+            if (typeof DB !== 'undefined') {
+                try {
+                    const settings = await DB.getSettings();
+                    if (settings && settings.enableAgentFaceAnalysis === false) {
+                        this._cachedFaceAnalysisEnabled = false;
+                        return false;
+                    }
+                } catch (_) {}
+
+                if (typeof Auth !== 'undefined') {
+                    const user = Auth.getCurrentUser();
+                    let schoolId = user ? user.schoolId : null;
+                    if (schoolId && schoolId !== 'ministry') {
+                        try {
+                            const school = await DB.getSchool(schoolId);
+                            if (school && school.agentFaceAnalysis === false) {
+                                this._cachedFaceAnalysisEnabled = false;
+                                return false;
+                            }
+                        } catch (_) {}
+                    }
+                }
+            }
+            this._cachedFaceAnalysisEnabled = true;
+            return true;
+        } catch (e) {
+            console.warn('[Agent] Error checking face analysis status:', e);
+            return true;
+        }
+    },
+
     // ═══ القالب المدمج للتعليمات والعقل التوجيهي الشامل ═══
-    _getBuiltinInstructionTemplate() {
+    _getBuiltinInstructionTemplate(faceAnalysisEnabled = true) {
         if (typeof AgentInstructions !== 'undefined' && typeof AgentInstructions.getTemplate === 'function') {
-            return AgentInstructions.getTemplate();
+            return AgentInstructions.getTemplate({ faceAnalysisEnabled });
         }
         if (typeof window !== 'undefined' && window.AgentPromptTemplate) {
+            if (!faceAnalysisEnabled && typeof AgentInstructions !== 'undefined' && typeof AgentInstructions.getTemplateWithoutFace === 'function') {
+                return AgentInstructions.getTemplateWithoutFace();
+            }
             return window.AgentPromptTemplate;
         }
         if (typeof require !== 'undefined') {
             try {
                 const instructions = require('./module-ai-prompt.js');
-                return typeof instructions.getTemplate === 'function' ? instructions.getTemplate() : (instructions.template || '');
+                return typeof instructions.getTemplate === 'function' ? instructions.getTemplate({ faceAnalysisEnabled }) : (instructions.template || '');
             } catch (_) {}
         }
         return '';
@@ -460,14 +531,15 @@ const Agent = {
     async getSystemContext(activeFile = null, activeFingerprint = null, activeMatchedStudent = null) {
         try {
             // High-performance concurrent retrieval from core-db.js L1 Cache (0 network reads on warm cache)
-            const [students, classes, records, teachers] = await Promise.all([
+            const [students, classes, records, teachers, isFaceEnabled] = await Promise.all([
                 DB.getStudents(),
                 DB.getClasses(),
                 DB.getRecentRecords(30), // Bounded 30-day sliding window
-                DB.getTeachers()
+                DB.getTeachers(),
+                this.isFaceAnalysisEnabled()
             ]);
 
-            const instructionTemplate = this._getBuiltinInstructionTemplate();
+            const instructionTemplate = this._getBuiltinInstructionTemplate(isFaceEnabled);
 
             const currentUser = typeof Auth !== 'undefined' ? Auth.getCurrentUser() : null;
             const currentUserId = currentUser ? (currentUser.id || currentUser.ministryId || '1') : '1';
@@ -576,7 +648,7 @@ const Agent = {
             const fingerprintToUse = activeFingerprint || this.currentFingerprint;
             const matchedStudentToUse = activeMatchedStudent || this.currentMatchedStudent;
 
-            if (fileToUse && fingerprintToUse) {
+            if (isFaceEnabled && fileToUse && fingerprintToUse) {
                 if (matchedStudentToUse) {
                     finalPrompt += `\n\n### نتيجة مطابقة البصمة الرقمية للوجه (Face Matching Match):
 - تم مطابقة الوجه في الصورة المرفوعة مع الطالب التالي المسجل في قاعدة البيانات:
@@ -986,6 +1058,50 @@ const Agent = {
                 loopCount++;
                 console.log(`[AutoPilot] Step ${loopCount}: Executing command silently:`, currentParsedCmd);
 
+                // فحص ما إذا كان الأمر تعديلياً ويحتاج موافقة واستئذان المستخدم أولاً
+                if (this.isMutativeDbAction(currentParsedCmd) && !currentParsedCmd._confirmed && this.isConfirmationRequired()) {
+                    console.log('[AutoPilot] Mutative DB action requires user approval. Rendering RecommendationCard...');
+                    if (loadingDiv && typeof ThinkingOrbs !== 'undefined') {
+                        ThinkingOrbs.completeBadge(loadingDiv);
+                    }
+                    this.isStreaming = false;
+                    this.setStatus('بانتظار موافقتك...', false);
+                    if (typeof window.setCapsuleActionState === 'function') {
+                        window.setCapsuleActionState('idle');
+                    }
+                    const sendBtn = document.getElementById('agent-send-btn');
+                    if (sendBtn) sendBtn.disabled = false;
+
+                    const bodyEl = msgEl.querySelector('.agent-msg-ai-body') || msgEl.querySelector('.agent-msg-ai') || msgEl;
+                    bodyEl.innerHTML = '';
+                    const contentContainer = document.createElement('div');
+                    contentContainer.className = 'agent-actual-content';
+
+                    const currentStepText = loopCount === 1 ? mainText : (typeof nextHiddenResponse !== 'undefined' && nextHiddenResponse ? nextHiddenResponse.split(CMD_REGEX)[0].trim() : '');
+                    const cleanDisplay = (currentStepText || '')
+                        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+                        .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+                        .trim();
+
+                    if (cleanDisplay) {
+                        if (typeof marked !== 'undefined') {
+                            contentContainer.innerHTML = marked.parse(cleanDisplay);
+                        } else {
+                            contentContainer.innerHTML = cleanDisplay.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+                        }
+                        bodyEl.appendChild(contentContainer);
+                    }
+
+                    // عرض بطاقة الاستئذان والموافقة
+                    this._renderRecommendationCard(bodyEl, currentParsedCmd);
+                    msgEl.style.display = '';
+                    this._appendMsgActions(bodyEl);
+
+                    this.chatHistory.push({ role: 'assistant', content: cleanDisplay ? cleanDisplay : 'طلب إذن لاعتماد العملية في قاعدة البيانات.' });
+                    this.scrollToBottom(true);
+                    return;
+                }
+
                 // تحديث حالة كبسولة التفكير بشكل ديناميكي أثناء العمل
                 if (loadingDiv && typeof ThinkingOrbs !== 'undefined') {
                     if (currentParsedCmd.action === 'select') {
@@ -1038,21 +1154,25 @@ const Agent = {
                         toolResultSummary = `[نتيجة العملية البرمجية]: تم حذف العنصر من جدول ${currentParsedCmd.table} بنجاح. تم تحديث قاعدة البيانات فوراً.`;
                     }
                 } else if (currentParsedCmd.type === 'identify_student') {
-                    const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
-                    if (!idRes.success) {
-                        toolResultSummary = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
-                    } else if (!idRes.faceDetected) {
-                        toolResultSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
+                    if (!this.isFaceAnalysisEnabledSync()) {
+                        toolResultSummary = `[نتيجة تنفيذ الأداة]: هذا الأمر غير معرّف أو غير مدعوم في النظام.`;
                     } else {
-                        const matchedList = idRes.matchedStudents || (idRes.match ? [idRes.match] : []);
-                        if (matchedList.length > 0) {
-                            const names = matchedList.map(s => `${s.name} (الرقم: ${s.academicId || s.id}, الصف: ${s.classId || '-'})`).join('، ');
-                            toolResultSummary = `[نتيجة أداة التعرف على الوجه بالمحرك المطور (${idRes.modeUsed === 'multiple' ? 'وضع عدة طلاب/صف كامل' : 'وضع طالب واحد'})]:\n` +
-                                `- إجمالي الوجوه المكتشفة في الصورة: ${idRes.totalFaces || matchedList.length}\n` +
-                                `- الطلاب الذين تم التعرف عليهم ومطابقتهم (${matchedList.length}): ${names}\n` +
-                                (idRes.unmatchedCount > 0 ? `- وجوه أخرى غير مسجلة في النظام: ${idRes.unmatchedCount}\n` : '');
+                        const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
+                        if (!idRes.success) {
+                            toolResultSummary = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
+                        } else if (!idRes.faceDetected) {
+                            toolResultSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
                         } else {
-                            toolResultSummary = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف (${idRes.totalFaces || 1}) وجه في الصورة، ولكن لم يتم مطابقة أي منها مع الطلاب المسجلين حالياً في قاعدة البيانات.`;
+                            const matchedList = idRes.matchedStudents || (idRes.match ? [idRes.match] : []);
+                            if (matchedList.length > 0) {
+                                const names = matchedList.map(s => `${s.name} (الرقم: ${s.academicId || s.id}, الصف: ${s.classId || '-'})`).join('، ');
+                                toolResultSummary = `[نتيجة أداة التعرف على الوجه بالمحرك المطور (${idRes.modeUsed === 'multiple' ? 'وضع عدة طلاب/صف كامل' : 'وضع طالب واحد'})]:\n` +
+                                    `- إجمالي الوجوه المكتشفة في الصورة: ${idRes.totalFaces || matchedList.length}\n` +
+                                    `- الطلاب الذين تم التعرف عليهم ومطابقتهم (${matchedList.length}): ${names}\n` +
+                                    (idRes.unmatchedCount > 0 ? `- وجوه أخرى غير مسجلة في النظام: ${idRes.unmatchedCount}\n` : '');
+                            } else {
+                                toolResultSummary = `[نتيجة أداة التعرف على الوجه]: تم اكتشاف (${idRes.totalFaces || 1}) وجه في الصورة، ولكن لم يتم مطابقة أي منها مع الطلاب المسجلين حالياً في قاعدة البيانات.`;
+                            }
                         }
                     }
                 } else if (currentParsedCmd.type === 'send_email') {
@@ -1288,18 +1408,22 @@ ${toolResultSummary}${rosterInstruction}
 
                     let fallbackSummary = '';
                     if (parsedFallbackCmd.type === 'identify_student') {
-                        const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
-                        if (!idRes.success) {
-                            fallbackSummary = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
-                        } else if (!idRes.faceDetected) {
-                            fallbackSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
+                        if (!this.isFaceAnalysisEnabledSync()) {
+                            fallbackSummary = `[نتيجة تنفيذ الأداة]: هذا الأمر غير معرّف أو غير مدعوم في النظام.`;
                         } else {
-                            const matchedList = idRes.matchedStudents || (idRes.match ? [idRes.match] : []);
-                            if (matchedList.length > 0) {
-                                const names = matchedList.map(s => `${s.name} (الرقم: ${s.academicId || s.id}, الصف: ${s.classId || '-'})`).join('، ');
-                                fallbackSummary = `[نتيجة أداة التعرف على الوجه]: تم التعرف على: ${names}`;
+                            const idRes = this.lastIdentifyResult || { success: false, error: 'لم يتم تشغيل الأداة بنجاح' };
+                            if (!idRes.success) {
+                                fallbackSummary = `[نتيجة أداة التعرف على الوجه]: فشل التعرف. الخطأ: ${idRes.error}`;
+                            } else if (!idRes.faceDetected) {
+                                fallbackSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم اكتشاف أي وجه في الصورة المرفوعة.`;
                             } else {
-                                fallbackSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم مطابقة أي وجوه مع المسجلين.`;
+                                const matchedList = idRes.matchedStudents || (idRes.match ? [idRes.match] : []);
+                                if (matchedList.length > 0) {
+                                    const names = matchedList.map(s => `${s.name} (الرقم: ${s.academicId || s.id}, الصف: ${s.classId || '-'})`).join('، ');
+                                    fallbackSummary = `[نتيجة أداة التعرف على الوجه]: تم التعرف على: ${names}`;
+                                } else {
+                                    fallbackSummary = `[نتيجة أداة التعرف على الوجه]: لم يتم مطابقة أي وجوه مع المسجلين.`;
+                                }
                             }
                         }
                     } else if (parsedFallbackCmd.type === 'database_action' && parsedFallbackCmd.action === 'select') {
@@ -1398,8 +1522,20 @@ ${toolResultSummary}${rosterInstruction}
                 return;
             }
 
-            // --- الفشل التام والتسجيل الصامت في قوقل شيت ---
+            // --- الفشل التام والتسجيل الصامت في قوقل شيت ورصد الوزارة ---
             console.error('[AutoPilot] Ultimate failure in agentic flow:', e);
+
+            // توثيق فوري للخطأ في منظومة الرصد الفني الموحدة لصفحة الوزارة
+            if (typeof Telemetry !== 'undefined' && typeof Telemetry.logError === 'function') {
+                try {
+                    Telemetry.logError('AI_AGENT', e.message || 'خطأ مستعصٍ أثناء استجابة المساعد الذكي', e, {
+                        userPrompt: text,
+                        provider: this.getEffectiveProvider(),
+                        attemptsCount: attempts.length,
+                        source: 'Agent.sendMessage'
+                    });
+                } catch (_) {}
+            }
 
             // إزالة الرسائل التمهيدية المتبقية إن وجدت
             if (typeof loadingDiv !== 'undefined' && loadingDiv && loadingDiv.parentNode) {
@@ -1849,9 +1985,15 @@ ${toolResultSummary}${rosterInstruction}
                     try {
                         await this.executeCommand(JSON.parse(fallback));
                     } catch (e2) {
+                        if (typeof Telemetry !== 'undefined' && typeof Telemetry.logError === 'function') {
+                            Telemetry.logError('AI_AGENT', `فشل تحليل وتنفيذ أمر الوكيل: ${e2.message}`, e2, { rawCommand: cmdStr });
+                        }
                         this._showCommandError(cmdStr);
                     }
                 } else {
+                    if (typeof Telemetry !== 'undefined' && typeof Telemetry.logError === 'function') {
+                        Telemetry.logError('AI_AGENT', `فشل استخراج صيغة JSON لأمر الوكيل: ${e.message}`, e, { rawCommand: cmdStr });
+                    }
                     this._showCommandError(cmdStr);
                 }
             }
@@ -1917,6 +2059,10 @@ ${toolResultSummary}${rosterInstruction}
             });
 
         } else if (cmd.type === 'database_action') {
+            if (this.isMutativeDbAction(cmd) && !cmd._confirmed && this.isConfirmationRequired() && messages) {
+                this._renderRecommendationCard(messages, cmd);
+                return;
+            }
             await this._handleDatabaseAction(messages, cmd);
 
         } else if (cmd.type === 'chart') {
@@ -1932,7 +2078,15 @@ ${toolResultSummary}${rosterInstruction}
         } else if (cmd.type === 'full_system_export') {
             await this._handleFullSystemExport(messages, cmd);
         } else if (cmd.type === 'identify_student') {
-            await this._handleIdentifyStudent(messages, cmd);
+            const isEnabled = await this.isFaceAnalysisEnabled();
+            if (!isEnabled) {
+                this.lastIdentifyResult = {
+                    success: false,
+                    error: 'أداة غير معرّفة أو غير مدعومة في هذا النظام.'
+                };
+            } else {
+                await this._handleIdentifyStudent(messages, cmd);
+            }
         } else {
             console.warn('Unknown command type:', cmd.type);
         }
@@ -1940,6 +2094,13 @@ ${toolResultSummary}${rosterInstruction}
 
     async _handleIdentifyStudent(messages, cmd) {
         try {
+            if (!(await this.isFaceAnalysisEnabled())) {
+                this.lastIdentifyResult = {
+                    success: false,
+                    error: 'خاصية تحليل الوجه معطلة بالكامل في هذا النظام.'
+                };
+                return;
+            }
             if (!this.lastUploadedImageForTools) {
                 throw new Error("لم يتم العثور على أي صورة مرفوعة حالياً للتعرف عليها.");
             }
@@ -2330,6 +2491,366 @@ ${toolResultSummary}${rosterInstruction}
         }
     },
 
+    _escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    },
+
+    _renderMeter(signal, tone) {
+        return `
+            <span class="agent-meter">
+                ${[0, 1, 2].map(bar => `
+                    <span class="agent-meter-bar ${bar < signal ? '' : 'agent-meter-bar-inactive'}"
+                          style="background-color: ${bar < signal ? tone : ''};"></span>
+                `).join('')}
+            </span>
+        `;
+    },
+
+    _buildRecommendationOptions(cmd) {
+        let defaultTitle = 'طلب إذن: هل تريد إضافة هذه البيانات؟';
+        let targetTable = cmd.table || 'البيانات';
+        let tableArabic = targetTable === 'students' ? 'الطلاب'
+                        : targetTable === 'teachers' ? 'المعلمين'
+                        : targetTable === 'classes' ? 'الفصول'
+                        : targetTable === 'records' ? 'سجلات الحضور'
+                        : targetTable;
+
+        if (cmd.action === 'update') {
+            defaultTitle = 'طلب إذن: هل تريد اعتماد وتعديل هذه البيانات؟';
+        } else if (cmd.action === 'delete') {
+            defaultTitle = '⚠️ طلب إذن: هل تريد حذف هذه السجلات نهائياً؟';
+        }
+
+        let primaryBodyHtml = '';
+        let shortDesc = '';
+        let primaryCtaText = 'اعتماد وتنفيذ';
+        let primaryCtaVariant = cmd.action === 'delete' ? 'btn-danger' : 'btn-accent';
+
+        // 1. حالات الإضافة (insert)
+        if (cmd.action === 'insert') {
+            if (cmd.table === 'students') {
+                const items = Array.isArray(cmd.data) ? cmd.data : [cmd.data];
+                if (items.length > 1) {
+                    const sampleNames = items.slice(0, 3).map(s => s.name || 'طالب').join('، ');
+                    const remaining = items.length - 3;
+                    const sampleNote = remaining > 0 ? ` (منهم: ${sampleNames} وغيرهم)` : ` (${sampleNames})`;
+                    primaryBodyHtml = `إضافة دفعة طلابية تتضمن <span class="agent-value-pill pill-green">${items.length} طالباً</span> إلى سجلات المدرسة${sampleNote} وحفظ أرقامهم الأكاديمية وربطهم بالصف.`;
+                    shortDesc = `إضافة دفعة من ${items.length} طالب`;
+                    defaultTitle = `طلب إذن: هل تريد إضافة هذه الدفعة (${items.length} طالب)؟`;
+                } else {
+                    const s = items[0] || {};
+                    const name = s.name || 'طالب جديد';
+                    const academicId = s.academicId || s.id || 'غير محدد';
+                    const classId = s.className || s.classId || 'غير محدد';
+                    primaryBodyHtml = `إضافة طالب جديد: <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(name)}</span> بالرقم الأكاديمي <span class="agent-value-pill pill-green">${this._escapeHtml(academicId)}</span> إلى الصف <span class="agent-value-pill pill-blue">${this._escapeHtml(classId)}</span>.`;
+                    shortDesc = `إضافة الطالب ${name} · ${academicId}`;
+                    defaultTitle = `طلب إذن: هل تريد إضافة الطالب "${name}"؟`;
+                }
+            } else if (cmd.table === 'classes') {
+                const c = cmd.data || {};
+                const name = c.name || c.className || 'صف جديد';
+                const section = c.section ? ` الشعبة <span class="agent-value-pill pill-blue">${this._escapeHtml(c.section)}</span>` : '';
+                primaryBodyHtml = `إنشاء صف دراسي جديد: <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(name)}</span>${section} وتجهيزه لاستقبال الطلاب والسجلات.`;
+                shortDesc = `إنشاء الصف ${name}${c.section ? ' (' + c.section + ')' : ''}`;
+                defaultTitle = `طلب إذن: هل تريد إنشاء الصف "${name}"؟`;
+            } else if (cmd.table === 'teachers') {
+                const t = cmd.data || {};
+                const name = t.name || 'معلم جديد';
+                const ministryId = t.ministryId || t.id || 'غير محدد';
+                const role = t.role === 'admin' ? 'مدير' : 'معلم';
+                primaryBodyHtml = `إضافة كادر تدريسي جديد: <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(name)}</span> بالرقم الوزاري <span class="agent-value-pill pill-green">${this._escapeHtml(ministryId)}</span> ورتبة <span class="agent-value-pill pill-neutral">${role}</span>.`;
+                shortDesc = `إضافة المعلم ${name} · ${ministryId}`;
+                defaultTitle = `طلب إذن: هل تريد إضافة المعلم "${name}"؟`;
+            } else if (cmd.table === 'records') {
+                const r = cmd.data || {};
+                const date = r.date || 'اليوم';
+                const count = Array.isArray(r.details) ? r.details.length : 0;
+                const present = Array.isArray(r.details) ? r.details.filter(d => d.status === 'present').length : 0;
+                const absent = Array.isArray(r.details) ? r.details.filter(d => d.status === 'absent').length : 0;
+                primaryBodyHtml = `تسجيل تقرير حضور وغياب بتاريخ <span class="agent-value-pill pill-blue">${this._escapeHtml(date)}</span> يتضمن <span class="agent-value-pill pill-green">${present} حاضر</span> و <span class="agent-value-pill pill-red">${absent} غائب</span> (إجمالي <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${count} طالب</span>).`;
+                shortDesc = `تسجيل كشف حضور · ${date}`;
+                defaultTitle = `طلب إذن: هل تريد حفظ تقرير الحضور بتاريخ ${date}؟`;
+            } else {
+                primaryBodyHtml = `إضافة سجل جديد إلى جدول <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(tableArabic)}</span> بالبيانات المستخرجة.`;
+                shortDesc = `إضافة بيانات إلى ${tableArabic}`;
+            }
+        }
+        // 2. حالات التعديل (update)
+        else if (cmd.action === 'update') {
+            const rawId = cmd.id || cmd.ID || cmd.studentId || cmd.teacherId || cmd.classId || 'السجل المطلوب';
+            const dataObj = cmd.data || {};
+            const fieldsPills = Object.keys(dataObj).filter(k => k !== 'id' && k !== 'schoolId').slice(0, 3).map(k => {
+                const val = typeof dataObj[k] === 'object' ? 'بيانات مخصصة' : String(dataObj[k]);
+                return `<span class="agent-value-pill pill-orange">${this._escapeHtml(k)}: ${this._escapeHtml(val)}</span>`;
+            }).join(' ');
+
+            primaryBodyHtml = `تعديل بيانات في جدول <span class="agent-value-pill pill-neutral">${this._escapeHtml(tableArabic)}</span> للسجل <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(rawId)}</span> وتحديث: ${fieldsPills || 'الحقول المحددة'}.`;
+            shortDesc = `تعديل في ${tableArabic} · ${rawId}`;
+            defaultTitle = `طلب إذن: هل تريد تعديل بيانات "${rawId}"؟`;
+        }
+        // 3. حالات الحذف (delete)
+        else if (cmd.action === 'delete') {
+            const rawIds = cmd.ids || [cmd.id || cmd.ID || cmd.studentId || cmd.teacherId || cmd.classId || 'السجل المطلوب'];
+            const idsList = Array.isArray(rawIds) ? rawIds.join('، ') : rawIds;
+            primaryBodyHtml = `حذف نهائي لسجل <span class="agent-entity-chip"><span class="agent-entity-chip-dot"></span>${this._escapeHtml(idsList)}</span> من جدول <span class="agent-value-pill pill-red">${this._escapeHtml(tableArabic)}</span>. <strong>تنبيه:</strong> لن تتمكن من التراجع عن هذه الخطوة.`;
+            shortDesc = `حذف نهائي من ${tableArabic} · ${idsList}`;
+            defaultTitle = `⚠️ تأكيد حذف: هل تريد حذف "${idsList}" نهائياً؟`;
+            primaryCtaText = 'تأكيد الحذف النهائي';
+        }
+
+        const options = [
+            {
+                key: 'high',
+                body: primaryBodyHtml,
+                short: shortDesc || 'اعتماد وحفظ التغييرات في النظام',
+                signal: 3,
+                tone: cmd.action === 'delete' ? '#ef4444' : '#10b981',
+                label: cmd.action === 'delete' ? 'تأكيد الحذف' : 'ثقة عالية',
+                cta: primaryCtaText,
+                ctaVariant: primaryCtaVariant
+            },
+            {
+                key: 'review',
+                body: `يمكنك مراجعة أو تغيير أي تفاصيل إضافية قبل الحفظ، بكتابة ما ترغب بتعديله مباشرة في المحادثة.`,
+                short: 'مراجعة أو تعديل البيانات في المحادثة',
+                signal: 2,
+                tone: '#f59e0b',
+                label: 'بانتظار المراجعة',
+                cta: 'تعديل في المحادثة',
+                ctaVariant: 'btn-primary'
+            },
+            {
+                key: 'none',
+                body: `إلغاء هذا الإجراء بالكامل والتراجع عنه دون كتابة أو تعديل أي بيانات في النظام.`,
+                short: 'إلغاء العملية والتراجع الكامل',
+                signal: 0,
+                tone: '#94a3b8',
+                label: 'إلغاء الأمر',
+                cta: 'إلغاء العملية',
+                ctaVariant: 'btn-secondary'
+            }
+        ];
+
+        return {
+            title: defaultTitle,
+            labels: {
+                title: defaultTitle,
+                alternatives: 'البدائل',
+                otherOptions: 'خيارات أخرى',
+                accepted: 'تم الاعتماد والتنفيذ ✓'
+            },
+            options
+        };
+    },
+
+    _renderRecommendationCard(messages, cmd) {
+        const { title, labels, options } = this._buildRecommendationOptions(cmd);
+        let selectedIndex = 0;
+        let isDrawerOpen = false;
+        let isAccepted = false;
+        let isCanceled = false;
+
+        const cardEl = document.createElement('div');
+        cardEl.className = 'agent-recommendation-card';
+
+        const renderCardContent = () => {
+            const active = options[selectedIndex];
+            const others = options
+                .map((o, i) => ({ o, i }))
+                .filter(({ i }) => i !== selectedIndex);
+
+            cardEl.innerHTML = `
+                <div class="agent-card-pad">
+                    <span class="agent-card-title">
+                        <span class="material-symbols-outlined text-[17px] text-amber-500">verified_user</span>
+                        ${title}
+                    </span>
+                    <div class="agent-card-body">
+                        ${active.body}
+                    </div>
+                </div>
+
+                <!-- alternatives drawer -->
+                <div class="agent-alternatives-drawer ${isDrawerOpen ? 'is-open' : ''}">
+                    <div class="agent-alternatives-inner">
+                        <div class="agent-alternatives-content">
+                            <p class="agent-alternatives-header">${labels.otherOptions}</p>
+                            <div class="agent-alternatives-list flex flex-col gap-1">
+                                ${others.map(({ o, i }) => `
+                                    <button type="button" class="agent-alt-option-btn" data-index="${i}">
+                                        ${this._renderMeter(o.signal, o.tone)}
+                                        <span class="agent-alt-option-text">${o.short}</span>
+                                        <span class="agent-alt-option-label">${o.label}</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- card footer -->
+                <div class="agent-card-footer">
+                    <div class="agent-card-footer-info">
+                        ${this._renderMeter(active.signal, active.tone)}
+                        <span class="agent-card-footer-label">${active.label}</span>
+                    </div>
+
+                    <div class="agent-card-footer-actions">
+                        <button type="button"
+                                class="agent-card-btn btn-secondary agent-btn-alternatives"
+                                aria-expanded="${isDrawerOpen}"
+                                ${isAccepted || isCanceled ? 'disabled' : ''}>
+                            ${labels.alternatives}
+                        </button>
+
+                        <button type="button"
+                                class="agent-card-btn ${isAccepted ? 'btn-success is-accepted' : active.ctaVariant} agent-btn-cta"
+                                ${isAccepted || isCanceled ? 'disabled' : ''}>
+                            ${isAccepted ? labels.accepted : isCanceled ? 'تم الإلغاء ✕' : active.cta}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Attach event listeners
+            const altBtn = cardEl.querySelector('.agent-btn-alternatives');
+            if (altBtn) {
+                altBtn.addEventListener('click', () => {
+                    isDrawerOpen = !isDrawerOpen;
+                    renderCardContent();
+                });
+            }
+
+            const ctaBtn = cardEl.querySelector('.agent-btn-cta');
+            if (ctaBtn) {
+                ctaBtn.addEventListener('click', async () => {
+                    if (isAccepted || isCanceled) return;
+
+                    if (active.key === 'high') {
+                        // Execute confirmed action
+                        ctaBtn.disabled = true;
+                        ctaBtn.innerHTML = `<span class="material-symbols-outlined text-[13px] animate-spin">progress_activity</span> جاري التنفيذ...`;
+                        try {
+                            await this._executeConfirmedAction(cmd, cardEl);
+                            isAccepted = true;
+                            isDrawerOpen = false;
+                            renderCardContent();
+                        } catch (err) {
+                            console.error('[Agent] Confirmed execution error:', err);
+                            ctaBtn.disabled = false;
+                            ctaBtn.innerHTML = `فشل التنفيذ ✕`;
+                            ctaBtn.className = 'agent-card-btn btn-danger agent-btn-cta';
+                        }
+                    } else if (active.key === 'review') {
+                        // Review / Configure in chat
+                        this._handleRecommendationReview(cmd, cardEl);
+                    } else if (active.key === 'none') {
+                        // Cancel action
+                        this._cancelRecommendationAction(cmd, cardEl);
+                        isCanceled = true;
+                        isDrawerOpen = false;
+                        renderCardContent();
+                    }
+                });
+            }
+
+            const optionButtons = cardEl.querySelectorAll('.agent-alt-option-btn');
+            optionButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.getAttribute('data-index'), 10);
+                    if (!isNaN(idx)) {
+                        selectedIndex = idx;
+                        isDrawerOpen = false;
+                        renderCardContent();
+                    }
+                });
+            });
+        };
+
+        renderCardContent();
+
+        if (messages) {
+            messages.appendChild(cardEl);
+            this.scrollToBottom(true);
+        }
+
+        return cardEl;
+    },
+
+    async _executeConfirmedAction(cmd, cardEl) {
+        cmd._confirmed = true;
+        const result = await this._executeCommandWithVerification(cmd);
+        if (!result || !result.success) {
+            throw new Error(result?.executionError || result?.verification?.reason || 'فشل التحقق من صحة حفظ البيانات');
+        }
+
+        // Post a clean success message in chat
+        let successMsg = 'تم اعتماد وتنفيذ العملية بنجاح وتحديث قاعدة البيانات. ✅';
+        if (cmd.action === 'insert') {
+            if (cmd.table === 'students') {
+                const count = Array.isArray(cmd.data) ? cmd.data.length : 1;
+                successMsg = count > 1 
+                    ? `تم بحمد الله اعتماد وإضافة كافة طلاب الدفعة (${count} طالباً) إلى قاعدة البيانات بنجاح. ✅`
+                    : `تم بحمد الله اعتماد وإضافة الطالب إلى قاعدة البيانات بنجاح. ✅`;
+            } else if (cmd.table === 'classes') {
+                successMsg = `تم إنشاء الصف الدراسي "${cmd.data?.name || ''}" وتثبيته في قاعدة البيانات بنجاح. ✅`;
+            } else if (cmd.table === 'teachers') {
+                successMsg = `تمت إضافة المعلم "${cmd.data?.name || ''}" وتثبيته في السجلات بنجاح. ✅`;
+            } else if (cmd.table === 'records') {
+                successMsg = `تم حفظ وتأكيد تقرير الحضور والغياب بنجاح في قاعدة البيانات. ✅`;
+            }
+        } else if (cmd.action === 'update') {
+            successMsg = `تم تحديث البيانات وتثبيت التعديل في قاعدة البيانات بنجاح. ✅`;
+        } else if (cmd.action === 'delete') {
+            successMsg = `تم حذف السجل المطلوب نهائياً من قاعدة البيانات. ✅`;
+        }
+
+        this.addMessagePlain(successMsg);
+
+        if (typeof window.renderAll === 'function') {
+            await window.renderAll();
+        }
+        if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+            UI.toast('تم الاعتماد والتنفيذ بنجاح ✨', 'success');
+        }
+
+        return result;
+    },
+
+    _handleRecommendationReview(cmd, cardEl) {
+        const input = document.getElementById('agent-input');
+        if (input) {
+            let hint = 'أريد تعديل البيانات التالية قبل الحفظ: ';
+            if (cmd.table === 'students' && cmd.data) {
+                const name = Array.isArray(cmd.data) ? `${cmd.data.length} طلاب` : (cmd.data.name || '');
+                hint = `أريد تعديل بيانات الطالب (${name}) كالآتي: `;
+            } else if (cmd.table === 'classes' && cmd.data) {
+                hint = `أريد تعديل بيانات الصف (${cmd.data.name || ''}) كالآتي: `;
+            }
+            input.value = hint;
+            input.focus();
+            if (typeof window.handleInputTyping === 'function') {
+                window.handleInputTyping(input);
+            }
+        }
+        if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+            UI.toast('يمكنك كتابة التعديلات المطلوبة في المحادثة أدناه', 'info');
+        }
+    },
+
+    _cancelRecommendationAction(cmd, cardEl) {
+        this.addMessagePlain('تم إلغاء العملية بناءً على طلبك، ولم يتم إجراء أي تغيير على قاعدة البيانات. ✕');
+        if (typeof UI !== 'undefined' && typeof UI.toast === 'function') {
+            UI.toast('تم إلغاء العملية', 'info');
+        }
+    },
+
     _renderFileCard(messages, opts) {
         const div = document.createElement('div');
         div.className = 'animate-fade-in mb-3';
@@ -2517,6 +3038,9 @@ ${toolResultSummary}${rosterInstruction}
         };
 
         const config = providers[currentProvider];
+        if (!config || !config.key) {
+            throw new Error(`مفتاح الذكاء الاصطناعي (${currentProvider}) غير معرّف أو مفقود. يرجى إضافة المفتاح داخل ملف .env (OPENROUTER_API_KEY=sk-or-v1-...) أو عبر التخزين المحلي.`);
+        }
 
         let originalMessages = [];
         if (useFreshMemory) {
@@ -2539,14 +3063,22 @@ ${toolResultSummary}${rosterInstruction}
         const supportsVision = this.isVisionModel(modelName) && !isRetry;
 
         if (!supportsVision) {
+            const faceEnabled = this.isFaceAnalysisEnabledSync();
             messages = messages.map(msg => {
                 if (Array.isArray(msg.content)) {
                     const textObj = msg.content.find(p => p.type === 'text');
                     const textContent = textObj ? (textObj.text || '') : '';
-                    return {
-                        ...msg,
-                        content: textContent + `\n\n[ملاحظة النظام: قام المستخدم برفع صورة. بما أن هذا النموذج لا يدعم رؤية الصور مباشرة، يرجى تشغيل أداة التعرف على الوجه المحلية (identify_student) لمعالجة الصورة. إذا كانت الصورة لطالب واحد استخدم mode: "single"، وإذا كانت لعدة طلاب أو صف كامل أو لم تكن متأكداً فاستخدم الافتراضي mode: "multiple":\n|||COMMAND|||\n{"type": "identify_student", "mode": "multiple"}\n]`
-                    };
+                    if (faceEnabled) {
+                        return {
+                            ...msg,
+                            content: textContent + `\n\n[ملاحظة النظام: قام المستخدم برفع صورة. بما أن هذا النموذج لا يدعم رؤية الصور مباشرة، يرجى تشغيل أداة التعرف على الوجه المحلية (identify_student) لمعالجة الصورة. إذا كانت الصورة لطالب واحد استخدم mode: "single"، وإذا كانت لعدة طلاب أو صف كامل أو لم تكن متأكداً فاستخدم الافتراضي mode: "multiple":\n|||COMMAND|||\n{"type": "identify_student", "mode": "multiple"}\n]`
+                        };
+                    } else {
+                        return {
+                            ...msg,
+                            content: textContent + `\n\n[ملاحظة النظام: قام المستخدم برفع صورة. بما أن هذا النموذج لا يدعم رؤية الصور مباشرة، يرجى معالجة النص أو المستند المرفوع مباشرة دون استدعاء أي أداة لتحليل الوجه.]`
+                        };
+                    }
                 }
                 return msg;
             });
@@ -3036,6 +3568,7 @@ ${toolResultSummary}${rosterInstruction}
     async _executeCommandWithVerification(cmd) {
         let executionError = null;
         try {
+            if (cmd) cmd._confirmed = true;
             await this.executeCommand(cmd);
         } catch (e) {
             executionError = e.message;
@@ -3067,6 +3600,21 @@ ${toolResultSummary}${rosterInstruction}
             console.log('[AutoPilot] Diagnostic log fallback saved to Firestore successfully.');
         } catch (dbErr) {
             console.warn('[AutoPilot] Firestore diagnostic log fallback skipped:', dbErr?.message || dbErr);
+        }
+
+        // توثيق الخطأ في منظومة المتابعة الفنية للوزارة (Telemetry v2_system_logs)
+        if (typeof Telemetry !== 'undefined' && typeof Telemetry.logError === 'function') {
+            try {
+                const errorMsg = errorDetails?.error || 'تقرير تشخيصي لعطل في الوكيل الذكي';
+                Telemetry.logError('AI_AGENT', errorMsg, null, {
+                    source: 'AgentEngine._silentLogToGoogleSheets',
+                    userPrompt: errorDetails?.userPrompt || '',
+                    provider: errorDetails?.provider || '',
+                    diagnosticData: errorDetails
+                });
+            } catch (telErr) {
+                console.warn('[AutoPilot] Telemetry report failed:', telErr);
+            }
         }
 
         if (!webhookUrl) {
@@ -3210,6 +3758,9 @@ ${toolResultSummary}${rosterInstruction}
     },
 
     async searchStudentByFingerprint(descriptor) {
+        if (!(await this.isFaceAnalysisEnabled())) {
+            return { success: false, error: 'خاصية تحليل الوجه معطلة بالكامل في هذا النظام.' };
+        }
         if (!descriptor || !Array.isArray(descriptor)) {
             return { success: false, error: 'البصمة الرقمية غير صالحة' };
         }

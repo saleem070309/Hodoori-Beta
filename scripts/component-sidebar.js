@@ -33,6 +33,16 @@
                     this.options.activeItem = 'agent';
                 } else if (path.includes('dashboard-analytics.html')) {
                     this.options.activeItem = 'analytics';
+                } else if (path.includes('teachers.html')) {
+                    this.options.activeItem = 'teachers';
+                } else if (path.includes('students.html') || path.includes('classes.html')) {
+                    this.options.activeItem = 'classes';
+                } else if (path.includes('reports.html')) {
+                    this.options.activeItem = 'reports';
+                } else if (path.includes('notifications.html')) {
+                    this.options.activeItem = 'notifications';
+                } else if (path.includes('schedule.html')) {
+                    this.options.activeItem = 'schedule';
                 } else if (path.includes('dashboard-admin.html')) {
                     const match = search.match(/tab=([a-z0-9_-]+)/);
                     this.options.activeItem = match ? match[1] : 'ai';
@@ -138,7 +148,7 @@
         },
 
         /**
-         * Handles tab navigation to dashboard-admin
+         * Handles navigation to platform modules and legacy admin tabs
          * @param {string} tab
          * @param {Event} [e=null]
          */
@@ -149,6 +159,24 @@
 
             if (window.innerWidth < 1024) {
                 this.close();
+            }
+
+            const pageMap = {
+                'analytics': 'dashboard-analytics.html',
+                'daily': 'dashboard-analytics.html',
+                'ai': 'agent.html',
+                'agent': 'agent.html',
+                'teachers': 'teachers.html',
+                'classes': 'students.html',
+                'students': 'students.html',
+                'reports': 'reports.html',
+                'notifications': 'notifications.html',
+                'schedule': 'schedule.html'
+            };
+
+            if (pageMap[tab]) {
+                window.location.href = pageMap[tab];
+                return;
             }
 
             const currentPath = window.location.pathname;
@@ -355,23 +383,15 @@
                     </a>
 
                     <!-- لوحة التحليلات والإحصائيات -->
-                    <a href="dashboard-analytics.html" class="agent-nav-row ${active === 'analytics' ? 'active' : ''}" title="التحليلات المتقدمة">
+                    <a href="dashboard-analytics.html" class="agent-nav-row ${active === 'analytics' ? 'active' : ''}" title="التحليلات والإحصاء">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
                         </span>
-                        <span class="text-[13px] font-bold">التحليلات والإحصاء</span>
-                    </a>
-
-                    <!-- المتابعة الحية -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('ai', event)" class="agent-nav-row ${active === 'ai' ? 'active' : ''}" title="المتابعة الحية">
-                        <span class="nav-row-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-                        </span>
-                        <span class="text-[13px] font-bold">المتابعة الحية</span>
+                        <span class="text-[13px] font-bold">لوحة الداشبورد</span>
                     </a>
 
                     <!-- المعلمون -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('teachers', event)" class="agent-nav-row ${active === 'teachers' ? 'active' : ''}" title="المعلمون">
+                    <a href="teachers.html" class="agent-nav-row ${active === 'teachers' ? 'active' : ''}" title="المعلمون">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         </span>
@@ -379,7 +399,7 @@
                     </a>
 
                     <!-- الطلاب والفصول -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('classes', event)" class="agent-nav-row ${active === 'classes' ? 'active' : ''}" title="الطلاب والفصول">
+                    <a href="students.html" class="agent-nav-row ${active === 'classes' ? 'active' : ''}" title="الطلاب والفصول">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
                         </span>
@@ -387,15 +407,15 @@
                     </a>
 
                     <!-- السجلات والتقارير -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('reports', event)" class="agent-nav-row ${active === 'reports' ? 'active' : ''}" title="السجلات">
+                    <a href="reports.html" class="agent-nav-row ${active === 'reports' ? 'active' : ''}" title="السجلات">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
                         </span>
-                        <span class="text-[13px] font-bold">السجلات</span>
+                        <span class="text-[13px] font-bold">السجلات والتقارير</span>
                     </a>
 
                     <!-- الاشعارات -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('notifications', event)" class="agent-nav-row ${active === 'notifications' ? 'active' : ''}" title="الاشعارات">
+                    <a href="notifications.html" class="agent-nav-row ${active === 'notifications' ? 'active' : ''}" title="الاشعارات">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
                         </span>
@@ -403,7 +423,7 @@
                     </a>
 
                     <!-- جدول الحصص -->
-                    <a href="dashboard-admin.html" onclick="HodooriSidebar.navigateToAdminTab('schedule', event)" class="agent-nav-row ${active === 'schedule' ? 'active' : ''}" title="جدول الحصص">
+                    <a href="schedule.html" class="agent-nav-row ${active === 'schedule' ? 'active' : ''}" title="جدول الحصص">
                         <span class="nav-row-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
                         </span>

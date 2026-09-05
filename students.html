@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<!--
+  Project: Hodoori (حضوري) - Intelligent Educational Platform
+  Developer: Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)
+  Copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All Rights Reserved.
+-->
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="author" content="Saleem Yasser Saleem Al-Khadiwi (سليم ياسر سليم الخديوي)" />
+    <meta name="copyright" content="Saleem Yasser Saleem Al-Khadiwi" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f6f8">
+    <title>إدارة الطلاب والفصول | حضوري</title>
+    <link rel="icon" type="image/png" href="assets/brand-logo.png" />
+    
+    <!-- Instant Anti-FOUC Theme Initializer -->
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('admin_theme_mode') || 'light-warm';
+                var isDark = theme === 'dark-orange' || theme === 'dark';
+                var bgColor = isDark ? '#09090b' : '#f4f6f8';
+                document.documentElement.className = isDark ? 'dark theme-dark-orange' : 'theme-light-warm';
+                document.documentElement.style.backgroundColor = bgColor;
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind & Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Google+Sans+Arabic:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- XLSX Library for Excel Import -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- Stylesheets -->
+    <link href="styles/style.css?v=3.0" rel="stylesheet" />
+    <link href="styles/dashboard-common.css?v=3.0" rel="stylesheet" />
+</head>
+
+<body class="agent-sidebar-open">
+    <!-- Standalone Sidebar Mount Point -->
+    <div id="hodoori-sidebar-mount" data-auto-sidebar></div>
+
+    <!-- ═══ MAIN CONTAINER ═══ -->
+    <main class="hodoori-page-container">
+        <!-- ─── Header ─── -->
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+            <div class="pr-10 sm:pr-0">
+                <h1 class="text-lg sm:text-[20px] font-black text-stone-900 dark:text-white leading-tight">إدارة الطلاب والفصول</h1>
+                <span class="text-xs font-bold text-stone-500 dark:text-stone-400 block mt-0.5" id="school-name-display">مدرسة حضوري الذكية</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <button type="button" onclick="document.getElementById('excel-file-input').click()" class="header-action-btn justify-center text-emerald-600 dark:text-emerald-400 hover:border-emerald-300">
+                    <span class="material-symbols-outlined text-sm">upload_file</span>
+                    <span>استيراد إكسل</span>
+                </button>
+                <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="hidden" onchange="handleExcelImport(event)" />
+
+                <button type="button" onclick="exportStudentsToExcel()" class="header-action-btn justify-center text-emerald-700 dark:text-emerald-400 hover:border-emerald-300" title="تصدير قائمة الطلاب إلى ملف Excel">
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    <span>تصدير إكسل</span>
+                </button>
+
+                <button type="button" onclick="showAddClassModal()" class="header-action-btn justify-center">
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    <span>إضافة فصل</span>
+                </button>
+
+                <button type="button" onclick="showAddStudentModal()" class="btn-primary-action justify-center col-span-2 sm:col-span-1">
+                    <span class="material-symbols-outlined text-sm">person_add</span>
+                    <span>إضافة طالب</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ─── 1. TOP KPI ROW ─── -->
+        <section class="kpi-segmented-card mb-5">
+            <div class="kpi-segment">
+                <span class="kpi-title">إجمالي الطلاب</span>
+                <span class="kpi-val" id="kpi-total-students">--</span>
+                <span class="kpi-sub">طالب مسجل</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">الصفوف الدراسية</span>
+                <span class="kpi-val text-amber-600 dark:text-amber-400" id="kpi-grades-count">--</span>
+                <span class="kpi-sub">مرحلة / صف</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">الشعب والفصول</span>
+                <span class="kpi-val text-sky-600 dark:text-sky-400" id="kpi-classes-count">--</span>
+                <span class="kpi-sub">شعبة مفعّلة</span>
+            </div>
+            <div class="kpi-segment">
+                <span class="kpi-title">البصمة والوجه</span>
+                <span class="kpi-val text-emerald-600 dark:text-emerald-400" id="kpi-biometric-count">--</span>
+                <span class="kpi-sub">طالب مفعّل</span>
+            </div>
+        </section>
+
+        <!-- ─── 2. BREADCRUMBS & NAVIGATION BAR ─── -->
+        <section class="hodoori-card mb-5 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <!-- Breadcrumbs -->
+            <div class="flex items-center gap-2 text-xs font-black text-stone-700 dark:text-stone-300 w-full sm:w-auto min-w-0 overflow-hidden" id="breadcrumbs-container">
+                <button type="button" onclick="setViewMode('grades')" class="hover:text-amber-600 transition-colors flex items-center gap-1 shrink-0">
+                    <span class="material-symbols-outlined text-sm">home</span>
+                    <span>كافة الصفوف</span>
+                </button>
+                <span id="crumb-grade-sep" class="text-stone-400 hidden shrink-0">/</span>
+                <span id="crumb-grade-title" class="text-amber-600 dark:text-amber-400 font-black cursor-pointer hidden truncate max-w-[130px] sm:max-w-[220px]" onclick="setViewMode('sections', currentGradeName)"></span>
+                <span id="crumb-section-sep" class="text-stone-400 hidden shrink-0">/</span>
+                <span id="crumb-section-title" class="text-stone-900 dark:text-white font-black hidden truncate max-w-[130px] sm:max-w-[220px]"></span>
+            </div>
+
+            <!-- Fast Search -->
+            <div class="relative w-full sm:w-72">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
+                    <span class="material-symbols-outlined text-sm">search</span>
+                </span>
+                <input type="text" id="global-student-search" placeholder="بحث سريع عن طالب..." oninput="handleGlobalSearch(this.value)" class="flat-input pr-9 !py-1.5 text-xs" />
+            </div>
+        </section>
+
+        <!-- ─── 3. DYNAMIC CONTENT CONTAINER ─── -->
+        <section id="students-view-container">
+            <div class="p-12 text-center text-xs font-bold text-stone-400">جاري تحميل الفصول والطلاب...</div>
+        </section>
+    </main>
+
+    <!-- ═══ ADD / EDIT CLASS MODAL ═══ -->
+    <div id="class-modal" class="hodoori-app-modal-backdrop" onclick="closeClassModal(event)">
+        <div class="hodoori-app-dialog" onclick="event.stopPropagation()">
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">meeting_room</span>
+                    </span>
+                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white" id="class-modal-title">إضافة فصل / شعبة جديدة</h3>
+                </div>
+                <button type="button" onclick="closeClassModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form id="class-form" onsubmit="handleSaveClass(event)" class="flex flex-col m-0 p-0">
+                <div class="app-dialog-body">
+                    <input type="hidden" id="modal-class-id" />
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اسم الصف الدراسي *</label>
+                        <input type="text" id="modal-class-name" required placeholder="مثال: الصف الأول، الصف الثاني، الثالث ثانوي..." class="flat-input" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">رمز الشعبة / القسم *</label>
+                        <input type="text" id="modal-class-section" required placeholder="مثال: أ، ب، 1، 2، علمي 1..." class="flat-input" />
+                    </div>
+                </div>
+
+                <div class="app-dialog-footer">
+                    <button type="button" id="modal-class-delete-btn" onclick="handleDeleteClass()" class="header-action-btn text-rose-600 hover:border-rose-300 dark:hover:border-rose-900 mr-auto hidden">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                        حذف الشعبة
+                    </button>
+                    <button type="button" class="header-action-btn" onclick="closeClassModal()">إلغاء</button>
+                    <button type="submit" class="btn-primary-action">حفظ الفصل</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ ADD / EDIT STUDENT MODAL ═══ -->
+    <div id="student-modal" class="hodoori-app-modal-backdrop" onclick="closeStudentModal(event)">
+        <div class="hodoori-app-dialog" onclick="event.stopPropagation()">
+            <div class="app-dialog-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black">
+                        <span class="material-symbols-outlined text-[18px]">school</span>
+                    </span>
+                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white" id="student-modal-title">إضافة طالب جديد</h3>
+                </div>
+                <button type="button" onclick="closeStudentModal()" class="agent-icon-btn" title="إغلاق">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form id="student-form" onsubmit="handleSaveStudent(event)" class="flex flex-col m-0 p-0">
+                <div class="app-dialog-body">
+                    <input type="hidden" id="modal-student-id" />
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">اسم الطالب الثلاثي أو الرباعي *</label>
+                        <input type="text" id="modal-student-name" required placeholder="مثال: عبد الله بن خالد الشمري" class="flat-input" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الرقم الأكاديمي / الهوية الوطنية</label>
+                        <input type="text" id="modal-student-academic-id" placeholder="مثال: 442019482" class="flat-input" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">الفصل / الشعبة المسكن عليها *</label>
+                        <select id="modal-student-class-id" required class="flat-select">
+                            <option value="">-- اختر الفصل والشعبة --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-extrabold text-stone-800 dark:text-stone-200 mb-1.5">رقم هاتف ولي الأمر (اختياري)</label>
+                        <input type="tel" id="modal-student-parent-phone" placeholder="مثال: 0501234567" class="flat-input" />
+                    </div>
+                </div>
+
+                <div class="app-dialog-footer">
+                    <button type="button" id="modal-student-delete-btn" onclick="handleDeleteStudent()" class="header-action-btn text-rose-600 hover:border-rose-300 dark:hover:border-rose-900 mr-auto hidden">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                        حذف الطالب
+                    </button>
+                    <button type="button" class="header-action-btn" onclick="closeStudentModal()">إلغاء</button>
+                    <button type="submit" class="btn-primary-action">حفظ الطالب</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ SCRIPTS ═══ -->
+    <script src="scripts/core-crypto.js"></script>
+    <script src="scripts/core-db.js"></script>
+    <script src="scripts/core-auth.js"></script>
+    <script src="scripts/core-ui.js"></script>
+    <script src="scripts/utils-notifications.js"></script>
+    <script src="scripts/utils-files.js"></script>
+    <script src="scripts/utils-morphicons.js"></script>
+    <script src="scripts/module-telemetry.js"></script>
+    <script src="scripts/component-sidebar.js"></script>
+
+    <!-- Page Specific Controller Logic -->
+    <script>
+        let allClasses = [];
+        let allStudents = [];
+        let currentView = 'grades';
+        let currentGradeName = '';
+        let currentClassId = '';
+        let searchQuery = '';
+
+        const AVATAR_COLORS = [
+            '#f59e0b', '#3b82f6', '#10b981', '#ef4444', 
+            '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadSchoolMeta();
+
+            // 1. Instant paint from local cache (0ms latency)
+            try {
+                if (typeof DB !== 'undefined' && DB.getCachedDashboardData) {
+                    const instant = DB.getCachedDashboardData();
+                    if ((instant.students && instant.students.length > 0) || (instant.classes && instant.classes.length > 0)) {
+                        allClasses = instant.classes || [];
+                        allStudents = instant.students || [];
+                        updateKpis();
+                        populateClassSelects();
+                        renderCurrentView();
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Realtime change reactivity
+            if (typeof DB !== 'undefined' && DB.onDataChange) {
+                DB.onDataChange(() => {
+                    reloadAllData();
+                });
+            }
+
+            await reloadAllData();
+        });
+
+        async function loadSchoolMeta() {
+            try {
+                const schoolName = localStorage.getItem('attendance_school_name') || 'مدرسة حضوري الذكية';
+                const el = document.getElementById('school-name-display');
+                if (el) el.textContent = schoolName;
+            } catch (_) {}
+        }
+
+        async function reloadAllData() {
+            try {
+                const [classes, students] = await Promise.all([
+                    DB.getClasses(),
+                    DB.getStudents()
+                ]);
+                allClasses = classes || [];
+                allStudents = students || [];
+            } catch (err) {
+                console.error('Data load error:', err);
+                allClasses = [];
+                allStudents = [];
+            }
+
+            updateKpis();
+            populateClassSelects();
+            renderCurrentView();
+        }
+
+        function updateKpis() {
+            const totalStudents = allStudents.length;
+            const uniqueGrades = [...new Set(allClasses.map(c => c.name))].length;
+            const totalClasses = allClasses.length;
+            const biometricCount = allStudents.filter(s => s.descriptors && s.descriptors.length > 0).length;
+
+            UI.animateNumber('kpi-total-students', totalStudents);
+            UI.animateNumber('kpi-grades-count', uniqueGrades);
+            UI.animateNumber('kpi-classes-count', totalClasses);
+            UI.animateNumber('kpi-biometric-count', biometricCount);
+        }
+
+        function populateClassSelects() {
+            const select = document.getElementById('modal-student-class-id');
+            if (!select) return;
+            select.innerHTML = '<option value="">-- اختر الفصل والشعبة --</option>' +
+                allClasses.map(c => `<option value="${c.id}">${c.name} - شعبة (${c.section || 'عامة'})` + '</option>').join('');
+        }
+
+        function setViewMode(view, gradeName = '', classId = '') {
+            currentView = view;
+            currentGradeName = gradeName;
+            currentClassId = classId;
+            searchQuery = '';
+            document.getElementById('global-student-search').value = '';
+            updateBreadcrumbs();
+            renderCurrentView();
+        }
+
+        function updateBreadcrumbs() {
+            const sepGrade = document.getElementById('crumb-grade-sep');
+            const titleGrade = document.getElementById('crumb-grade-title');
+            const sepSection = document.getElementById('crumb-section-sep');
+            const titleSection = document.getElementById('crumb-section-title');
+
+            if (currentView === 'grades') {
+                sepGrade.classList.add('hidden');
+                titleGrade.classList.add('hidden');
+                sepSection.classList.add('hidden');
+                titleSection.classList.add('hidden');
+            } else if (currentView === 'sections') {
+                sepGrade.classList.remove('hidden');
+                titleGrade.classList.remove('hidden');
+                titleGrade.textContent = currentGradeName;
+                sepSection.classList.add('hidden');
+                titleSection.classList.add('hidden');
+            } else if (currentView === 'students') {
+                const cls = allClasses.find(c => c.id === currentClassId);
+                sepGrade.classList.remove('hidden');
+                titleGrade.classList.remove('hidden');
+                titleGrade.textContent = currentGradeName;
+                sepSection.classList.remove('hidden');
+                titleSection.classList.remove('hidden');
+                titleSection.textContent = cls ? 'شعبة ' + cls.section : 'الطلاب';
+            } else if (currentView === 'search') {
+                sepGrade.classList.remove('hidden');
+                titleGrade.classList.remove('hidden');
+                titleGrade.textContent = 'نتائج البحث';
+                sepSection.classList.add('hidden');
+                titleSection.classList.add('hidden');
+            }
+        }
+
+        function handleGlobalSearch(q) {
+            searchQuery = q.trim();
+            if (searchQuery.length > 0) {
+                currentView = 'search';
+                updateBreadcrumbs();
+                renderSearchView();
+            } else {
+                setViewMode('grades');
+            }
+        }
+
+        function renderCurrentView() {
+            const container = document.getElementById('students-view-container');
+            if (!container) return;
+
+            if (currentView === 'grades') {
+                renderGradesView(container);
+            } else if (currentView === 'sections') {
+                renderSectionsView(container);
+            } else if (currentView === 'students') {
+                renderStudentsView(container);
+            } else if (currentView === 'search') {
+                renderSearchView(container);
+            }
+        }
+
+        function renderGradesView(container) {
+            const uniqueGrades = [...new Set(allClasses.map(c => c.name))];
+
+            if (uniqueGrades.length === 0) {
+                container.innerHTML = `
+                    <div class="hodoori-card text-center p-12">
+                        <span class="material-symbols-outlined text-5xl text-stone-300 dark:text-neutral-700 mb-3 block">meeting_room</span>
+                        <h3 class="text-base font-extrabold text-stone-900 dark:text-white">لا توجد فصول دراسية مضافة بعد</h3>
+                        <p class="text-xs text-stone-500 mt-1 mb-4">أضف فصول وشعب مدرستك أو استوردها من ملف Excel بضغطة زر واحدة.</p>
+                        <button type="button" onclick="showAddClassModal()" class="btn-primary-action">
+                            <span class="material-symbols-outlined text-sm">add</span>
+                            <span>إضافة صف جديد</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${uniqueGrades.map(name => {
+                        const sections = allClasses.filter(c => c.name === name);
+                        const sectionIds = sections.map(c => c.id);
+                        const studentCount = allStudents.filter(s => sectionIds.includes(s.classId)).length;
+                        const sectionsList = sections.map(c => c.section).join('، ');
+
+                        return `
+                            <div class="hodoori-card cursor-pointer hover:border-amber-500/50 hover:shadow-md transition-all flex flex-col justify-between group min-h-[170px]" onclick="setViewMode('sections', '${name}')">
+                                <div class="min-w-0">
+                                    <div class="flex items-center justify-between gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black shrink-0">
+                                            <span class="material-symbols-outlined">layers</span>
+                                        </div>
+                                        <span class="badge-tag badge-role-assistant shrink-0">${sections.length} شعبة</span>
+                                    </div>
+                                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-2 leading-snug break-words" title="${name}">${name}</h3>
+                                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-1.5 font-medium truncate" title="الشعب: (${sectionsList || 'عامة'})">الشعب: (${sectionsList || 'عامة'})</p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-stone-100 dark:border-neutral-800 flex items-center justify-between text-xs font-bold text-stone-600 dark:text-stone-300">
+                                    <span>${studentCount} طالب مسجل</span>
+                                    <span class="material-symbols-outlined text-stone-300 dark:text-neutral-700 group-hover:text-amber-500 group-hover:-translate-x-1 transition-all">arrow_back</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                    
+                    <div class="border-2 border-dashed border-stone-200 dark:border-neutral-800 rounded-2xl flex flex-col items-center justify-center p-6 text-stone-400 hover:border-amber-500/50 hover:text-amber-500 cursor-pointer transition-all min-h-[170px] text-center" onclick="showAddClassModal()">
+                        <span class="material-symbols-outlined text-3xl mb-1">add_circle</span>
+                        <span class="text-xs font-black">إضافة صف دراسي جديد</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSectionsView(container) {
+            const sections = allClasses.filter(c => c.name === currentGradeName);
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${sections.map(c => {
+                        const studentCount = allStudents.filter(s => s.classId === c.id).length;
+                        return `
+                            <div class="hodoori-card cursor-pointer hover:border-amber-500/50 hover:shadow-md transition-all flex flex-col justify-between group min-h-[170px]" onclick="setViewMode('students', '${currentGradeName}', '${c.id}')">
+                                <div class="min-w-0">
+                                    <div class="flex items-center justify-between gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-black shrink-0">
+                                            <span class="material-symbols-outlined">meeting_room</span>
+                                        </div>
+                                        <button type="button" onclick="event.stopPropagation(); showEditClassModal('${c.id}')" class="agent-icon-btn shrink-0" title="تعديل بيانات الشعبة">
+                                            <span class="material-symbols-outlined text-sm">edit</span>
+                                        </button>
+                                    </div>
+                                    <h3 class="text-base font-extrabold text-stone-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-2 leading-snug break-words" title="شعبة: ${c.section}">شعبة: ${c.section}</h3>
+                                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-1.5 font-medium truncate" title="${c.name}">${c.name}</p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-stone-100 dark:border-neutral-800 flex items-center justify-between text-xs font-bold text-stone-600 dark:text-stone-300">
+                                    <span>${studentCount} طالب</span>
+                                    <span class="material-symbols-outlined text-stone-300 dark:text-neutral-700 group-hover:text-amber-500 group-hover:-translate-x-1 transition-all">arrow_back</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+
+                    <div class="border-2 border-dashed border-stone-200 dark:border-neutral-800 rounded-2xl flex flex-col items-center justify-center p-6 text-stone-400 hover:border-amber-500/50 hover:text-amber-500 cursor-pointer transition-all min-h-[170px] text-center" onclick="showAddClassModal('${currentGradeName}')">
+                        <span class="material-symbols-outlined text-3xl mb-1">add_circle</span>
+                        <span class="text-xs font-black">إضافة شعبة جديدة</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStudentsView(container) {
+            const cls = allClasses.find(c => c.id === currentClassId);
+            if (!cls) { setViewMode('grades'); return; }
+
+            const students = allStudents.filter(s => s.classId === cls.id);
+
+            container.innerHTML = `
+                <div class="hodoori-card !p-0 overflow-hidden">
+                    <div class="p-4 px-4 sm:px-6 border-b border-stone-200/70 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-base font-black text-stone-900 dark:text-white truncate leading-tight" title="${cls.name} - شعبة: ${cls.section}">${cls.name} - شعبة: ${cls.section}</h3>
+                            <span class="text-xs font-bold text-stone-400 block mt-0.5">${students.length} طالب مسجل في هذه الشعبة</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                            <button type="button" onclick="exportStudentsToExcel()" class="header-action-btn flex-1 sm:flex-initial justify-center text-xs" title="تصدير طلاب هذه الشعبة إلى Excel">
+                                <span class="material-symbols-outlined text-sm">download</span>
+                                <span>تصدير الشعبة</span>
+                            </button>
+                            <button type="button" onclick="showAddStudentModal('${cls.id}')" class="btn-primary-action flex-1 sm:flex-initial justify-center">
+                                <span class="material-symbols-outlined text-sm">person_add</span>
+                                <span>إضافة طالب</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="divide-y divide-stone-100 dark:divide-neutral-800/60">
+                        ${students.length === 0 ? `
+                            <div class="p-12 text-center text-stone-400">
+                                <span class="material-symbols-outlined text-4xl mb-2 text-stone-300 dark:text-neutral-700">school</span>
+                                <p class="text-sm font-bold">لا يوجد طلاب في هذا الفصل</p>
+                                <p class="text-xs text-stone-500 mt-1">اضغط على زر "إضافة طالب" للبدء.</p>
+                            </div>
+                        ` : students.map(s => {
+                            const initial = s.name ? s.name.trim().charAt(0) : '؟';
+                            const hash = Math.abs((s.id || '1').split('').reduce((a, b) => a + b.charCodeAt(0), 0));
+                            const avatarBg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+                            const hasBiometric = s.descriptors && s.descriptors.length > 0;
+
+                            return `
+                                <div class="flex items-center justify-between gap-3 p-3.5 px-4 sm:px-6 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all">
+                                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                                        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style="background-color: ${avatarBg}">
+                                            ${initial}
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <h4 class="font-extrabold text-sm text-stone-900 dark:text-white leading-tight truncate">${s.name}</h4>
+                                            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                <span class="text-[11px] font-mono text-stone-400 font-bold">ID: ${s.academicId || 'بدون رقم'}</span>
+                                                ${hasBiometric ? `
+                                                    <span class="badge-tag badge-status-present text-[10px]">
+                                                        <span class="material-symbols-outlined text-[12px]">face</span> مفعّل الوجه
+                                                    </span>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" onclick="showEditStudentModal('${s.id}')" class="agent-icon-btn text-amber-600 dark:text-amber-400" title="تعديل">
+                                            <span class="material-symbols-outlined text-sm">edit</span>
+                                        </button>
+                                        <button type="button" onclick="handleDeleteStudent('${s.id}')" class="agent-icon-btn text-rose-500" title="حذف">
+                                            <span class="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSearchView(container) {
+            const q = searchQuery.toLowerCase();
+            const matched = allStudents.filter(s => 
+                (s.name && s.name.toLowerCase().includes(q)) || 
+                (s.academicId && s.academicId.toLowerCase().includes(q))
+            );
+
+            container.innerHTML = `
+                <div class="hodoori-card !p-0 overflow-hidden">
+                    <div class="p-4 px-6 border-b border-stone-200/70 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-900/40">
+                        <h3 class="text-sm font-black text-stone-900 dark:text-white">نتائج البحث عن: "${searchQuery}" (${matched.length} طالب)</h3>
+                    </div>
+                    <div class="divide-y divide-stone-100 dark:divide-neutral-800/60">
+                        ${matched.length === 0 ? `
+                            <div class="p-12 text-center text-stone-400 text-xs font-bold">لا يوجد طلاب يطابقون كلمة البحث</div>
+                        ` : matched.map(s => {
+                            const cls = allClasses.find(c => c.id === s.classId);
+                            const clsName = cls ? `${cls.name} (${cls.section})` : 'بدون فصل';
+                            const initial = s.name ? s.name.trim().charAt(0) : '؟';
+                            const hash = Math.abs((s.id || '1').split('').reduce((a, b) => a + b.charCodeAt(0), 0));
+                            const avatarBg = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+
+                            return `
+                                <div class="flex items-center justify-between p-3.5 px-6 hover:bg-stone-50/80 dark:hover:bg-neutral-900/50 transition-all">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style="background-color: ${avatarBg}">
+                                            ${initial}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <h4 class="font-extrabold text-sm text-stone-900 dark:text-white leading-tight truncate">${s.name}</h4>
+                                            <p class="text-[11px] font-bold text-stone-400 mt-0.5">الفصل: ${clsName} • ID: ${s.academicId || '--'}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" onclick="showEditStudentModal('${s.id}')" class="agent-icon-btn text-amber-600 dark:text-amber-400" title="تعديل">
+                                            <span class="material-symbols-outlined text-sm">edit</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        /* ─── Class Modal Handlers ─── */
+        function showAddClassModal(defaultGrade = '') {
+            document.getElementById('class-modal-title').textContent = 'إضافة صف / شعبة جديدة';
+            document.getElementById('modal-class-id').value = '';
+            document.getElementById('modal-class-name').value = defaultGrade || '';
+            document.getElementById('modal-class-section').value = '';
+            document.getElementById('modal-class-delete-btn').classList.add('hidden');
+            const modal = document.getElementById('class-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function showEditClassModal(id) {
+            const cls = allClasses.find(c => c.id === id);
+            if (!cls) return;
+            document.getElementById('class-modal-title').textContent = 'تعديل بيانات الشعبة';
+            document.getElementById('modal-class-id').value = cls.id;
+            document.getElementById('modal-class-name').value = cls.name || '';
+            document.getElementById('modal-class-section').value = cls.section || '';
+            document.getElementById('modal-class-delete-btn').classList.remove('hidden');
+            const modal = document.getElementById('class-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeClassModal() {
+            const modal = document.getElementById('class-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        async function handleSaveClass(e) {
+            e.preventDefault();
+            const id = document.getElementById('modal-class-id').value;
+            const name = document.getElementById('modal-class-name').value.trim();
+            const section = document.getElementById('modal-class-section').value.trim();
+
+            if (!name || !section) {
+                UI.toast('يرجى ملء جميع الحقول', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await DB.updateClass(id, { name, section });
+                    UI.toast('تم تحديث بيانات الشعبة بنجاح', 'success');
+                } else {
+                    await DB.saveClass({ name, section });
+                    UI.toast('تمت إضافة الشعبة بنجاح', 'success');
+                }
+                closeClassModal();
+                await reloadAllData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء حفظ الشعبة', 'error');
+            }
+        }
+
+        async function handleDeleteClass() {
+            const id = document.getElementById('modal-class-id').value;
+            if (!id) return;
+            const confirmed = await UI.confirm('حذف الشعبة', 'هل أنت متأكد من حذف هذه الشعبة؟ قد يؤثر ذلك على الطلاب المسجلين بها.', { confirmText: 'نعم، احذف', type: 'error' });
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteClass(id);
+                UI.toast('تم حذف الشعبة', 'success');
+                closeClassModal();
+                await reloadAllData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء حذف الشعبة', 'error');
+            }
+        }
+
+        /* ─── Student Modal Handlers ─── */
+        function showAddStudentModal(defaultClassId = '') {
+            document.getElementById('student-modal-title').textContent = 'إضافة طالب جديد';
+            document.getElementById('modal-student-id').value = '';
+            document.getElementById('student-form').reset();
+            document.getElementById('modal-student-class-id').value = defaultClassId || currentClassId || '';
+            document.getElementById('modal-student-delete-btn').classList.add('hidden');
+            const modal = document.getElementById('student-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function showEditStudentModal(id) {
+            const s = allStudents.find(x => x.id === id);
+            if (!s) return;
+            document.getElementById('student-modal-title').textContent = 'تعديل بيانات الطالب';
+            document.getElementById('modal-student-id').value = s.id;
+            document.getElementById('modal-student-name').value = s.name || '';
+            document.getElementById('modal-student-academic-id').value = s.academicId || '';
+            document.getElementById('modal-student-class-id').value = s.classId || '';
+            document.getElementById('modal-student-parent-phone').value = s.parentPhone || '';
+            document.getElementById('modal-student-delete-btn').classList.remove('hidden');
+            const modal = document.getElementById('student-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeStudentModal() {
+            const modal = document.getElementById('student-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        async function handleSaveStudent(e) {
+            e.preventDefault();
+            const id = document.getElementById('modal-student-id').value;
+            const name = document.getElementById('modal-student-name').value.trim();
+            const academicId = document.getElementById('modal-student-academic-id').value.trim();
+            const classId = document.getElementById('modal-student-class-id').value;
+            const parentPhone = document.getElementById('modal-student-parent-phone').value.trim();
+
+            if (!name || !classId) {
+                UI.toast('يرجى كتابة اسم الطالب واختيار الفصل', 'error');
+                return;
+            }
+
+            const studentData = { name, academicId, classId, parentPhone };
+
+            try {
+                if (id) {
+                    await DB.updateStudent(id, studentData);
+                    UI.toast('تم تحديث بيانات الطالب', 'success');
+                } else {
+                    await DB.saveStudent(studentData);
+                    UI.toast('تمت إضافة الطالب بنجاح', 'success');
+                }
+                closeStudentModal();
+                await reloadAllData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء حفظ الطالب', 'error');
+            }
+        }
+
+        async function handleDeleteStudent(targetId = null) {
+            const id = targetId || document.getElementById('modal-student-id').value;
+            if (!id) return;
+            const confirmed = await UI.confirm('حذف الطالب', 'هل أنت متأكد من حذف هذا الطالب نهائياً من النظام؟', { confirmText: 'نعم، احذف', type: 'error' });
+            if (!confirmed) return;
+
+            try {
+                await DB.deleteStudent(id);
+                UI.toast('تم حذف الطالب بنجاح', 'success');
+                closeStudentModal();
+                await reloadAllData();
+            } catch (err) {
+                console.error(err);
+                UI.toast('حدث خطأ أثناء الحذف', 'error');
+            }
+        }
+
+        /* ─── Excel Import Logic ─── */
+        async function handleExcelImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            UI.setLoading(true, 'جاري معالجة واستيراد الطلاب من ملف Excel...');
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (rows.length < 2) {
+                        UI.setLoading(false);
+                        UI.toast('الملف فارغ أو لا يحتوي على صفوف بيانات صالحة', 'error');
+                        return;
+                    }
+
+                    let nameCol = -1, idCol = -1, classCol = -1, sectionCol = -1;
+                    const headers = rows[0].map(h => (h || '').toString().trim());
+
+                    headers.forEach((h, idx) => {
+                        if (h.includes('اسم') || h.includes('طالب')) nameCol = idx;
+                        else if (h.includes('هوية') || h.includes('رقم') || h.includes('سجل') || h.includes('أكاديمي')) idCol = idx;
+                        else if (h.includes('صف') || h.includes('مرحلة')) classCol = idx;
+                        else if (h.includes('شعبة') || h.includes('فصل') || h.includes('قسم')) sectionCol = idx;
+                    });
+
+                    if (nameCol === -1) nameCol = 0;
+
+                    let addedCount = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row || !row[nameCol]) continue;
+
+                        const sName = row[nameCol].toString().trim();
+                        const sId = (idCol !== -1 && row[idCol]) ? row[idCol].toString().trim() : '';
+                        const cName = (classCol !== -1 && row[classCol]) ? row[classCol].toString().trim() : (currentGradeName || 'الصف الأول');
+                        const cSection = (sectionCol !== -1 && row[sectionCol]) ? row[sectionCol].toString().trim() : 'أ';
+
+                        let targetClass = allClasses.find(c => c.name === cName && c.section === cSection);
+                        if (!targetClass) {
+                            const newClassId = await DB.saveClass({ name: cName, section: cSection });
+                            targetClass = { id: newClassId, name: cName, section: cSection };
+                            allClasses.push(targetClass);
+                        }
+
+                        await DB.saveStudent({
+                            name: sName,
+                            academicId: sId,
+                            classId: targetClass.id
+                        });
+                        addedCount++;
+                    }
+
+                    UI.setLoading(false);
+                    UI.toast('تم استيراد ' + addedCount + ' طالب بنجاح!', 'success');
+                    await reloadAllData();
+                } catch (err) {
+                    console.error('Excel Import Error:', err);
+                    UI.setLoading(false);
+                    UI.toast('فشل استيراد الملف، تأكد من صحة صيغة Excel', 'error');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+            event.target.value = '';
+        }
+
+        /* ─── Excel Export Logic ─── */
+        function exportStudentsToExcel() {
+            if (!allStudents || allStudents.length === 0) {
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('لا يوجد طلاب لتصديرهم حالياً', 'error');
+                } else {
+                    alert('لا يوجد طلاب لتصديرهم حالياً');
+                }
+                return;
+            }
+
+            if (typeof XLSX === 'undefined') {
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('مكتبة Excel غير جاهزة، يرجى المحاولة لاحقاً', 'error');
+                }
+                return;
+            }
+
+            try {
+                if (typeof UI !== 'undefined' && UI.setLoading) UI.setLoading(true);
+
+                let targetStudents = allStudents;
+                let sheetName = 'كافة الطلاب';
+                let fileSuffix = 'كافة_الطلاب';
+
+                if (currentView === 'students' && currentClassId) {
+                    const cls = allClasses.find(c => c.id === currentClassId);
+                    if (cls) {
+                        targetStudents = allStudents.filter(s => s.classId === cls.id);
+                        sheetName = `${cls.name} (${cls.section || 'عامة'})`;
+                        fileSuffix = `${cls.name}_شعبة_${cls.section || 'عامة'}`.replace(/[\/\s]/g, '_');
+                    }
+                } else if (currentView === 'sections' && currentGradeName) {
+                    const sectionIds = allClasses.filter(c => c.name === currentGradeName).map(c => c.id);
+                    targetStudents = allStudents.filter(s => sectionIds.includes(s.classId));
+                    sheetName = currentGradeName;
+                    fileSuffix = currentGradeName.replace(/[\/\s]/g, '_');
+                } else if (currentView === 'search' && searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    targetStudents = allStudents.filter(s => 
+                        (s.name && s.name.toLowerCase().includes(q)) || 
+                        (s.academicId && s.academicId.toLowerCase().includes(q))
+                    );
+                    sheetName = 'نتائج البحث';
+                    fileSuffix = 'نتائج_البحث';
+                }
+
+                if (targetStudents.length === 0) {
+                    if (typeof UI !== 'undefined' && UI.setLoading) UI.setLoading(false);
+                    if (typeof UI !== 'undefined' && UI.toast) {
+                        UI.toast('لا توجد بيانات طلاب مطابقة للتصدير', 'error');
+                    }
+                    return;
+                }
+
+                // Format data array for XLSX
+                const excelData = targetStudents.map((s, index) => {
+                    const cls = allClasses.find(c => c.id === s.classId);
+                    const gradeName = cls ? (cls.name || '') : 'غير محدد';
+                    const sectionName = cls ? (cls.section || '') : 'عامة';
+                    const biometric = (s.descriptors && s.descriptors.length > 0) ? 'مفعّلة' : 'غير مفعّلة';
+
+                    return {
+                        'م': index + 1,
+                        'اسم الطالب': s.name || '',
+                        'الرقم الأكاديمي / الهوية': s.academicId || '',
+                        'الصف الدراسي': gradeName,
+                        'الشعبة': sectionName,
+                        'رقم ولي الأمر': s.parentPhone || '',
+                        'بصمة الوجه': biometric
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+                // Set column widths for readability
+                worksheet['!cols'] = [
+                    { wch: 6 },   // م
+                    { wch: 28 },  // اسم الطالب
+                    { wch: 22 },  // الرقم الأكاديمي / الهوية
+                    { wch: 20 },  // الصف الدراسي
+                    { wch: 12 },  // الشعبة
+                    { wch: 18 },  // رقم ولي الأمر
+                    { wch: 15 }   // بصمة الوجه
+                ];
+
+                // Right to left sheet display
+                if (!worksheet['!views']) worksheet['!views'] = [];
+                worksheet['!views'].push({ RTL: true });
+
+                const workbook = XLSX.utils.book_new();
+                const sanitizedSheetName = sheetName.replace(/[:\\/?*\[\]]/g, '_').slice(0, 31);
+                XLSX.utils.book_append_sheet(workbook, worksheet, sanitizedSheetName);
+
+                const dateStamp = new Date().toISOString().slice(0, 10);
+                const fileName = `قائمة_الطلاب_${fileSuffix}_${dateStamp}.xlsx`;
+
+                XLSX.writeFile(workbook, fileName);
+
+                if (typeof UI !== 'undefined' && UI.setLoading) UI.setLoading(false);
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast(`تم تصدير ${targetStudents.length} طالب إلى ملف Excel بنجاح ✓`, 'success');
+                }
+            } catch (err) {
+                console.error('Excel Export Error:', err);
+                if (typeof UI !== 'undefined' && UI.setLoading) UI.setLoading(false);
+                if (typeof UI !== 'undefined' && UI.toast) {
+                    UI.toast('حدث خطأ أثناء تصدير ملف Excel', 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
