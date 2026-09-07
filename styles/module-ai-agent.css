@@ -10,6 +10,8 @@
  * ═════════════════════════════════════════════════════════════════
  */
 
+@import url('transitions-root.css');
+
 /* ─── Themes & CSS Variables ─── */
 html.theme-light-warm, body.theme-light-warm, .theme-light-warm {
   background-color: #f4f6f8 !important;
@@ -839,7 +841,7 @@ body.theme-light-warm, body.theme-dark-orange {
   align-items: flex-start;
   margin-top: -2px !important;
   margin-bottom: 16px !important;
-  animation: messageSlideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: messageSlideIn var(--duration-fast) var(--ease-smooth-out);
 }
 
 .agent-msg-ai-avatar {
@@ -861,11 +863,13 @@ body.theme-light-warm, body.theme-dark-orange {
 @keyframes messageSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(var(--distance-base));
+    filter: blur(var(--blur-small));
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    filter: blur(0);
   }
 }
 

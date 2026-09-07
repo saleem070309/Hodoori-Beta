@@ -22,7 +22,7 @@
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <link href="styles/transitions-root.css?v=3.0" rel="stylesheet" />
     <link href="styles/style.css?v=2.9" rel="stylesheet" />
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -171,8 +171,8 @@
             background: rgba(255, 167, 38, 0.13);
             border-radius: 18px;
             border: 1.5px solid rgba(255, 167, 38, 0.22);
-            transition: left 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
-                width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: left var(--tabs-dur, 250ms) var(--tabs-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+                width var(--tabs-dur, 250ms) var(--tabs-ease, cubic-bezier(0.22, 1, 0.36, 1));
             pointer-events: none;
             z-index: 0;
         }
@@ -197,7 +197,7 @@
             font-size: 22px;
             line-height: 1;
             color: #b0a898;
-            transition: color 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: color var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)), transform var(--duration-fast, 250ms) var(--ease-bounce, cubic-bezier(0.34, 1.36, 0.64, 1));
             font-family: 'Material Symbols Outlined';
         }
 
@@ -206,7 +206,7 @@
             font-weight: 700;
             letter-spacing: 0.02em;
             color: #b0a898;
-            transition: color 0.25s ease;
+            transition: color var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1));
             white-space: nowrap;
             font-family: 'Tajawal', sans-serif;
         }
@@ -234,37 +234,41 @@
 
         /* Agent message styles moved to global style.css */
 
-        /* ─── Tab Slide Animation ─── */
+        /* ─── Tab Slide Animation (transitions.dev page side-by-side) ─── */
         @keyframes tabSlideRight {
             from {
-                transform: translateX(48px);
+                transform: translateX(var(--distance-base, 8px));
                 opacity: 0;
+                filter: blur(var(--blur-medium, 3px));
             }
 
             to {
                 transform: translateX(0);
                 opacity: 1;
+                filter: blur(0);
             }
         }
 
         @keyframes tabSlideLeft {
             from {
-                transform: translateX(-48px);
+                transform: translateX(calc(var(--distance-base, 8px) * -1));
                 opacity: 0;
+                filter: blur(var(--blur-medium, 3px));
             }
 
             to {
                 transform: translateX(0);
                 opacity: 1;
+                filter: blur(0);
             }
         }
 
         .slide-from-right {
-            animation: tabSlideRight 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+            animation: tabSlideRight var(--page-slide-dur, 250ms) var(--page-slide-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
         }
 
         .slide-from-left {
-            animation: tabSlideLeft 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+            animation: tabSlideLeft var(--page-slide-dur, 250ms) var(--page-slide-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
         }
 
         /* ─── Utility ─── */
@@ -650,23 +654,35 @@
             <span id="statTeachers" style="display:none">0</span>
             <span id="statClasses" style="display:none">0</span>
 
-            <!-- Stats grid 2×2 -->
+            <!-- Stats grid 2×2 with 3D Tilt Hover Physics -->
             <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-primary p-4 rounded-2xl">
-                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الطلاب</p>
-                    <h2 id="statStudents" class="text-2xl font-black text-gray-800">0</h2>
+                <div class="t-tilt">
+                    <div class="t-tilt-card liquid-glass liquid-glass-prominent liquid-glass-stat stat-primary p-4 rounded-2xl">
+                        <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الطلاب</p>
+                        <h2 id="statStudents" class="text-2xl font-black text-gray-800">0</h2>
+                        <div class="t-tilt-glare"></div>
+                    </div>
                 </div>
-                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
-                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">نسبة الحضور</p>
-                    <h2 id="statAttendanceRate" class="text-2xl font-black text-gray-800">--%</h2>
+                <div class="t-tilt">
+                    <div class="t-tilt-card liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
+                        <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">نسبة الحضور</p>
+                        <h2 id="statAttendanceRate" class="text-2xl font-black text-gray-800">--%</h2>
+                        <div class="t-tilt-glare"></div>
+                    </div>
                 </div>
-                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
-                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الحضور</p>
-                    <h2 id="statPresent" class="text-2xl font-black text-gray-800">0</h2>
+                <div class="t-tilt">
+                    <div class="t-tilt-card liquid-glass liquid-glass-prominent liquid-glass-stat stat-success p-4 rounded-2xl">
+                        <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الحضور</p>
+                        <h2 id="statPresent" class="text-2xl font-black text-gray-800">0</h2>
+                        <div class="t-tilt-glare"></div>
+                    </div>
                 </div>
-                <div class="liquid-glass liquid-glass-prominent liquid-glass-stat stat-error p-4 rounded-2xl">
-                    <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الغياب</p>
-                    <h2 id="statAbsent" class="text-2xl font-black text-gray-800">0</h2>
+                <div class="t-tilt">
+                    <div class="t-tilt-card liquid-glass liquid-glass-prominent liquid-glass-stat stat-error p-4 rounded-2xl">
+                        <p class="text-gray-500 text-[9px] font-bold uppercase tracking-wider mb-1">إجمالي الغياب</p>
+                        <h2 id="statAbsent" class="text-2xl font-black text-gray-800">0</h2>
+                        <div class="t-tilt-glare"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1439,6 +1455,7 @@
     <script src="scripts/utils-notifications.js?v=2.9.3"></script>
     <script src="scripts/utils-files.js?v=2.9.3"></script>
     <script src="scripts/utils-gemini.js?v=2.9.3"></script>
+    <script src="scripts/utils-transitions.js?v=3.0"></script>
     <script src="scripts/module-face-api.js?v=2.9.3"></script>
     <script src="scripts/module-ai-prompt.js?v=2.9.3"></script>
     <script src="scripts/module-ai-agent.js?v=2.9.3"></script>

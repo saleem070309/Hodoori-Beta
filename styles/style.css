@@ -6,6 +6,8 @@
  * @license Proprietary - All rights reserved.
  */
 
+@import url('transitions-root.css');
+
 :root {
   /* Core Palette (Maintained from your original identity) */
   --color-dark: #1b1b1b;

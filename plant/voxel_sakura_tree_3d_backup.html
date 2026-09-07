@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sakura Voxel Island</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 70% 20%, #fff8dc 0%, transparent 25%),
+        linear-gradient(to bottom, #84cfff 0%, #d9f2ff 55%, #ffd6e7 100%);
+      transition: background 1.2s ease;
+    }
+
+    body.night {
+      background:
+        radial-gradient(circle at 72% 18%, #dce8ff 0%, #8aa2d0 3%, transparent 13%),
+        linear-gradient(to bottom, #050817 0%, #101934 48%, #34294f 100%);
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #controls {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #modeButton {
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 14px;
+      padding: 11px 18px;
+      color: white;
+      background: rgba(15, 22, 38, 0.42);
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+      transition: 0.3s ease;
+    }
+
+    #modeButton:hover {
+      transform: translateY(-2px);
+      background: rgba(15, 22, 38, 0.62);
+    }
+
+    #title {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(10, 15, 25, 0.25);
+      backdrop-filter: blur(8px);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="controls">
+    <button id="modeButton">🌙 الوضع الليلي</button>
+  </div>
+
+  <div id="title">Sakura Voxel Island</div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    // --------------------------------------------------
+    // الإعداد الأساسي
+    // --------------------------------------------------
+
+    const scene = new THREE.Scene();
+
+    // نستخدم خلفية HTML المتدرجة.
+    scene.background = null;
+
+    // ضباب خفيف لإضافة عمق.
+    scene.fog = new THREE.FogExp2(0xcfeaff, 0.011);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      200
+    );
+
+    camera.position.set(18, 13, 22);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+
+    document.body.appendChild(renderer.domElement);
+
+    // --------------------------------------------------
+    // التحكم بالكاميرا
+    // --------------------------------------------------
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+
+    controls.target.set(0, 4.8, 0);
+
+    controls.minDistance = 12;
+    controls.maxDistance = 42;
+
+    controls.minPolarAngle = Math.PI * 0.16;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    controls.enablePan = false;
+
+    // --------------------------------------------------
+    // مجموعات المشهد
+    // --------------------------------------------------
+
+    const worldGroup = new THREE.Group();
+    scene.add(worldGroup);
+
+    // حجم الخلية 1، وحجم البلوكة أقل بقليل للحصول على فاصل شبه غير مرئي.
+    const CELL = 1;
+    const BLOCK_SIZE = 0.965;
+
+    const voxelGeometry = new THREE.BoxGeometry(
+      BLOCK_SIZE,
+      BLOCK_SIZE,
+      BLOCK_SIZE
+    );
+
+    // خامة بدون أي Texture.
+    function createVoxelMaterial(roughness = 0.86) {
+      return new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness,
+        metalness: 0,
+        vertexColors: true
+      });
+    }
+
+    // مولّد عشوائي ثابت حتى لا تتغير الشجرة عند كل تحديث.
+    let seed = 8127;
+
+    function random() {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    }
+
+    function randomRange(min, max) {
+      return min + random() * (max - min);
+    }
+
+    // إنشاء لون مع اختلاف بسيط لكل بلوكة.
+    function variedColor(baseColor, variation = 0.04, lightOffset = 0) {
+      const color = new THREE.Color(baseColor);
+      const hsl = {};
+
+      color.getHSL(hsl);
+
+      hsl.h += randomRange(-variation * 0.15, variation * 0.15);
+      hsl.s += randomRange(-variation, variation);
+      hsl.l += randomRange(-variation, variation) + lightOffset;
+
+      hsl.s = THREE.MathUtils.clamp(hsl.s, 0, 1);
+      hsl.l = THREE.MathUtils.clamp(hsl.l, 0.02, 0.98);
+
+      color.setHSL(hsl.h, hsl.s, hsl.l);
+      return color;
+    }
+
+    // إنشاء InstancedMesh لتقليل استهلاك الأداء.
+    function createVoxelInstances(blocks, material, options = {}) {
+      const mesh = new THREE.InstancedMesh(
+        voxelGeometry,
+        material,
+        blocks.length
+      );
+
+      const matrix = new THREE.Matrix4();
+      const scale = new THREE.Vector3(1, 1, 1);
+      const quaternion = new THREE.Quaternion();
+
+      blocks.forEach((block, index) => {
+        matrix.compose(
+          new THREE.Vector3(block.x, block.y, block.z),
+          quaternion,
+          scale
+        );
+
+        mesh.setMatrixAt(index, matrix);
+
+        const color = block.color || variedColor(
+          options.baseColor || 0xffffff,
+          options.variation ?? 0.03,
+          block.lightOffset || 0
+        );
+
+        mesh.setColorAt(index, color);
+      });
+
+      mesh.instanceMatrix.needsUpdate = true;
+
+      if (mesh.instanceColor) {
+        mesh.instanceColor.needsUpdate = true;
+      }
+
+      mesh.castShadow = options.castShadow ?? true;
+      mesh.receiveShadow = options.receiveShadow ?? true;
+
+      worldGroup.add(mesh);
+      return mesh;
+    }
+
+    // --------------------------------------------------
+    // الجزيرة العائمة
+    // --------------------------------------------------
+
+    const lowerGrassBlocks = [];
+    const upperGrassBlocks = [];
+    const soilBlocks = [];
+    const stoneBlocks = [];
+
+    function irregularRadius(x, z, baseRadius) {
+      const angle = Math.atan2(z, x);
+
+      return baseRadius
+        + Math.sin(angle * 3.0) * 0.32
+        + Math.cos(angle * 5.0) * 0.22
+        + Math.sin((x + z) * 1.7) * 0.12;
+    }
+
+    // طبقة العشب السفلية: أكبر من العليا.
+    for (let x = -8; x <= 8; x++) {
+      for (let z = -8; z <= 8; z++) {
+        const distance = Math.sqrt(x * x + z * z);
+        const radius = irregularRadius(x, z, 7.15);
+
+        if (distance <= radius) {
+          lowerGrassBlocks.push({
+            x,
+            y: -0.55,
+            z,
+            color: variedColor(0x4d9c50, 0.035, -0.015)
+          });
+        }
+      }
+    }
+
+    // طبقة العشب العليا: أصغر وشبه مستوية.
+    for (let x = -7; x <= 7; x++) {
+      for (let z = -7; z <= 7; z++) {
+        const distance = Math.sqrt(x * x + z * z);
+        const radius = irregularRadius(x, z, 6.25);
+
+        if (distance <= radius) {
+          upperGrassBlocks.push({
+            x,
+            y: 0.42,
+            z,
+            color: variedColor(0x71bd5e, 0.04, 0.015)
+          });
+        }
+      }
+    }
+
+    // التربة أسفل الجزيرة بشكل مخروطي متدرج.
+    for (let level = 0; level < 6; level++) {
+      const y = -1.52 - level;
+      const radius = 6.7 - level * 0.86;
+
+      for (let x = -7; x <= 7; x++) {
+        for (let z = -7; z <= 7; z++) {
+          const distance = Math.sqrt(x * x + z * z);
+          const edgeNoise =
+            Math.sin(x * 1.9 + z * 0.7 + level) * 0.22 +
+            Math.cos(z * 1.6 - level) * 0.16;
+
+          if (distance <= radius + edgeNoise) {
+            const isDeep = level >= 3 && random() > 0.58;
+
+            const block = {
+              x,
+              y,
+              z,
+              color: variedColor(
+                isDeep ? 0x6d625d : 0x79533d,
+                0.055,
+                -level * 0.005
+              )
+            };
+
+            if (isDeep) {
+              stoneBlocks.push(block);
+            } else {
+              soilBlocks.push(block);
+            }
+          }
+        }
+      }
+    }
+
+    createVoxelInstances(
+      lowerGrassBlocks,
+      createVoxelMaterial(0.92)
+    );
+
+    createVoxelInstances(
+      upperGrassBlocks,
+      createVoxelMaterial(0.9)
+    );
+
+    createVoxelInstances(
+      soilBlocks,
+      createVoxelMaterial(0.98)
+    );
+
+    createVoxelInstances(
+      stoneBlocks,
+      createVoxelMaterial(1)
+    );
+
+    // --------------------------------------------------
+    // جذع الشجرة والأغصان
+    // --------------------------------------------------
+
+    const trunkBlocks = [];
+    const trunkPositions = new Set();
+
+    function addTrunkBlock(x, y, z, lightOffset = 0) {
+      const key = `${x},${y},${z}`;
+
+      if (trunkPositions.has(key)) return;
+
+      trunkPositions.add(key);
+
+      trunkBlocks.push({
+        x,
+        y,
+        z,
+        color: variedColor(0x6b4038, 0.045, lightOffset)
+      });
+    }
+
+    // جذع رئيسي غير مستقيم قليلاً.
+    for (let y = 1; y <= 9; y++) {
+      let x = 0;
+      let z = 0;
+
+      if (y >= 5) x = 1;
+      if (y >= 8) z = -1;
+
+      addTrunkBlock(x, y, z, y * 0.002);
+
+      // زيادة سماكة الجزء السفلي.
+      if (y <= 4) {
+        addTrunkBlock(x + 1, y, z, -0.015);
+        addTrunkBlock(x, y, z + 1, 0.005);
+      }
+
+      if (y <= 2) {
+        addTrunkBlock(x - 1, y, z, -0.02);
+        addTrunkBlock(x, y, z - 1, -0.01);
+      }
+    }
+
+    // دالة لإنشاء غصن Voxel بين نقطتين.
+    function createBranch(start, end, thickness = false) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const dz = end.z - start.z;
+
+      const steps = Math.max(
+        Math.abs(dx),
+        Math.abs(dy),
+        Math.abs(dz)
+      );
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+
+        const x = Math.round(THREE.MathUtils.lerp(start.x, end.x, t));
+        const y = Math.round(THREE.MathUtils.lerp(start.y, end.y, t));
+        const z = Math.round(THREE.MathUtils.lerp(start.z, end.z, t));
+
+        addTrunkBlock(x, y, z, t * 0.018);
+
+        if (thickness && i < steps * 0.55) {
+          addTrunkBlock(x, y - 1, z, -0.01);
+        }
+      }
+    }
+
+    createBranch(
+      { x: 0, y: 5, z: 0 },
+      { x: -4, y: 9, z: 0 },
+      true
+    );
+
+    createBranch(
+      { x: 1, y: 6, z: 0 },
+      { x: 5, y: 10, z: 1 },
+      true
+    );
+
+    createBranch(
+      { x: 1, y: 7, z: 0 },
+      { x: 3, y: 11, z: -3 }
+    );
+
+    createBranch(
+      { x: 0, y: 6, z: 1 },
+      { x: -2, y: 10, z: 4 }
+    );
+
+    createBranch(
+      { x: 1, y: 8, z: -1 },
+      { x: 0, y: 13, z: -1 }
+    );
+
+    createBranch(
+      { x: -1, y: 7, z: 1 },
+      { x: -5, y: 9, z: 3 }
+    );
+
+    createVoxelInstances(
+      trunkBlocks,
+      createVoxelMaterial(0.94)
+    );
+
+    // --------------------------------------------------
+    // أوراق الساكورا
+    // --------------------------------------------------
+
+    const leafBlocks = [];
+    const leafPositions = new Set();
+
+    const leafClusters = [
+      { x: -4, y: 10, z: 0, rx: 3.4, ry: 2.1, rz: 2.7 },
+      { x:  4, y: 11, z: 1, rx: 3.6, ry: 2.3, rz: 2.9 },
+      { x:  2, y: 12, z: -3, rx: 3.1, ry: 2.3, rz: 2.6 },
+      { x: -2, y: 11, z: 3, rx: 3.2, ry: 2.2, rz: 2.8 },
+      { x:  0, y: 14, z: -1, rx: 3.5, ry: 2.5, rz: 3.1 },
+      { x: -5, y: 10, z: 3, rx: 2.7, ry: 1.9, rz: 2.4 },
+      { x:  0, y: 11, z: 1, rx: 3.2, ry: 2.2, rz: 3.0 }
+    ];
+
+    function addLeafBlock(x, y, z) {
+      // لا نسمح بأوراق قريبة من الأرض.
+      if (y < 8) return;
+
+      const key = `${x},${y},${z}`;
+
+      if (
+        leafPositions.has(key) ||
+        trunkPositions.has(key)
+      ) {
+        return;
+      }
+
+      leafPositions.add(key);
+
+      // كلما ارتفعت الأوراق أصبحت أفتح.
+      const heightFactor = THREE.MathUtils.clamp(
+        (y - 8) / 9,
+        0,
+        1
+      );
+
+      const baseColors = [
+        0xe88fab,
+        0xf09ab8,
+        0xf4aac4,
+        0xdd7fa3
+      ];
+
+      const baseColor =
+        baseColors[Math.floor(random() * baseColors.length)];
+
+      leafBlocks.push({
+        x,
+        y,
+        z,
+        color: variedColor(
+          baseColor,
+          0.035,
+          heightFactor * 0.105 - 0.025
+        )
+      });
+    }
+
+    leafClusters.forEach((cluster) => {
+      const minX = Math.floor(cluster.x - cluster.rx);
+      const maxX = Math.ceil(cluster.x + cluster.rx);
+
+      const minY = Math.floor(cluster.y - cluster.ry);
+      const maxY = Math.ceil(cluster.y + cluster.ry);
+
+      const minZ = Math.floor(cluster.z - cluster.rz);
+      const maxZ = Math.ceil(cluster.z + cluster.rz);
+
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            const nx = (x - cluster.x) / cluster.rx;
+            const ny = (y - cluster.y) / cluster.ry;
+            const nz = (z - cluster.z) / cluster.rz;
+
+            const distance = nx * nx + ny * ny + nz * nz;
+
+            // فراغات بسيطة داخل التاج لكي لا يصبح كتلة مصمتة.
+            const densityNoise =
+              Math.sin(x * 2.1 + z * 1.3) * 0.055 +
+              Math.cos(y * 2.4 - x) * 0.04;
+
+            if (
+              distance < 1 + densityNoise &&
+              random() > 0.075
+            ) {
+              addLeafBlock(x, y, z);
+            }
+          }
+        }
+      }
+    });
+
+    createVoxelInstances(
+      leafBlocks,
+      createVoxelMaterial(0.82)
+    );
+
+    // --------------------------------------------------
+    // بتلات الساكورا المتساقطة
+    // --------------------------------------------------
+
+    const petalCount = 95;
+
+    const petalGeometry = new THREE.BoxGeometry(
+      0.14,
+      0.045,
+      0.23
+    );
+
+    const petalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf6abc5,
+      roughness: 0.72,
+      metalness: 0,
+      vertexColors: true
+    });
+
+    const petals = new THREE.InstancedMesh(
+      petalGeometry,
+      petalMaterial,
+      petalCount
+    );
+
+    petals.castShadow = false;
+    petals.receiveShadow = false;
+
+    scene.add(petals);
+
+    const petalData = [];
+    const petalMatrix = new THREE.Matrix4();
+    const petalQuaternion = new THREE.Quaternion();
+    const petalScale = new THREE.Vector3(1, 1, 1);
+    const petalEuler = new THREE.Euler();
+
+    function resetPetal(petal, initial = false) {
+      petal.x = randomRange(-6.5, 6.5);
+      petal.y = initial
+        ? randomRange(3.0, 16.5)
+        : randomRange(12.0, 16.5);
+      petal.z = randomRange(-5.2, 5.2);
+
+      petal.speed = randomRange(0.55, 1.25);
+      petal.drift = randomRange(0.3, 0.85);
+      petal.phase = randomRange(0, Math.PI * 2);
+      petal.rotationSpeed = randomRange(-2.3, 2.3);
+    }
+
+    for (let i = 0; i < petalCount; i++) {
+      const petal = {};
+      resetPetal(petal, true);
+      petalData.push(petal);
+
+      petals.setColorAt(
+        i,
+        variedColor(0xf2a3bf, 0.055, randomRange(-0.02, 0.05))
+      );
+    }
+
+    petals.instanceColor.needsUpdate = true;
+
+    function updatePetals(elapsed, delta) {
+      for (let i = 0; i < petalCount; i++) {
+        const petal = petalData[i];
+
+        petal.y -= petal.speed * delta;
+
+        petal.x +=
+          Math.sin(elapsed * 1.2 + petal.phase) *
+          petal.drift *
+          delta;
+
+        petal.z +=
+          Math.cos(elapsed * 0.85 + petal.phase) *
+          petal.drift *
+          0.55 *
+          delta;
+
+        // تختفي البتلة قبل ملامسة العشب حتى لا توجد
+        // بلوكات وردية أو أوراق متراكمة على الأرض.
+        if (
+          petal.y < 1.15 ||
+          Math.abs(petal.x) > 10 ||
+          Math.abs(petal.z) > 9
+        ) {
+          resetPetal(petal);
+        }
+
+        petalEuler.set(
+          elapsed * petal.rotationSpeed + petal.phase,
+          elapsed * 0.7 + petal.phase,
+          Math.sin(elapsed + petal.phase)
+        );
+
+        petalQuaternion.setFromEuler(petalEuler);
+
+        petalMatrix.compose(
+          new THREE.Vector3(petal.x, petal.y, petal.z),
+          petalQuaternion,
+          petalScale
+        );
+
+        petals.setMatrixAt(i, petalMatrix);
+      }
+
+      petals.instanceMatrix.needsUpdate = true;
+    }
+
+    // --------------------------------------------------
+    // الإضاءة النهارية والليلية
+    // --------------------------------------------------
+
+    const hemisphereLight = new THREE.HemisphereLight(
+      0xcfeaff,
+      0x6b4c40,
+      1.55
+    );
+
+    scene.add(hemisphereLight);
+
+    const sunLight = new THREE.DirectionalLight(
+      0xfff0d3,
+      3.25
+    );
+
+    sunLight.position.set(-12, 22, 13);
+    sunLight.castShadow = true;
+
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 70;
+
+    sunLight.shadow.camera.left = -18;
+    sunLight.shadow.camera.right = 18;
+    sunLight.shadow.camera.top = 20;
+    sunLight.shadow.camera.bottom = -18;
+
+    sunLight.shadow.bias = -0.00025;
+    sunLight.shadow.normalBias = 0.035;
+
+    scene.add(sunLight);
+
+    const fillLight = new THREE.DirectionalLight(
+      0xffb7ce,
+      0.8
+    );
+
+    fillLight.position.set(14, 8, -12);
+    scene.add(fillLight);
+
+    const moonLight = new THREE.DirectionalLight(
+      0x9cbcff,
+      0
+    );
+
+    moonLight.position.set(10, 18, 8);
+    moonLight.castShadow = true;
+
+    moonLight.shadow.mapSize.set(2048, 2048);
+    moonLight.shadow.camera.left = -18;
+    moonLight.shadow.camera.right = 18;
+    moonLight.shadow.camera.top = 20;
+    moonLight.shadow.camera.bottom = -18;
+    moonLight.shadow.camera.near = 0.5;
+    moonLight.shadow.camera.far = 65;
+    moonLight.shadow.normalBias = 0.04;
+
+    scene.add(moonLight);
+
+    // ضوء وردي خفيف داخل الشجرة ليلاً.
+    const sakuraGlow = new THREE.PointLight(
+      0xff8fbd,
+      0,
+      25,
+      2
+    );
+
+    sakuraGlow.position.set(0, 10, 1);
+    scene.add(sakuraGlow);
+
+    // --------------------------------------------------
+    // نجوم الوضع الليلي
+    // --------------------------------------------------
+
+    const starsGeometry = new THREE.BufferGeometry();
+    const starPositions = [];
+
+    for (let i = 0; i < 650; i++) {
+      const radius = randomRange(35, 75);
+      const theta = randomRange(0, Math.PI * 2);
+      const phi = randomRange(0.12, Math.PI * 0.48);
+
+      starPositions.push(
+        Math.cos(theta) * Math.sin(phi) * radius,
+        Math.cos(phi) * radius,
+        Math.sin(theta) * Math.sin(phi) * radius
+      );
+    }
+
+    starsGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(starPositions, 3)
+    );
+
+    const starsMaterial = new THREE.PointsMaterial({
+      color: 0xdce8ff,
+      size: 0.13,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+
+    const stars = new THREE.Points(
+      starsGeometry,
+      starsMaterial
+    );
+
+    scene.add(stars);
+
+    // --------------------------------------------------
+    // تبديل الوضع
+    // --------------------------------------------------
+
+    let isNight = false;
+    const modeButton = document.getElementById("modeButton");
+
+    const lightingState = {
+      sun: 3.25,
+      fill: 0.8,
+      moon: 0,
+      glow: 0,
+      hemi: 1.55,
+      exposure: 1.12,
+      stars: 0
+    };
+
+    const lightingTarget = { ...lightingState };
+
+    modeButton.addEventListener("click", () => {
+      isNight = !isNight;
+
+      document.body.classList.toggle("night", isNight);
+
+      modeButton.textContent = isNight
+        ? "☀️ الوضع النهاري"
+        : "🌙 الوضع الليلي";
+
+      if (isNight) {
+        lightingTarget.sun = 0.08;
+        lightingTarget.fill = 0.12;
+        lightingTarget.moon = 2.15;
+        lightingTarget.glow = 1.55;
+        lightingTarget.hemi = 0.42;
+        lightingTarget.exposure = 0.82;
+        lightingTarget.stars = 0.9;
+
+        hemisphereLight.color.set(0x51658e);
+        hemisphereLight.groundColor.set(0x161222);
+
+        scene.fog.color.set(0x11152b);
+        scene.fog.density = 0.015;
+      } else {
+        lightingTarget.sun = 3.25;
+        lightingTarget.fill = 0.8;
+        lightingTarget.moon = 0;
+        lightingTarget.glow = 0;
+        lightingTarget.hemi = 1.55;
+        lightingTarget.exposure = 1.12;
+        lightingTarget.stars = 0;
+
+        hemisphereLight.color.set(0xcfeaff);
+        hemisphereLight.groundColor.set(0x6b4c40);
+
+        scene.fog.color.set(0xcfeaff);
+        scene.fog.density = 0.011;
+      }
+    });
+
+    function updateLighting(delta) {
+      const factor = 1 - Math.exp(-delta * 2.6);
+
+      lightingState.sun = THREE.MathUtils.lerp(
+        lightingState.sun,
+        lightingTarget.sun,
+        factor
+      );
+
+      lightingState.fill = THREE.MathUtils.lerp(
+        lightingState.fill,
+        lightingTarget.fill,
+        factor
+      );
+
+      lightingState.moon = THREE.MathUtils.lerp(
+        lightingState.moon,
+        lightingTarget.moon,
+        factor
+      );
+
+      lightingState.glow = THREE.MathUtils.lerp(
+        lightingState.glow,
+        lightingTarget.glow,
+        factor
+      );
+
+      lightingState.hemi = THREE.MathUtils.lerp(
+        lightingState.hemi,
+        lightingTarget.hemi,
+        factor
+      );
+
+      lightingState.exposure = THREE.MathUtils.lerp(
+        lightingState.exposure,
+        lightingTarget.exposure,
+        factor
+      );
+
+      lightingState.stars = THREE.MathUtils.lerp(
+        lightingState.stars,
+        lightingTarget.stars,
+        factor
+      );
+
+      sunLight.intensity = lightingState.sun;
+      fillLight.intensity = lightingState.fill;
+      moonLight.intensity = lightingState.moon;
+      sakuraGlow.intensity = lightingState.glow;
+      hemisphereLight.intensity = lightingState.hemi;
+
+      renderer.toneMappingExposure = lightingState.exposure;
+      starsMaterial.opacity = lightingState.stars;
+    }
+
+    // --------------------------------------------------
+    // الحركة والرسم
+    // --------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.elapsedTime;
+
+      controls.update();
+      updatePetals(elapsed, delta);
+      updateLighting(delta);
+
+      // حركة طفيفة جداً للجزيرة لتعزيز إحساس الطفو.
+      worldGroup.position.y =
+        Math.sin(elapsed * 0.42) * 0.07;
+
+      petals.position.y = worldGroup.position.y;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // --------------------------------------------------
+    // تغيير حجم النافذة
+    // --------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+      );
+
+      renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 2)
+      );
+    });
+  </script>
+</body>
+</html>

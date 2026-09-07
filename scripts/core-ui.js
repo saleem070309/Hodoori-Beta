@@ -65,7 +65,7 @@ const UI = {
             position: fixed;
             top: 16px;
             left: 50%;
-            transform: translateX(-50%) translateY(-60px) scale(0.85);
+            transform: translateX(-50%) translateY(-30px) scale(0.96);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -73,7 +73,10 @@ const UI = {
             border-radius: 999px;
             z-index: 99999;
             opacity: 0;
-            transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.28s ease;
+            filter: blur(var(--blur-small, 2px));
+            transition: transform var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)),
+                        opacity var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)),
+                        filter var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1));
             max-width: 90vw;
             white-space: nowrap;
             box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
@@ -102,20 +105,21 @@ const UI = {
 
         document.body.appendChild(toast);
 
-        // Animate in — slide down + scale up (Dynamic Island feel)
+        // Animate in — slide down + scale up
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 toast.style.opacity = '1';
+                toast.style.filter = 'blur(0)';
                 toast.style.transform = 'translateX(-50%) translateY(0) scale(1)';
             });
         });
 
-        // Auto remove — slide up + scale down
+        // Auto remove — quick exit with open/close asymmetry (150ms)
         setTimeout(() => {
+            toast.style.transition = 'transform var(--duration-quick, 150ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)), opacity var(--duration-quick, 150ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1))';
             toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(-40px) scale(0.88)';
-            toast.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 1, 1), opacity 0.25s ease';
-            setTimeout(() => toast.remove(), 350);
+            toast.style.transform = 'translateX(-50%) translateY(-20px) scale(0.96)';
+            setTimeout(() => toast.remove(), 160);
         }, 3000);
     },
 
@@ -599,24 +603,32 @@ const UI = {
     /**
      * Modal Helpers
      */
+    /**
+     * Modal Helpers (Asymmetric open 250ms vs close 150ms)
+     */
     showModal(modalId) {
         const overlay = document.getElementById('modalOverlay');
         const modals = document.querySelectorAll('.liquid-glass-modal');
         
         if (overlay) {
             overlay.classList.remove('hidden');
+            overlay.style.opacity = '0';
+            overlay.style.transition = 'opacity var(--modal-open-dur, 250ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1))';
+            requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
             modals.forEach(m => m.classList.add('hidden'));
             const target = document.getElementById(modalId);
             if (target) {
                 target.classList.remove('hidden');
-                // Standard liquid animation
                 target.style.opacity = '0';
-                target.style.transform = 'scale(0.9) translateY(20px)';
-                setTimeout(() => {
-                    target.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                target.style.transform = 'scale(var(--modal-scale, 0.96))';
+                target.style.transition = 'none';
+                void target.offsetWidth; // flush
+                target.style.transition = 'transform var(--modal-open-dur, 250ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1)), opacity var(--modal-open-dur, 250ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1))';
+                requestAnimationFrame(() => {
                     target.style.opacity = '1';
-                    target.style.transform = 'scale(1) translateY(0)';
-                }, 10);
+                    target.style.transform = 'scale(1)';
+                });
             }
         }
     },
@@ -624,14 +636,26 @@ const UI = {
     hideModal() {
         const overlay = document.getElementById('modalOverlay');
         if (overlay) {
-            overlay.classList.add('hidden');
-            // Reset modal states
+            overlay.style.transition = 'opacity var(--modal-close-dur, 150ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1))';
+            overlay.style.opacity = '0';
+
             const modals = document.querySelectorAll('.liquid-glass-modal');
             modals.forEach(m => {
-                m.classList.add('hidden');
-                m.style.opacity = '0';
-                m.style.transform = 'scale(0.9) translateY(20px)';
+                if (!m.classList.contains('hidden')) {
+                    m.style.transition = 'transform var(--modal-close-dur, 150ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1)), opacity var(--modal-close-dur, 150ms) var(--modal-ease, cubic-bezier(0.22, 1, 0.36, 1))';
+                    m.style.opacity = '0';
+                    m.style.transform = 'scale(var(--modal-scale-close, 0.96))';
+                }
             });
+
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                modals.forEach(m => {
+                    m.classList.add('hidden');
+                    m.style.opacity = '0';
+                    m.style.transform = 'scale(var(--modal-scale, 0.96))';
+                });
+            }, 160);
         }
     }
 };
@@ -639,11 +663,13 @@ const UI = {
 // Global shortcuts
 window.animateNumber = (el, val, opts) => UI.animateNumber(el, val, opts);
 window.formatNumberPopIn = (val, opts) => UI.formatNumberPopIn(val, opts);
-window.Transitions = {
-    popIn: (el, val, opts) => UI.animateNumber(el, val, opts),
-    format: (val, opts) => UI.formatNumberPopIn(val, opts)
-};
+if (!window.Transitions) {
+    window.Transitions = {};
+}
+window.Transitions.popIn = (el, val, opts) => UI.animateNumber(el, val, opts);
+window.Transitions.format = (val, opts) => UI.formatNumberPopIn(val, opts);
 
 // Auto-init on script load
 UI.init();
 UI.initAutoNumberPopIn();
+

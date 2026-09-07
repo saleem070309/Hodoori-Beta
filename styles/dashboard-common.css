@@ -5,6 +5,7 @@
  * @copyright (c) 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All rights reserved.
  */
 
+@import url('transitions-root.css');
 @import url('component-sidebar.css');
 
 /* ─── Page Container & Modern Neutral Background ─── */
@@ -17,7 +18,7 @@
   background-color: #f4f6f8 !important;
   color: #0f172a;
   font-family: 'Tajawal', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  transition: margin-right 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease;
+  transition: margin-right var(--panel-open-dur) var(--panel-ease), width var(--panel-open-dur) var(--panel-ease), background-color var(--duration-fast) ease;
   padding: 1.25rem;
 }
 

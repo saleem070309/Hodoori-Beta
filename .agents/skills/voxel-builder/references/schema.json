@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VoxelIslandModel",
+  "type": "object",
+  "required": [
+    "title",
+    "gridSize",
+    "layers"
+  ],
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "generator": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "gridSize": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 32
+    },
+    "centerOffset": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "y",
+          "grid"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "y": {
+            "type": "integer"
+          },
+          "grid": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

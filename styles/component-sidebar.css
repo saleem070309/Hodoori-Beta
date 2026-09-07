@@ -5,6 +5,8 @@
  * @copyright © 2025-2026 Saleem Yasser Saleem Al-Khadiwi. All rights reserved.
  */
 
+@import url('transitions-root.css');
+
 /* ─── Legendary 2-Line Menu Trigger Button ─── */
 .hodoori-menu-btn {
   width: 40px;
@@ -19,7 +21,7 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  transition: opacity 0.2s ease, transform 0.15s ease;
+  transition: opacity var(--duration-fast) var(--ease-smooth-out), transform var(--duration-quick) var(--ease-smooth-out);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -37,7 +39,7 @@
   height: 2px;
   border-radius: 9999px;
   background-color: #1c1917;
-  transition: background-color 0.2s ease, width 0.2s ease;
+  transition: background-color var(--duration-fast) ease, width var(--duration-fast) var(--ease-smooth-out);
 }
 
 .menu-line-top {
@@ -67,10 +69,11 @@
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s ease, background-color 0.3s ease;
+  transition: transform var(--panel-open-dur) var(--panel-ease), visibility var(--panel-open-dur) ease, background-color var(--duration-fast) ease;
   visibility: hidden;
   box-shadow: -3px 0 15px rgba(0, 0, 0, 0.03);
   font-family: 'Tajawal', sans-serif;
+  will-change: transform;
 }
 
 body.agent-sidebar-open .agent-sidebar {
@@ -245,13 +248,14 @@ body.agent-sidebar-open .agent-sidebar-overlay {
   padding: 1rem;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--modal-close-dur) var(--modal-ease);
 }
 
 .hodoori-modal-backdrop.active {
   display: flex !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+  transition: opacity var(--modal-open-dur) var(--modal-ease);
 }
 
 .hodoori-settings-dialog {
@@ -264,14 +268,22 @@ body.agent-sidebar-open .agent-sidebar-overlay {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
-  transform: scale(0.97);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scale(var(--modal-scale));
+  opacity: 0;
+  transition:
+    transform var(--modal-close-dur) var(--modal-ease),
+    opacity var(--modal-close-dur) var(--modal-ease);
+  will-change: transform, opacity;
   direction: rtl;
   font-family: 'Tajawal', sans-serif;
 }
 
 .hodoori-modal-backdrop.active .hodoori-settings-dialog {
   transform: scale(1);
+  opacity: 1;
+  transition:
+    transform var(--modal-open-dur) var(--modal-ease),
+    opacity var(--modal-open-dur) var(--modal-ease);
 }
 
 .theme-dark-orange .hodoori-settings-dialog {

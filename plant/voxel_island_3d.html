@@ -1,0 +1,3800 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>استوديو فوكسل الجزيرة - Voxel Island & Layer Studio</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- GSAP for Smooth Morph & Transitions -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <!-- QRCode Generator for 3D Voxel QR Code Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Tajawal', sans-serif;
+            background-color: #000000;
+            color: #f4f4f5;
+        }
+        
+        /* Monochrome Minimalist Button System */
+        .mono-btn {
+            height: 32px;
+            padding: 0 8px;
+            min-width: 0;
+            font-size: 11px;
+            font-weight: 700;
+            background-color: #121214;
+            color: #d4d4d8;
+            border: 1px solid #27272a;
+            border-radius: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .mono-btn:hover {
+            background-color: #27272a;
+            color: #ffffff;
+            border-color: #52525b;
+        }
+        .mono-btn:active {
+            transform: translateY(1px);
+        }
+        .mono-btn.active {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #ffffff !important;
+            font-weight: 800;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 13px;
+            background-color: #121214;
+            color: #d4d4d8;
+            border: 1px solid #27272a;
+            border-radius: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .icon-btn:hover {
+            background-color: #27272a;
+            color: #ffffff;
+            border-color: #52525b;
+        }
+        .icon-btn:active {
+            transform: translateY(1px);
+        }
+        .icon-btn.active {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #ffffff !important;
+            font-weight: bold;
+        }
+
+        /* Minimalist Sharp Card */
+        .mono-card {
+            background-color: #0c000e;
+            border: 1px solid #1f1f23;
+            border-radius: 2px;
+        }
+
+        /* 2D Pixel Grid Canvas */
+        .pixel-grid {
+            display: grid;
+            gap: 1px;
+            background-color: #18181b;
+            padding: 2px;
+            border: 1px solid #27272a;
+            border-radius: 2px;
+            width: 100%;
+            max-height: 240px;
+            aspect-ratio: 1;
+        }
+        .pixel-cell {
+            aspect-ratio: 1;
+            cursor: pointer;
+            position: relative;
+            background-color: #09090b;
+            border: 1px solid #18181b;
+            transition: background-color 0.1s ease;
+        }
+        .pixel-cell:hover {
+            z-index: 2;
+            border-color: #ffffff;
+        }
+        .pixel-cell.onion-preview::after {
+            content: '';
+            position: absolute;
+            inset: 1px;
+            background: var(--onion-color);
+            opacity: 0.35;
+            border: 1px dashed rgba(255, 255, 255, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 1px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* Mobile Drawer Slide-in Animation */
+        @media (max-width: 767px) {
+            #sidebar-controls {
+                position: fixed;
+                top: 56px;
+                right: 0;
+                bottom: 0;
+                z-index: 50;
+                width: 88vw;
+                max-width: 380px;
+                background-color: #000000;
+                border-left: 1px solid #27272a;
+                transform: translateX(100%);
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+                box-shadow: -10px 0 30px rgba(0,0,0,0.85);
+            }
+            #sidebar-controls.drawer-open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="relative w-full h-full flex flex-col bg-black text-zinc-100 overflow-hidden select-none">
+
+    <!-- ==================== TOP NAVIGATION BAR ==================== -->
+    <header class="min-h-[52px] bg-black border-b border-zinc-800 px-2 sm:px-3 py-1 flex flex-wrap sm:flex-nowrap justify-between items-center gap-1.5 shrink-0 z-30">
+        
+        <!-- Left: Branding & Stats -->
+        <div class="flex items-center gap-2 shrink-0">
+            <div class="w-7 h-7 bg-white text-black font-black flex items-center justify-center rounded-sm text-xs shrink-0">
+                VX
+            </div>
+            <div>
+                <h1 class="text-[11px] font-black tracking-wider uppercase text-white flex items-center gap-1.5 leading-none">
+                    <span>VOXEL STUDIO</span>
+                    <span class="text-[8px] font-mono px-1 py-0.2 bg-zinc-900 border border-zinc-700 text-zinc-400 rounded-sm">PRO</span>
+                </h1>
+                <p class="text-[9px] font-mono text-zinc-400 flex items-center gap-1.5 leading-none mt-0.5">
+                    <span id="stat-blocks-count">0 مكعب</span> • 
+                    <span id="stat-layers-count">1 طبقة</span> • 
+                    <span id="stat-grid-size" class="text-zinc-200 font-bold">8×8</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Center: Mode Switcher -->
+        <div class="flex items-center bg-zinc-950 p-0.5 border border-zinc-800 rounded-sm gap-0.5 shrink-0">
+            <button id="mode-layers" class="mono-btn active !h-7 !px-2 !text-[10px]" title="محرر الطبقات 2D/3D">
+                <span>🎨</span>
+                <span id="mode-layers-label">الطبقات</span>
+            </button>
+            <button id="mode-direct" class="mono-btn !h-7 !px-2 !text-[10px]" title="البناء المباشر في العالم">
+                <span>🧊</span>
+                <span>تحرير 3D</span>
+            </button>
+            <button id="mode-view" class="mono-btn !h-7 !px-2 !text-[10px]" title="عرض حر & تموج">
+                <span>👁️</span>
+                <span>عرض حر</span>
+            </button>
+        </div>
+
+        <!-- Right: Performance Tier, Audio, Reset, Export/Import, Mobile Drawer Button -->
+        <div class="flex items-center gap-1 shrink-0">
+            <!-- Performance Tier Selector -->
+            <div class="flex items-center gap-1 bg-zinc-950 px-1 py-0.5 border border-zinc-800 rounded-sm" title="وضع أداء الرسوم">
+                <span class="text-[9px] text-amber-400 font-bold">⚡</span>
+                <select id="select-perf-tier" class="bg-zinc-900 border border-zinc-700 text-white text-[9px] font-bold px-1 py-0.5 rounded-sm focus:outline-none cursor-pointer max-w-[90px] sm:max-w-none">
+                    <option value="auto" selected>⚡ تلقائي</option>
+                    <option value="eco">🔋 اقتصادي</option>
+                    <option value="balanced">⚖️ متوازن</option>
+                    <option value="ultra">💎 فائق</option>
+                </select>
+            </div>
+
+            <!-- Sound Toggle Button -->
+            <button id="btn-sound-toggle" class="icon-btn !w-7 !h-7 !text-xs" title="كتم / تشغيل المؤثرات الصوتية">
+                <span id="sound-icon">🔊</span>
+            </button>
+
+            
+
+            <!-- Reset Camera -->
+            <button id="btn-reset-cam" class="icon-btn !w-7 !h-7 !text-xs" title="إعادة ضبط الكاميرا">
+                <span>🎯</span>
+            </button>
+
+            <!-- Mobile Drawer Button -->
+            <button id="btn-mobile-sidebar-toggle" class="md:hidden mono-btn !h-7 !px-2 !bg-zinc-800 !text-white font-bold flex items-center gap-1 text-[10px]">
+                <span id="mobile-toggle-icon">⚙️</span>
+                <span id="mobile-toggle-text">الأدوات</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ==================== MAIN WORKSPACE AREA ==================== -->
+    <main class="flex-1 flex w-full h-[calc(100vh-52px)] overflow-hidden relative">
+
+        <!-- ==================== LEFT AREA: 3D VIEWPORT WINDOW ==================== -->
+        <section class="flex-1 relative flex flex-col bg-zinc-950 min-w-0 border-l border-zinc-800">
+            
+            <!-- Viewport Header Bar -->
+            <div class="h-8 bg-zinc-900/90 border-b border-zinc-800 px-2 sm:px-3 flex justify-between items-center text-[11px] font-mono text-zinc-400 shrink-0 z-10">
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span id="fps-badge" class="px-1.5 py-0.2 bg-emerald-950 border border-emerald-700 text-emerald-300 font-mono text-[9px] rounded-sm font-bold">60 FPS</span>
+                    <span class="font-bold text-zinc-200 tracking-wider hidden sm:inline text-[10px]">3D VIEWPORT</span>
+                    <span class="text-zinc-600 hidden sm:inline">|</span>
+                    <span id="viewport-coords-label" class="text-zinc-400 text-[10px]">المركز: (0, 0, 0)</span>
+                </div>
+
+                <!-- Quick Camera Angle Presets & Auto Rotate -->
+                <div class="flex items-center gap-1">
+                    <button id="btn-auto-rotate" class="icon-btn !w-6 !h-6 !text-[10px]" title="دوران تلقائي">🔄</button>
+                    <button id="cam-iso" class="mono-btn !h-6 !px-2 !text-[9px] sm:!text-[10px] active">منظور</button>
+                    <button id="cam-top" class="mono-btn !h-6 !px-2 !text-[9px] sm:!text-[10px]" title="عرض علوي للـ QR">علوي (QR)</button>
+                    <button id="cam-front" class="mono-btn !h-6 !px-2 !text-[9px] sm:!text-[10px]">أمامي</button>
+                </div>
+            </div>
+
+            <!-- 3D Canvas Sub-Window Container -->
+            <div id="viewport-container" class="flex-1 relative w-full h-full overflow-hidden bg-zinc-950">
+                <canvas id="webgl-canvas" class="w-full h-full block outline-none"></canvas>
+
+                <!-- Free View Floating Ripple Notice -->
+                <!-- QR Mode Floating Top Banner -->
+                <div id="qr-active-banner" class="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none hidden">
+                    <div class="mono-card px-3 py-1.5 bg-black/90 border border-cyan-500/70 text-white text-xs font-bold flex items-center gap-3 shadow-2xl backdrop-blur-md">
+                        <span class="flex items-center gap-1.5 text-cyan-400">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                            <span>📱 وضع عرض كود الـ QR ثلاثي الأبعاد</span>
+                        </span>
+                        <button id="btn-banner-exit-qr" class="mono-btn !h-6 !px-2.5 !bg-rose-950 !border-rose-700 !text-rose-200 pointer-events-auto hover:!bg-rose-900 font-bold text-[10px]">
+                            <span>🔙</span> <span>العودة للجزيرة</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="view-mode-banner" class="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none hidden">
+                    <div class="mono-card px-3 py-1 bg-black/85 border-zinc-700 text-zinc-300 text-[11px] font-medium flex items-center gap-2 shadow-lg backdrop-blur-sm">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                        <span>🌊 انقر في أي مكان لإطلاق تموجات بحرية ثلاثية الأبعاد!</span>
+                    </div>
+                </div>
+
+                <!-- Floating Bottom Bar Inside 3D Viewport -->
+                <div class="absolute bottom-3 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
+                    <!-- Environment Lighting Preset Buttons -->
+                    <div class="mono-card p-1 pointer-events-auto flex items-center gap-1 bg-black/85 border-zinc-800">
+                        <button class="env-btn mono-btn !h-6.5 !px-2 !text-[10px] active" data-env="day">
+                            <span>☀️</span> <span class="hidden sm:inline">نهار</span>
+                        </button>
+                        <button class="env-btn mono-btn !h-6.5 !px-2 !text-[10px]" data-env="sunset">
+                            <span>🌅</span> <span class="hidden sm:inline">غروب</span>
+                        </button>
+                        <button class="env-btn mono-btn !h-6.5 !px-2 !text-[10px]" data-env="night">
+                            <span>🌙</span> <span class="hidden sm:inline">ليل</span>
+                        </button>
+                    </div>
+
+                    <!-- Toast Notification Badge -->
+                    <div id="studio-toast" class="mono-card px-3 py-1.5 pointer-events-auto text-xs text-white hidden items-center gap-2 bg-black/90 border-zinc-700 shadow-xl">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="toast-message" class="font-medium">تم تحديث النموذج بنجاح!</span>
+                    </div>
+
+                    <!-- Screenshot Button -->
+                    <button id="btn-screenshot" class="icon-btn !h-6.5 !w-6.5 pointer-events-auto bg-black/85" title="التقاط صورة">
+                        <span>📷</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== RIGHT AREA: CONTROLS & EDITOR SIDEBAR ==================== -->
+        <aside id="sidebar-controls" class="w-full md:w-[380px] lg:w-[410px] max-w-full bg-black border-r border-zinc-800 flex flex-col h-full shrink-0 overflow-y-auto overflow-x-hidden p-2.5 sm:p-3 gap-2.5">
+
+            <!-- Mobile Close Header -->
+            <div class="md:hidden flex items-center justify-between pb-2 border-b border-zinc-800">
+                <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>🛠️</span> لوحة التحرير والأدوات
+                </span>
+                <button id="btn-close-mobile-drawer" class="icon-btn !w-7 !h-7 text-zinc-400 hover:text-white">✕</button>
+            </div>
+
+            <!-- 0. MULTI-MODEL MANAGER CARD -->
+            <div id="card-model-manager" class="mono-card p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between pb-1.5 border-b border-zinc-800/80">
+                    <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🗂️</span> إدارة المجسمات:
+                    </span>
+                    
+                    <!-- Transition Animation Mode -->
+                    <div class="flex items-center gap-1">
+                        <span class="text-[9px] text-zinc-400 font-bold">الحركية:</span>
+                        <select id="select-anim-mode" class="bg-zinc-900 border border-zinc-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm focus:outline-none cursor-pointer">
+                            <option value="morph" selected>مورف (Morph)</option>
+                            <option value="stagger">تتابع (Stagger)</option>
+                            <option value="off">إيقاف (Off)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Model Selector Dropdown (Full Width) -->
+                <div class="w-full">
+                    <select id="select-model" class="w-full bg-zinc-900 border border-zinc-700 text-white text-xs font-bold px-2 py-1.5 rounded-sm focus:outline-none focus:border-white truncate cursor-pointer">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Model Primary Actions (2 columns) -->
+                <div class="grid grid-cols-2 gap-1.5 w-full">
+                    <button id="btn-new-model" class="mono-btn !h-7 text-xs text-emerald-400 hover:text-white justify-center w-full font-bold" title="إنشاء مجسم جديد">
+                        <span>➕</span> <span>مجسم جديد</span>
+                    </button>
+                    <button id="btn-duplicate-model" class="mono-btn !h-7 text-xs text-zinc-300 hover:text-white justify-center w-full" title="تكرار المجسم الحالي">
+                        <span>📋</span> <span>تكرار المجسم</span>
+                    </button>
+                </div>
+
+                <!-- Model Secondary Actions (2 columns: Rename & Clear Delete) -->
+                <div class="grid grid-cols-2 gap-1.5 w-full">
+                    <button id="btn-rename-model" class="mono-btn !h-7 text-xs text-zinc-300 hover:text-white justify-center w-full" title="إعادة تسمية المجسم">
+                        <span>✏️</span> <span>إعادة تسمية</span>
+                    </button>
+                    <button id="btn-delete-model" class="mono-btn !h-7 text-xs text-rose-400 hover:text-rose-100 hover:bg-rose-950/60 border border-rose-800/80 justify-center w-full font-bold" title="حذف المجسم الحالي">
+                        <span>🗑️</span> <span>حذف المجسم</span>
+                    </button>
+                </div>
+
+                <!-- JSON Import / Export Quick Bar (Always available on all devices) -->
+                <div class="grid grid-cols-2 gap-1.5 w-full pt-1 border-t border-zinc-800/60">
+                    <button id="btn-export-json-card" class="mono-btn !h-7 text-xs text-zinc-200 hover:text-white justify-center w-full font-bold" title="تصدير المجسم الحالي كملف JSON">
+                        <span>💾</span> <span>تصدير JSON</span>
+                    </button>
+                    <label class="mono-btn !h-7 text-xs text-zinc-200 hover:text-white justify-center w-full cursor-pointer font-bold" title="استيراد مجسم من ملف JSON">
+                        <span>📂</span> <span>استيراد JSON</span>
+                        <input type="file" id="file-import-json-card" accept=".json" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <!-- 1. LAYER MANAGER CARD -->
+            <div id="card-layer-manager" class="mono-card p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between pb-1.5 border-b border-zinc-800/80 gap-1">
+                    <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1 shrink-0">
+                            <span>🥞</span> الطبقة:
+                        </span>
+                        <select id="select-layer" class="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-white text-xs font-bold px-2 py-1 rounded-sm focus:outline-none focus:border-white truncate cursor-pointer">
+                            <option value="0">طبقة 1 (Y=1)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button id="btn-prev-layer" class="icon-btn !w-7 !h-7" title="الطبقة السفلية (Y-)">▼</button>
+                        <button id="btn-next-layer" class="icon-btn !w-7 !h-7" title="الطبقة العلوية (Y+)">▲</button>
+                    </div>
+                </div>
+
+                <!-- Layer Primary Actions: Add & Delete -->
+                <div class="grid grid-cols-2 gap-1.5 w-full">
+                    <button id="btn-add-layer" class="mono-btn !h-7 text-xs text-emerald-400 hover:text-white justify-center w-full font-bold" title="إضافة طبقة جديدة فوق الحالية">
+                        <span>➕</span> <span>إضافة طبقة</span>
+                    </button>
+                    <button id="btn-delete-layer" class="mono-btn !h-7 text-xs text-rose-400 hover:text-rose-200 border border-rose-900/60 justify-center w-full font-bold" title="حذف الطبقة الحالية">
+                        <span>🗑️</span> <span>حذف الطبقة</span>
+                    </button>
+                </div>
+
+                <!-- Layer Secondary Actions (3 columns) -->
+                <div class="grid grid-cols-3 gap-1 w-full text-[10px]">
+                    <button id="btn-duplicate-layer" class="mono-btn !h-6.5 text-[10px] justify-center w-full" title="تكرار محتوى الطبقة">
+                        <span>📋</span> <span>تكرار</span>
+                    </button>
+                    <button id="btn-clear-layer" class="mono-btn !h-6.5 text-[10px] justify-center w-full" title="مسح محتوى الطبقة">
+                        <span>🧼</span> <span>مسح</span>
+                    </button>
+                    <button id="btn-onion-skin" class="mono-btn !h-6.5 text-[10px] justify-center w-full" title="معاينة شفافة للطبقة السفلية">
+                        <span>🧅</span> <span>شفاف</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. DIMENSIONS & CENTER POSITION CARD -->
+            <div id="card-dimensions-offset" class="mono-card p-2.5 flex flex-col gap-2">
+                <!-- Grid Dimensions Row -->
+                <div class="flex items-center justify-between gap-1 pb-1 border-b border-zinc-800/80">
+                    <span class="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1 shrink-0">
+                        <span>📐</span> أبعاد الشبكة:
+                    </span>
+                    <select id="select-grid-size" class="bg-zinc-900 border border-zinc-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm focus:outline-none cursor-pointer">
+                        <option value="4">4×4</option>
+                        <option value="6">6×6</option>
+                        <option value="7">7×7</option>
+                        <option value="8" selected>8×8</option>
+                        <option value="10">10×10</option>
+                        <option value="12">12×12</option>
+                        <option value="16">16×16</option>
+                    </select>
+                </div>
+
+                <!-- Quick Size Preset Pills Grid -->
+                <div class="grid grid-cols-6 gap-1 w-full" id="grid-size-presets">
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] justify-center w-full" data-size="4">4×4</button>
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] justify-center w-full" data-size="6">6×6</button>
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] justify-center w-full" data-size="7">7×7</button>
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] active justify-center w-full" data-size="8">8×8</button>
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] justify-center w-full" data-size="10">10×10</button>
+                    <button class="grid-size-btn mono-btn !h-6 !px-1 !text-[10px] justify-center w-full" data-size="12">12×12</button>
+                </div>
+
+                <div class="w-full h-px bg-zinc-800/80"></div>
+
+                <!-- Center Position On Island (D-Pad & Height) -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between text-[10px]">
+                        <span class="font-bold text-zinc-300 flex items-center gap-1">
+                            <span>🕹️</span> موضع مركز الطبقات:
+                        </span>
+                        <span id="badge-center-offset" class="font-mono text-[9px] px-1.5 py-0.2 bg-zinc-900 border border-zinc-700 text-white rounded-sm">
+                            X: 0 | Y: 0 | Z: 0
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-1.5">
+                        <!-- Horizontal D-Pad -->
+                        <div class="flex items-center gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-sm">
+                            <button id="btn-move-z-dec" class="icon-btn !w-6 !h-6 !text-[10px]" title="شمال (Z-)">⬆️</button>
+                            <button id="btn-move-x-dec" class="icon-btn !w-6 !h-6 !text-[10px]" title="غرب (X-)">⬅️</button>
+                            <button id="btn-move-reset" class="mono-btn !w-6 !h-6 !p-0 !text-[9px] text-white" title="المنتصف (0,0,0)">🎯</button>
+                            <button id="btn-move-x-inc" class="icon-btn !w-6 !h-6 !text-[10px]" title="شرق (X+)">➡️</button>
+                            <button id="btn-move-z-inc" class="icon-btn !w-6 !h-6 !text-[10px]" title="جنوب (Z+)">⬇️</button>
+                        </div>
+
+                        <!-- Height Up / Down -->
+                        <div class="flex items-center gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-sm">
+                            <button id="btn-move-y-inc" class="mono-btn !h-6 !px-2 !text-[10px]" title="رفع الطبقات (Y+1)">🔼 Y+</button>
+                            <button id="btn-move-y-dec" class="mono-btn !h-6 !px-2 !text-[10px]" title="خفض الطبقات (Y-1)">🔽 Y-</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 2D PIXEL ART CANVAS & DRAWING TOOLS -->
+            <div id="card-pixel-editor" class="mono-card p-2.5 flex flex-col gap-1.5">
+                <!-- Tools Row -->
+                <div class="flex items-center justify-between gap-1 pb-1 border-b border-zinc-800/80">
+                    <div class="flex items-center gap-1">
+                        <button id="tool-brush" class="tool-btn mono-btn active !h-6 !px-2.5 !text-[10px]">
+                            <span>✏️</span> رسم
+                        </button>
+                        <button id="tool-eraser" class="tool-btn mono-btn !h-6 !px-2.5 !text-[10px]">
+                            <span>🧹</span> ممحاة
+                        </button>
+                        <button id="tool-fill" class="tool-btn mono-btn !h-6 !px-2.5 !text-[10px]">
+                            <span>🪣</span> ملء
+                        </button>
+                    </div>
+                    <span id="label-layer-height" class="text-[9px] font-mono text-zinc-400">Y: 1 (فوق الجزيرة)</span>
+                </div>
+
+                <!-- Coordinate Header Labels -->
+                <div class="w-full flex justify-between text-[9px] font-mono text-zinc-500 px-1">
+                    <span id="label-x-start">X: -4</span>
+                    <span class="text-zinc-400 font-bold">لوحة الرسم 2D</span>
+                    <span id="label-x-end">X: +3</span>
+                </div>
+
+                <!-- Pixel Grid Container -->
+                <div class="flex justify-center w-full overflow-hidden">
+                    <div id="pixel-grid" class="pixel-grid max-w-[240px]"></div>
+                </div>
+
+                <!-- Coordinate Footer Labels -->
+                <div class="w-full flex justify-between text-[9px] font-mono text-zinc-500 px-1">
+                    <span id="label-z-start">Z: -4</span>
+                    <span id="label-z-end">Z: +3</span>
+                </div>
+            </div>
+
+            <!-- 4. CUSTOM COLOR PICKER & PALETTE CARD -->
+            <div id="card-color-picker" class="mono-card p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1">
+                        <span>🎨</span> اختيار لون مخصص:
+                    </span>
+                    <span id="custom-palette-count" class="text-[9px] text-zinc-400 font-mono">8/8</span>
+                </div>
+
+                <!-- Custom Color Picker Row -->
+                <div class="flex items-center gap-2 bg-zinc-900 p-1.5 border border-zinc-800 rounded-sm">
+                    <!-- Clickable Visual Color Swatch Tile -->
+                    <label class="relative cursor-pointer shrink-0">
+                        <input type="color" id="input-color-picker" value="#f472b6" class="sr-only">
+                        <div id="active-color-preview" class="w-8 h-8 border-2 border-white rounded-sm shadow-sm" style="background-color: #f472b6;"></div>
+                    </label>
+
+                    <!-- Hex Code Manual Text Input -->
+                    <div class="flex-1 flex flex-col gap-0.5">
+                        <div class="flex items-center gap-1">
+                            <span class="text-zinc-500 font-mono text-xs">#</span>
+                            <input type="text" id="input-hex-code" value="F472B6" maxlength="7" class="w-full bg-black border border-zinc-700 text-white font-mono text-xs px-1.5 py-0.5 rounded-sm focus:outline-none focus:border-white uppercase">
+                        </div>
+                    </div>
+
+                    <button id="btn-add-custom-color" class="mono-btn !h-7 !px-2 text-xs" title="إضافة إلى الألوان المحفوظة">
+                        ➕ حفظ
+                    </button>
+                </div>
+
+                <!-- Recent / Custom Saved Colors Palette -->
+                <div id="recent-colors-container" class="grid grid-cols-8 gap-1">
+                    <!-- Dynamic recent/custom swatches -->
+                </div>
+
+                <div class="w-full h-px bg-zinc-800/80"></div>
+
+                <!-- Curated Minecraft & Sakura Color Palette -->
+                <div class="grid grid-cols-8 gap-1">
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #f472b6;" data-color="#f472b6" title="زهري ساكورا"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #fbcfe8;" data-color="#fbcfe8" title="باستيل ناعم"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #db2777;" data-color="#db2777" title="قرمزي عميق"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #fff0f5;" data-color="#fff0f5" title="أبيض زهري"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #e11d48;" data-color="#e11d48" title="أحمر ياباني"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #f59e0b;" data-color="#f59e0b" title="ذهبي دافئ"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #fef08a;" data-color="#fef08a" title="شعلة فانوس"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #ffffff;" data-color="#ffffff" title="أبيض ناصع"></button>
+
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #5a3220;" data-color="#5a3220" title="خشب الكرز"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #3d2014;" data-color="#3d2014" title="خشب داكن"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #7a4833;" data-color="#7a4833" title="لحاء خشب"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #4d7c0f;" data-color="#4d7c0f" title="عشب ياباني"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #22c55e;" data-color="#22c55e" title="أوراق زاهية"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #38bdf8;" data-color="#38bdf8" title="ماء نقي"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #64748b;" data-color="#64748b" title="حجر رمادي"></button>
+                    <button class="color-swatch w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-transform" style="background: #18181b;" data-color="#18181b" title="فحم أسود"></button>
+                </div>
+            </div>
+
+            <!-- 5. TARGETED FALLING LEAVES PARTICLE SYSTEM CARD -->
+            <div id="card-falling-leaves" class="mono-card p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-800/80">
+                    <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🍃</span> تساقط الأوراق المخصص:
+                    </span>
+                    <span class="text-[9px] font-mono px-1.5 py-0.2 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-sm">FX</span>
+                </div>
+
+                <!-- Target Layer Row -->
+                <div class="flex items-center justify-between text-xs gap-1.5">
+                    <span class="text-zinc-300 font-bold shrink-0 text-[10px]">المصدر:</span>
+                    <select id="select-leaf-layer" class="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm focus:outline-none cursor-pointer truncate">
+                        <option value="active">الطبقة الحالية المحددة</option>
+                    </select>
+                </div>
+
+                <!-- Leaf Color Picker Row -->
+                <div class="flex items-center justify-between text-xs gap-1.5 bg-zinc-900 p-1.5 border border-zinc-800 rounded-sm">
+                    <div class="flex items-center gap-1.5">
+                        <input type="color" id="input-leaf-color" value="#f472b6" class="w-5 h-5 rounded-sm cursor-pointer border border-white bg-transparent">
+                        <span id="label-leaf-color" class="font-mono text-[9px] text-zinc-400">#F472B6</span>
+                    </div>
+
+                    <!-- Quick Leaf Color Presets -->
+                    <div class="flex items-center gap-1">
+                        <button class="leaf-color-preset w-4 h-4 rounded-sm border border-zinc-700 hover:border-white" style="background:#f472b6" data-color="#f472b6" title="زهري ساكورا"></button>
+                        <button class="leaf-color-preset w-4 h-4 rounded-sm border border-zinc-700 hover:border-white" style="background:#f59e0b" data-color="#f59e0b" title="ذهبي خريفي"></button>
+                        <button class="leaf-color-preset w-4 h-4 rounded-sm border border-zinc-700 hover:border-white" style="background:#22c55e" data-color="#22c55e" title="أخضر نضر"></button>
+                        <button class="leaf-color-preset w-4 h-4 rounded-sm border border-zinc-700 hover:border-white" style="background:#e11d48" data-color="#e11d48" title="أحمر قرمزي"></button>
+                        <button class="leaf-color-preset w-4 h-4 rounded-sm border border-zinc-700 hover:border-white" style="background:#ffffff" data-color="#ffffff" title="أبيض ثلجي"></button>
+                    </div>
+                </div>
+
+                <!-- Toggle Falling Leaves Button -->
+                <button id="btn-toggle-leaves" class="mono-btn w-full !h-7 font-bold justify-center">
+                    <span>🍃</span>
+                    <span id="leaf-btn-text">تشغيل تساقط الأوراق</span>
+                </button>
+            </div>
+
+            <!-- 6. 3D VOXEL QR CODE GENERATOR CARD -->
+            <div id="card-qr-generator" class="mono-card p-2.5 flex flex-col gap-2">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-800/80">
+                    <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span>📱</span> تحويل الجزيرة إلى كود QR:
+                    </span>
+                    <span id="qr-status-badge" class="text-[9px] font-mono px-1.5 py-0.2 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-sm">QR 3D</span>
+                </div>
+
+                <!-- URL Input -->
+                <div class="space-y-1">
+                    <input type="url" id="input-qr-url" dir="ltr" value="https://google.com" placeholder="https://your-link.com" 
+                        class="w-full px-2 py-1 bg-black border border-zinc-700 text-white font-mono text-xs rounded-sm focus:outline-none focus:border-white">
+                    
+                    <!-- Quick URL Presets -->
+                    <div class="flex flex-wrap gap-1">
+                        <button class="qr-url-preset mono-btn !h-5 !px-1.5 !text-[9px]" data-url="https://google.com">Google</button>
+                        <button class="qr-url-preset mono-btn !h-5 !px-1.5 !text-[9px]" data-url="https://youtube.com">YouTube</button>
+                        <button class="qr-url-preset mono-btn !h-5 !px-1.5 !text-[9px]" data-url="https://wa.me/">WhatsApp</button>
+                    </div>
+                </div>
+
+                <!-- QR Colors & Dual Gradient Configuration -->
+                <div class="grid grid-cols-2 gap-1.5 bg-zinc-900 p-1.5 border border-zinc-800 rounded-sm text-xs">
+                    <!-- Foreground QR Modules -->
+                    <div class="space-y-0.5">
+                        <span class="text-[9px] font-bold text-zinc-300 block">لون رمز الـ QR:</span>
+                        <div class="flex items-center gap-1">
+                            <input type="color" id="input-qr-fg1" value="#0a0512" class="w-5 h-5 rounded-sm cursor-pointer border border-white bg-transparent" title="لون البداية">
+                            <input type="color" id="input-qr-fg2" value="#ec4899" class="w-5 h-5 rounded-sm cursor-pointer border border-white bg-transparent" title="لون النهاية">
+                            <select id="select-qr-gradient" class="bg-black border border-zinc-700 text-[8px] text-white p-0.5 rounded-sm flex-1 cursor-pointer">
+                                <option value="linear">خطي</option>
+                                <option value="radial">دائري</option>
+                                <option value="solid">موحد</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Background Base Plate -->
+                    <div class="space-y-0.5">
+                        <span class="text-[9px] font-bold text-zinc-300 block">لون أرضية الـ QR:</span>
+                        <div class="flex items-center gap-1">
+                            <input type="color" id="input-qr-bg1" value="#ffffff" class="w-5 h-5 rounded-sm cursor-pointer border border-white bg-transparent" title="لون الأرضية الأول">
+                            <input type="color" id="input-qr-bg2" value="#fbcfe8" class="w-5 h-5 rounded-sm cursor-pointer border border-white bg-transparent" title="لون الأرضية الثاني">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons: Generate / Update / Return -->
+                <div id="qr-buttons-default">
+                    <button id="btn-generate-qr" class="mono-btn w-full !h-7 font-bold justify-center !bg-white !text-black hover:!bg-zinc-200">
+                        <span>🚀</span>
+                        <span>تحويل الجزيرة بالكامل إلى كود QR 3D</span>
+                    </button>
+                </div>
+
+                <div id="qr-buttons-active" class="grid grid-cols-2 gap-1.5 hidden">
+                    <button id="btn-update-qr" class="mono-btn !h-7 font-bold justify-center !bg-white !text-black hover:!bg-zinc-200 text-xs">
+                        <span>🔄</span>
+                        <span>تحديث الـ QR</span>
+                    </button>
+                    <button id="btn-exit-qr" class="mono-btn !h-7 font-bold justify-center text-rose-300 !bg-rose-950/80 border border-rose-800 hover:!bg-rose-900 text-xs">
+                        <span>🔙</span>
+                        <span>العودة للجزيرة</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 7. 3D DIRECT MODE INSTRUCTIONS CARD -->
+            <div id="card-direct-instructions" class="mono-card p-2.5 flex flex-col gap-1.5 hidden">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-800">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>🧊</span> إرشادات البناء المباشر 3D:
+                    </span>
+                </div>
+                <div class="space-y-1 text-xs text-zinc-300">
+                    <div class="p-1.5 bg-zinc-900 border border-zinc-800 rounded-sm space-y-0.5">
+                        <div class="font-bold text-white flex items-center gap-1 text-[11px]">
+                            <span>🖱️</span> الزر الأيمن (Right Click):
+                        </div>
+                        <p class="text-[10px] text-zinc-400 pr-4">وضع مكعب جديد باللون المختار على الوجه المحدد.</p>
+                    </div>
+                    <div class="p-1.5 bg-zinc-900 border border-zinc-800 rounded-sm space-y-0.5">
+                        <div class="font-bold text-rose-400 flex items-center gap-1 text-[11px]">
+                            <span>🖱️</span> الزر الأيسر (Left Click):
+                        </div>
+                        <p class="text-[10px] text-zinc-400 pr-4">حذف وإزالة المكعب مباشرة.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. FREE VIEW & RIPPLE CONTROLS CARD -->
+            <div id="card-freeview-controls" class="mono-card p-2.5 flex flex-col gap-1.5 hidden">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-800">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>🌊</span> وضع العرض الحر والتموج:
+                    </span>
+                </div>
+                <div class="p-2 bg-zinc-900 border border-zinc-800 rounded-sm space-y-1.5 text-xs text-zinc-300">
+                    <p class="text-[10px] text-zinc-300 leading-relaxed">
+                        استكشف الجزيرة بحرية تامة. عند النقر في أي نقطة، ستنطلق موجة تموج انسيابية هادئة تتخلل العالم بدون إتلاف أو تغيير أي مكعب.
+                    </p>
+                    <button id="btn-trigger-wave" class="mono-btn w-full !h-7 font-bold justify-center text-cyan-400 hover:text-white">
+                        <span>🌊</span> إطلاق موجة تموج مركزية
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+<script>
+        // =========================================================================
+        // 1. PERFORMANCE PROFILE & LOW-END MOBILE DETECTOR
+        // =========================================================================
+        const DeviceDetector = {
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024),
+            isLowEnd: false,
+            init() {
+                const cores = navigator.hardwareConcurrency || 4;
+                const memory = navigator.deviceMemory || 4;
+                this.isLowEnd = this.isMobile && (cores <= 4 || memory <= 4);
+            }
+        };
+        DeviceDetector.init();
+
+        const PERF_PROFILES = {
+            eco: {
+                name: '🔋 اقتصادي / هواتف ضعيفة',
+                pixelRatioCap: 0.85,
+                shadows: false,
+                leafCount: 15,
+                shadowRadius: 1.0,
+                powerPreference: 'high-performance',
+                throttleIdle: true
+            },
+            balanced: {
+                name: '⚖️ متوازن (60 FPS)',
+                pixelRatioCap: 1.0,
+                shadows: true,
+                shadowMapSize: 1024,
+                shadowRadius: 1.2,
+                leafCount: 25,
+                powerPreference: 'high-performance',
+                throttleIdle: true
+            },
+            ultra: {
+                name: '💎 فائق (Ultra Quality)',
+                pixelRatioCap: Math.min(window.devicePixelRatio || 1, 1.75),
+                shadows: true,
+                shadowMapSize: 2048,
+                shadowRadius: 1.8,
+                leafCount: 40,
+                powerPreference: 'high-performance',
+                throttleIdle: false
+            }
+        };
+
+        let currentTierKey = 'balanced';
+        if (DeviceDetector.isLowEnd) currentTierKey = 'eco';
+        else if (DeviceDetector.isMobile) currentTierKey = 'balanced';
+
+        // =========================================================================
+        // 2. CORE CONSTANTS & THREE.JS ENGINE SETUP
+        // =========================================================================
+        const VOXEL_SIZE = 1.0;
+        let GRID_SIZE = 8;
+        let centerOffset = { x: 0, y: 0, z: 0 };
+        
+        const PALETTE = {
+            GRASS_TOP: 0x4d7c0f,
+            GRASS_SIDE: 0x3f6212,
+            DIRT: 0x452b1b,
+            DIRT_DARK: 0x2e1c12,
+            STONE: 0x64748b,
+            STONE_MOSSY: 0x475569
+        };
+
+        const BLOCK_TYPES = {
+            GRASS: { name: 'عشب السطح العلوي', color: PALETTE.GRASS_TOP, roughness: 0.8 },
+            GRASS_SIDE: { name: 'عشب الطبقة الثانية', color: PALETTE.GRASS_SIDE, roughness: 0.82 },
+            DIRT: { name: 'تربة خصبة', color: PALETTE.DIRT, roughness: 1.0 },
+            DIRT_DARK: { name: 'تربة صخرية عميقة', color: PALETTE.DIRT_DARK, roughness: 0.95 },
+            STONE: { name: 'أحجار طبيعية', color: PALETTE.STONE, roughness: 0.9 },
+            STONE_MOSSY: { name: 'صخور معتقة متدلية', color: PALETTE.STONE_MOSSY, roughness: 0.9 }
+        };
+
+        const canvas = document.getElementById('webgl-canvas');
+        const viewportContainer = document.getElementById('viewport-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x7dd3fc);
+        scene.fog = new THREE.FogExp2(0x7dd3fc, 0.008);
+
+        const initWidth = viewportContainer ? viewportContainer.clientWidth : window.innerWidth;
+        const initHeight = viewportContainer ? viewportContainer.clientHeight : window.innerHeight;
+
+        const camera = new THREE.PerspectiveCamera(45, (initWidth || 1) / (initHeight || 1), 0.5, 350);
+        camera.position.set(24, 18, 26);
+
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: !DeviceDetector.isLowEnd,
+            powerPreference: 'high-performance',
+            precision: 'highp',
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(initWidth, initHeight);
+        renderer.setPixelRatio(PERF_PROFILES[currentTierKey].pixelRatioCap);
+        renderer.shadowMap.enabled = PERF_PROFILES[currentTierKey].shadows;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+
+        const controls = new THREE.OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.maxPolarAngle = Math.PI / 2 + 0.12;
+        controls.minDistance = 3.5;
+        controls.maxDistance = 85;
+        controls.target.set(0, 2, 0);
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 0.8;
+
+        function resizeViewport() {
+            if (!viewportContainer) return;
+            const w = viewportContainer.clientWidth;
+            const h = viewportContainer.clientHeight;
+            if (w === 0 || h === 0) return;
+            const aspect = w / h;
+            camera.aspect = aspect;
+            if (aspect < 1.0) {
+                camera.fov = Math.min(62, Math.max(45, 45 / Math.max(0.45, aspect) * 0.72));
+            } else {
+                camera.fov = 45;
+            }
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(PERF_PROFILES[currentTierKey].pixelRatioCap);
+            requestRender();
+        }
+
+        window.addEventListener('resize', resizeViewport);
+        if (window.ResizeObserver && viewportContainer) {
+            const ro = new ResizeObserver(() => resizeViewport());
+            ro.observe(viewportContainer);
+        }
+
+        const ambientLight = new THREE.AmbientLight(0xffeedd, 0.7);
+        scene.add(ambientLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e1b2e, 0.45);
+        hemiLight.position.set(0, 50, 0);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff3d6, 1.4);
+        sunLight.position.set(24, 38, 20);
+        sunLight.castShadow = PERF_PROFILES[currentTierKey].shadows;
+        sunLight.shadow.mapSize.width = PERF_PROFILES[currentTierKey].shadowMapSize || 1024;
+        sunLight.shadow.mapSize.height = PERF_PROFILES[currentTierKey].shadowMapSize || 1024;
+        sunLight.shadow.camera.near = 10;
+        sunLight.shadow.camera.far = 85;
+        const d = 22;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0001;
+        sunLight.shadow.normalBias = 0.035;
+        sunLight.shadow.radius = PERF_PROFILES[currentTierKey].shadowRadius || 1.2;
+        scene.add(sunLight);
+
+        const rimLight = new THREE.DirectionalLight(0xf472b6, 0.45);
+        rimLight.position.set(-20, 15, -20);
+        scene.add(rimLight);
+
+        // Reusable Singleton Shared Box Geometry (Zero Redundant Allocations)
+        const SHARED_BOX_GEO = new THREE.BoxGeometry(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE);
+
+        // =========================================================================
+        // 3. PERFORMANCE TIER CONTROLLER
+        // =========================================================================
+        function applyPerformanceTier(tierKey, userTriggered = false) {
+            if (tierKey === 'auto') {
+                tierKey = DeviceDetector.isLowEnd ? 'eco' : (DeviceDetector.isMobile ? 'balanced' : 'ultra');
+            }
+            if (!PERF_PROFILES[tierKey]) tierKey = 'balanced';
+            currentTierKey = tierKey;
+            const profile = PERF_PROFILES[tierKey];
+
+            renderer.setPixelRatio(profile.pixelRatioCap);
+            renderer.shadowMap.enabled = profile.shadows;
+            sunLight.castShadow = profile.shadows;
+
+            if (profile.shadows && profile.shadowMapSize) {
+                if (sunLight.shadow.mapSize.width !== profile.shadowMapSize) {
+                    if (sunLight.shadow.map) {
+                        sunLight.shadow.map.dispose();
+                        sunLight.shadow.map = null;
+                    }
+                    sunLight.shadow.mapSize.width = profile.shadowMapSize;
+                    sunLight.shadow.mapSize.height = profile.shadowMapSize;
+                }
+            }
+            if (sunLight.shadow) {
+                sunLight.shadow.radius = profile.shadowRadius || 1.2;
+                sunLight.shadow.bias = -0.0001;
+                sunLight.shadow.normalBias = 0.035;
+                if (sunLight.shadow.camera) sunLight.shadow.camera.updateProjectionMatrix();
+            }
+
+            if (leafSystem) {
+                leafSystem.init(profile.leafCount);
+            }
+
+            const selectEl = document.getElementById('select-perf-tier');
+            if (selectEl && !userTriggered) {
+                selectEl.value = tierKey;
+            }
+
+            requestRender();
+            if (userTriggered) {
+                showToast(`⚡ تم تفعيل ${profile.name}`);
+            }
+        }
+
+        document.getElementById('select-perf-tier')?.addEventListener('change', (e) => {
+            applyPerformanceTier(e.target.value, true);
+        });
+
+        // =========================================================================
+        // 4. AUDIO SYNTHESIZER WITH MUTE CONTROL
+        // =========================================================================
+        let audioCtx = null;
+        let isAudioMuted = (localStorage.getItem('vx_audio_muted') === 'true');
+
+        function updateSoundUI() {
+            const soundIcon = document.getElementById('sound-icon');
+            const soundBtn = document.getElementById('btn-sound-toggle');
+            if (soundIcon) soundIcon.textContent = isAudioMuted ? '🔇' : '🔊';
+            if (soundBtn) soundBtn.title = isAudioMuted ? 'الصوت مكتوم (انقر للتشغيل)' : 'الصوت يعمل (انقر للكتم)';
+        }
+
+        function toggleSound() {
+            isAudioMuted = !isAudioMuted;
+            localStorage.setItem('vx_audio_muted', isAudioMuted.toString());
+            updateSoundUI();
+            showToast(isAudioMuted ? '🔇 تم كتم المؤثرات الصوتية' : '🔊 تم تفعيل المؤثرات الصوتية');
+            if (!isAudioMuted) playVoxelSound(3, 520);
+        }
+
+        document.getElementById('btn-sound-toggle')?.addEventListener('click', toggleSound);
+
+        function playVoxelSound(pitchStep = 1, baseFreq = 440) {
+            if (isAudioMuted) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                const freq = baseFreq * Math.pow(1.06, Math.min(16, Math.max(-8, pitchStep)));
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.16);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.16);
+            } catch (e) {}
+        }
+
+        // =========================================================================
+        // 5. PROCEDURAL ISLAND TERRAIN WITH COMPLETE OCCLUSION CULLING
+        // =========================================================================
+        const islandVoxelWorld = new Map();
+
+        function getVoxelKey(x, y, z) {
+            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+        }
+
+        function buildTerrain() {
+            const islandRadius = 14.0;
+            const upperTierRadius = 10.8;
+            
+            for (let x = -17; x <= 17; x++) {
+                for (let z = -17; z <= 17; z++) {
+                    const distFromCenter = Math.sqrt(x * x + z * z);
+                    const edgeNoise = Math.sin(x * 0.35) * Math.cos(z * 0.35) * 2.0 + 
+                                     Math.sin(x * 0.75 + z * 0.55) * 0.9;
+                    if (distFromCenter + edgeNoise > islandRadius) continue;
+                    
+                    const upperEdgeNoise = Math.sin(x * 0.45) * Math.cos(z * 0.45) * 1.4;
+                    const hasUpperTier = (distFromCenter + upperEdgeNoise <= upperTierRadius);
+                    const elevation = hasUpperTier ? 0 : -1;
+                    
+                    const normalizedDist = distFromCenter / islandRadius;
+                    const maxDepth = 10.5;
+                    const depthTaper = Math.pow(Math.max(0, 1 - normalizedDist), 1.25);
+                    const bottomNoise = (
+                        Math.sin(x * 0.65 + z * 0.45) * 1.8 +
+                        Math.cos(x * 0.35 - z * 0.75) * 1.4 +
+                        Math.sin((x * x + z * z) * 0.06) * 1.2
+                    );
+                    const bottomY = -Math.max(2, Math.round(depthTaper * maxDepth + bottomNoise));
+                    
+                    for (let y = bottomY; y <= elevation; y++) {
+                        let typeKey = 'DIRT';
+                        if (y === 0) typeKey = 'GRASS';
+                        else if (y === -1) typeKey = hasUpperTier ? 'GRASS_SIDE' : 'GRASS';
+                        else if (y >= -3) typeKey = 'DIRT';
+                        else if (y >= -5) typeKey = Math.random() > 0.45 ? 'DIRT' : 'DIRT_DARK';
+                        else if (y > bottomY + 2) {
+                            const rockNoise = Math.sin(x * 1.1 + y * 0.9 + z * 1.1);
+                            typeKey = rockNoise > 0.25 ? 'STONE' : (rockNoise > -0.25 ? 'STONE_MOSSY' : 'DIRT_DARK');
+                        } else {
+                            typeKey = Math.random() > 0.35 ? 'STONE_MOSSY' : 'STONE';
+                        }
+                        const rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+                        islandVoxelWorld.set(getVoxelKey(rx, ry, rz), { x: rx, y: ry, z: rz, type: typeKey });
+                    }
+                }
+            }
+        }
+
+        // Complete 6-Directional Occlusion Culling: Deletes 100% invisible internal voxels
+        function cullIslandHiddenVoxels() {
+            const hiddenKeys = [];
+            islandVoxelWorld.forEach((v, key) => {
+                // Only cull deep underground island voxels where v.y < -3 (surface layers y=0, -1, -2 are preserved solid)
+                if (v.y >= -3) return;
+
+                if (
+                    islandVoxelWorld.has(getVoxelKey(v.x + 1, v.y, v.z)) &&
+                    islandVoxelWorld.has(getVoxelKey(v.x - 1, v.y, v.z)) &&
+                    islandVoxelWorld.has(getVoxelKey(v.x, v.y + 1, v.z)) &&
+                    islandVoxelWorld.has(getVoxelKey(v.x, v.y - 1, v.z)) &&
+                    islandVoxelWorld.has(getVoxelKey(v.x, v.y, v.z + 1)) &&
+                    islandVoxelWorld.has(getVoxelKey(v.x, v.y, v.z - 1))
+                ) {
+                    hiddenKeys.push(key);
+                }
+            });
+            hiddenKeys.forEach(k => islandVoxelWorld.delete(k));
+        }
+
+        const islandMeshes = [];
+        function renderIsland() {
+            islandMeshes.forEach(m => { scene.remove(m); if (m.material) m.material.dispose(); });
+            islandMeshes.length = 0;
+            islandVoxelWorld.clear();
+            buildTerrain();
+            cullIslandHiddenVoxels();
+
+            const typeGroups = {};
+            islandVoxelWorld.forEach(v => {
+                if (!typeGroups[v.type]) typeGroups[v.type] = [];
+                typeGroups[v.type].push(v);
+            });
+
+            const dummy = new THREE.Object3D();
+
+            Object.keys(typeGroups).forEach(typeKey => {
+                const blockDef = BLOCK_TYPES[typeKey] || BLOCK_TYPES.GRASS;
+                const voxels = typeGroups[typeKey];
+                const count = voxels.length;
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: blockDef.color,
+                    roughness: blockDef.roughness || 0.8,
+                    metalness: 0.05
+                });
+
+                const instMesh = new THREE.InstancedMesh(SHARED_BOX_GEO, mat, count);
+                instMesh.castShadow = PERF_PROFILES[currentTierKey].shadows;
+                instMesh.receiveShadow = PERF_PROFILES[currentTierKey].shadows;
+                instMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                instMesh.frustumCulled = false;
+
+                const baseColor = new THREE.Color(blockDef.color);
+                const tempColor = new THREE.Color();
+
+                for (let i = 0; i < count; i++) {
+                    const v = voxels[i];
+                    dummy.position.set(v.x, v.y, v.z);
+                    dummy.updateMatrix();
+                    instMesh.setMatrixAt(i, dummy.matrix);
+
+                    const jitter = (Math.sin(v.x * 3.1 + v.y * 7.7 + v.z * 5.3) * 0.04);
+                    tempColor.copy(baseColor).offsetHSL(0, 0, jitter);
+                    instMesh.setColorAt(i, tempColor);
+                }
+
+                instMesh.instanceMatrix.needsUpdate = true;
+                if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
+                instMesh.userData = { isIsland: true, voxels: voxels };
+                scene.add(instMesh);
+                islandMeshes.push(instMesh);
+            });
+            requestRender();
+        }
+
+        // =========================================================================
+        // 6. ZERO-ALLOCATION SHOCKWAVE / RIPPLE WAVE SYSTEM (Float32Array Direct)
+        // =========================================================================
+        class HighPerfShockwaveSystem {
+            constructor() {
+                this.waves = [];
+                this.wasActive = false;
+            }
+            add(center) {
+                if (this.waves.length >= 2) this.waves.shift();
+                this.waves.push({
+                    x: center.x,
+                    y: center.y,
+                    z: center.z,
+                    age: 0,
+                    maxAge: 1.0,
+                    speed: 16.0,
+                    wavelength: 4.5,
+                    amplitude: 1.2
+                });
+                this.wasActive = true;
+                wakeAnimation();
+                playVoxelSound(2, 380);
+                showToast('🌊 انطلقت موجة تموج انسيابية!');
+            }
+            update(dt) {
+                if (this.waves.length === 0) {
+                    if (this.wasActive) {
+                        this.resetAllMatrices();
+                        this.wasActive = false;
+                    }
+                    return false;
+                }
+                for (let i = this.waves.length - 1; i >= 0; i--) {
+                    this.waves[i].age += dt;
+                    if (this.waves[i].age >= this.waves[i].maxAge) {
+                        this.waves.splice(i, 1);
+                    }
+                }
+                return true;
+            }
+            getYOffset(vx, vy, vz) {
+                if (this.waves.length === 0) return 0;
+                let total = 0;
+                for (let i = 0; i < this.waves.length; i++) {
+                    const w = this.waves[i];
+                    const dx = vx - w.x;
+                    const dy = vy - w.y;
+                    const dz = vz - w.z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    const waveFront = w.age * w.speed;
+                    const diff = dist - waveFront;
+
+                    if (Math.abs(diff) < w.wavelength) {
+                        const decay = 1.0 - (w.age / w.maxAge);
+                        const shape = Math.sin((diff / w.wavelength) * Math.PI);
+                        const spatialFalloff = 1.0 - (Math.abs(diff) / w.wavelength);
+                        total += shape * spatialFalloff * decay * w.amplitude;
+                    }
+                }
+                return total;
+            }
+            resetAllMatrices() {
+                // Instantly reset matrix Y column to base position in 1 pass
+                const allMeshes = [...customVoxelMeshes, ...islandMeshes];
+                allMeshes.forEach(mesh => {
+                    if (mesh.userData && mesh.userData.voxels) {
+                        const array = mesh.instanceMatrix.array;
+                        const voxels = mesh.userData.voxels;
+                        const len = voxels.length;
+                        for (let i = 0; i < len; i++) {
+                            array[i * 16 + 13] = voxels[i].y;
+                        }
+                        mesh.instanceMatrix.needsUpdate = true;
+                    }
+                });
+                requestRender();
+            }
+        }
+        const shockwaveEngine = new HighPerfShockwaveSystem();
+
+        document.getElementById('btn-trigger-wave')?.addEventListener('click', () => {
+            shockwaveEngine.add({ x: centerOffset.x, y: centerOffset.y, z: centerOffset.z });
+        });
+
+        // =========================================================================
+        // 7. INSTANCED FALLING LEAVES PARTICLE SYSTEM (Single Draw Call)
+        // =========================================================================
+        class InstancedLeafParticleSystem {
+            constructor() {
+                this.particles = [];
+                this.active = false;
+                this.targetLayer = 'active';
+                this.leafColor = '#f472b6';
+                this.maxCount = 40;
+                this.instMesh = null;
+                this.leafGeo = new THREE.PlaneGeometry(0.35, 0.45);
+                this.leafMat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(this.leafColor),
+                    roughness: 0.65,
+                    side: THREE.DoubleSide
+                });
+                this.dummy = new THREE.Object3D();
+            }
+
+            init(count = 25) {
+                this.maxCount = count;
+                if (this.instMesh) {
+                    scene.remove(this.instMesh);
+                    this.instMesh.dispose();
+                }
+                this.instMesh = new THREE.InstancedMesh(this.leafGeo, this.leafMat, this.maxCount);
+                this.instMesh.castShadow = false; // Disabled shadow for leaves on mobile for ultra performance
+                this.instMesh.receiveShadow = false;
+                this.instMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                this.instMesh.frustumCulled = false;
+                this.instMesh.visible = this.active;
+                scene.add(this.instMesh);
+
+                this.particles = [];
+                for (let i = 0; i < this.maxCount; i++) {
+                    const p = {
+                        x: 0, y: 0, z: 0,
+                        rotX: Math.random() * Math.PI * 2,
+                        rotY: Math.random() * Math.PI * 2,
+                        rotZ: Math.random() * Math.PI * 2,
+                        fallSpeed: 1.2 + Math.random() * 1.5,
+                        swaySpeed: 1.5 + Math.random() * 2.0,
+                        phaseX: Math.random() * Math.PI * 2,
+                        phaseZ: Math.random() * Math.PI * 2,
+                        scale: 0.7 + Math.random() * 0.6
+                    };
+                    this.resetParticle(p, true);
+                    this.particles.push(p);
+
+                    this.dummy.position.set(p.x, p.y, p.z);
+                    this.dummy.scale.set(p.scale, p.scale, p.scale);
+                    this.dummy.rotation.set(p.rotX, p.rotY, p.rotZ);
+                    this.dummy.updateMatrix();
+                    this.instMesh.setMatrixAt(i, this.dummy.matrix);
+                }
+                this.instMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            getTargetSpawnCoords() {
+                let targetY = 6;
+                let layer = null;
+
+                const selectEl = document.getElementById('select-leaf-layer');
+                const selVal = selectEl ? selectEl.value : 'active';
+
+                if (selVal === 'active' || isNaN(parseInt(selVal, 10))) {
+                    layer = layers[activeLayerIndex] || layers[layers.length - 1];
+                } else {
+                    const idx = parseInt(selVal, 10);
+                    layer = layers[idx] || layers[0];
+                }
+
+                if (layer) {
+                    targetY = layer.y + centerOffset.y + 0.3;
+                    const offset = Math.floor(GRID_SIZE / 2);
+                    const filledCells = [];
+
+                    for (let r = 0; r < layer.grid.length; r++) {
+                        for (let c = 0; c < layer.grid[r].length; c++) {
+                            if (layer.grid[r][c]) {
+                                filledCells.push({
+                                    x: c - offset + centerOffset.x,
+                                    z: r - offset + centerOffset.z
+                                });
+                            }
+                        }
+                    }
+
+                    if (filledCells.length > 0) {
+                        const cell = filledCells[Math.floor(Math.random() * filledCells.length)];
+                        return {
+                            x: cell.x + (Math.random() - 0.5) * 0.8,
+                            y: targetY,
+                            z: cell.z + (Math.random() - 0.5) * 0.8
+                        };
+                    }
+                }
+
+                const offset = Math.floor(GRID_SIZE / 2);
+                return {
+                    x: (Math.random() * GRID_SIZE - offset) + centerOffset.x,
+                    y: (layer ? layer.y + centerOffset.y : 6) + 0.3,
+                    z: (Math.random() * GRID_SIZE - offset) + centerOffset.z
+                };
+            }
+
+            resetParticle(p, randomInitialY = false) {
+                const pt = this.getTargetSpawnCoords();
+                p.x = pt.x;
+                p.z = pt.z;
+                p.y = randomInitialY ? (pt.y - Math.random() * Math.max(1, pt.y)) : pt.y;
+            }
+
+            setColor(hex) {
+                this.leafColor = hex;
+                this.leafMat.color.set(hex);
+                requestRender();
+            }
+
+            toggle() {
+                this.active = !this.active;
+                if (this.instMesh) this.instMesh.visible = this.active;
+                const btnText = document.getElementById('leaf-btn-text');
+                const btn = document.getElementById('btn-toggle-leaves');
+                if (btnText) btnText.textContent = this.active ? 'إيقاف تساقط الأوراق' : 'تشغيل تساقط الأوراق';
+                if (btn) btn.classList.toggle('active', this.active);
+                showToast(this.active ? '🍃 تم تفعيل تساقط الأوراق من الطبقة المحددة!' : '🍃 تم إيقاف تساقط الأوراق');
+                if (this.active) {
+                    wakeAnimation();
+                    playVoxelSound(4, 460);
+                } else {
+                    requestRender();
+                }
+            }
+
+            update(dt, time) {
+                if (!this.active || !this.instMesh) return;
+                const len = this.particles.length;
+                for (let i = 0; i < len; i++) {
+                    const p = this.particles[i];
+                    p.y -= p.fallSpeed * dt;
+                    p.x += Math.sin(time * p.swaySpeed + p.phaseX) * 0.025;
+                    p.z += Math.cos(time * p.swaySpeed + p.phaseZ) * 0.025;
+
+                    p.rotX += 0.02;
+                    p.rotY += 0.03;
+                    p.rotZ += 0.015;
+
+                    if (p.y <= -0.5) {
+                        this.resetParticle(p, false);
+                    }
+
+                    this.dummy.position.set(p.x, p.y, p.z);
+                    this.dummy.scale.set(p.scale, p.scale, p.scale);
+                    this.dummy.rotation.set(p.rotX, p.rotY, p.rotZ);
+                    this.dummy.updateMatrix();
+                    this.instMesh.setMatrixAt(i, this.dummy.matrix);
+                }
+                this.instMesh.instanceMatrix.needsUpdate = true;
+            }
+        }
+        const leafSystem = new InstancedLeafParticleSystem();
+
+        document.getElementById('btn-toggle-leaves')?.addEventListener('click', () => leafSystem.toggle());
+
+        const inputLeafColor = document.getElementById('input-leaf-color');
+        const labelLeafColor = document.getElementById('label-leaf-color');
+
+        function setLeafColor(hex) {
+            leafSystem.setColor(hex);
+            if (inputLeafColor) inputLeafColor.value = hex;
+            if (labelLeafColor) labelLeafColor.textContent = hex.toUpperCase();
+        }
+
+        inputLeafColor?.addEventListener('input', (e) => setLeafColor(e.target.value));
+        document.querySelectorAll('.leaf-color-preset').forEach(btn => {
+            btn.addEventListener('click', () => setLeafColor(btn.dataset.color));
+        });
+
+        function populateLeafLayerOptions() {
+            const selectEl = document.getElementById('select-leaf-layer');
+            if (!selectEl) return;
+            const currentVal = selectEl.value;
+            selectEl.innerHTML = '';
+
+            const optActive = document.createElement('option');
+            optActive.value = 'active';
+            optActive.textContent = 'الطبقة الحالية المحددة';
+            selectEl.appendChild(optActive);
+
+            layers.forEach((l, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx.toString();
+                opt.textContent = `${l.name} (Y=${l.y + centerOffset.y})`;
+                selectEl.appendChild(opt);
+            });
+            if (currentVal) selectEl.value = currentVal;
+        }
+
+        // =========================================================================
+        // 8. MULTI-MODEL MANAGER & PRESETS
+        // =========================================================================
+        const BUILTIN_PRESETS = [
+            {
+                id: 'preset-sakura-tree',
+                name: '🌸 شجرة الساكورا (Sakura Tree)',
+                gridSize: 8,
+                centerOffset: { x: 0, y: 0, z: 0 },
+                layers: (function() {
+                    const l = [];
+                    const mkGrid = () => Array(8).fill(null).map(() => Array(8).fill(null));
+                    
+                    // L1: Trunk Base & Roots (Y=1)
+                    const g1 = mkGrid();
+                    g1[3][3] = '#3d2014'; g1[3][4] = '#5a3220';
+                    g1[4][3] = '#5a3220'; g1[4][4] = '#3d2014';
+                    g1[2][3] = '#7a4833'; g1[5][4] = '#7a4833';
+                    l.push({ id: 101, name: 'طبقة 1: الجذور وقاعدة الجذع (Y=1)', y: 1, grid: g1 });
+
+                    // L2: Trunk Core (Y=2)
+                    const g2 = mkGrid();
+                    g2[3][3] = '#5a3220'; g2[3][4] = '#5a3220';
+                    g2[4][3] = '#3d2014'; g2[4][4] = '#5a3220';
+                    l.push({ id: 102, name: 'طبقة 2: وسط الجذع (Y=2)', y: 2, grid: g2 });
+
+                    // L3: Main Branching (Y=3)
+                    const g3 = mkGrid();
+                    g3[3][3] = '#5a3220'; g3[3][4] = '#5a3220';
+                    g3[2][2] = '#7a4833'; g3[5][5] = '#7a4833';
+                    g3[2][5] = '#7a4833'; g3[5][2] = '#7a4833';
+                    l.push({ id: 103, name: 'طبقة 3: تفرع الأغصان (Y=3)', y: 3, grid: g3 });
+
+                    // L4: Lower Foliage (Y=4)
+                    const g4 = mkGrid();
+                    for (let r = 1; r <= 6; r++) {
+                        for (let c = 1; c <= 6; c++) {
+                            if ((r===1 && (c===1||c===6)) || (r===6 && (c===1||c===6))) continue;
+                            g4[r][c] = (r+c)%2 === 0 ? '#f472b6' : '#db2777';
+                        }
+                    }
+                    g4[3][3] = '#5a3220'; g4[3][4] = '#5a3220';
+                    l.push({ id: 104, name: 'طبقة 4: الأوراق السفلية (Y=4)', y: 4, grid: g4 });
+
+                    // L5: Full Sakura Blossom Canopy (Y=5)
+                    const g5 = mkGrid();
+                    for (let r = 1; r <= 6; r++) {
+                        for (let c = 1; c <= 6; c++) {
+                            g5[r][c] = (r*c)%3 === 0 ? '#fff0f5' : ((r+c)%2===0 ? '#fbcfe8' : '#f472b6');
+                        }
+                    }
+                    l.push({ id: 105, name: 'طبقة 5: التاج الزهري الرئيسي (Y=5)', y: 5, grid: g5 });
+
+                    // L6: Upper Blossoms (Y=6)
+                    const g6 = mkGrid();
+                    for (let r = 2; r <= 5; r++) {
+                        for (let c = 2; c <= 5; c++) {
+                            g6[r][c] = (r+c)%2 === 0 ? '#fff0f5' : '#fbcfe8';
+                        }
+                    }
+                    l.push({ id: 106, name: 'طبقة 6: قمة الأزهار (Y=6)', y: 6, grid: g6 });
+
+                    // L7: Peak Tip (Y=7)
+                    const g7 = mkGrid();
+                    g7[3][3] = '#fff0f5'; g7[3][4] = '#fbcfe8';
+                    g7[4][3] = '#fbcfe8'; g7[4][4] = '#fff0f5';
+                    l.push({ id: 107, name: 'طبقة 7: القمة العليا (Y=7)', y: 7, grid: g7 });
+
+                    return l;
+                })()
+            },
+            {
+                id: 'preset-voxel-tower',
+                name: '🏰 برج الفوكسل الحجري (Voxel Tower)',
+                gridSize: 8,
+                centerOffset: { x: 0, y: 0, z: 0 },
+                layers: (function() {
+                    const l = [];
+                    const mkGrid = () => Array(8).fill(null).map(() => Array(8).fill(null));
+
+                    // L1: Base Foundation (Y=1)
+                    const g1 = mkGrid();
+                    for (let r = 1; r <= 6; r++) {
+                        for (let c = 1; c <= 6; c++) g1[r][c] = '#64748b';
+                    }
+                    g1[6][3] = null; g1[6][4] = null; // Door
+                    l.push({ id: 201, name: 'طبقة 1: قاعدة البرج والمدخل (Y=1)', y: 1, grid: g1 });
+
+                    // L2: Walls (Y=2)
+                    const g2 = mkGrid();
+                    for (let r = 2; r <= 5; r++) {
+                        g2[r][2] = '#64748b'; g2[r][5] = '#64748b';
+                        g2[2][r] = '#64748b'; g2[5][r] = '#64748b';
+                    }
+                    l.push({ id: 202, name: 'طبقة 2: الجدران السفلية (Y=2)', y: 2, grid: g2 });
+
+                    // L3: Midsection with moss (Y=3)
+                    const g3 = mkGrid();
+                    for (let r = 2; r <= 5; r++) {
+                        g3[r][2] = '#475569'; g3[r][5] = '#64748b';
+                        g3[2][r] = '#64748b'; g3[5][r] = '#475569';
+                    }
+                    l.push({ id: 203, name: 'طبقة 3: الجدران الوسطى (Y=3)', y: 3, grid: g3 });
+
+                    // L4: Floor Platform (Y=4)
+                    const g4 = mkGrid();
+                    for (let r = 1; r <= 6; r++) {
+                        for (let c = 1; c <= 6; c++) g4[r][c] = '#64748b';
+                    }
+                    l.push({ id: 204, name: 'طبقة 4: منصة البرج العلوية (Y=4)', y: 4, grid: g4 });
+
+                    // L5: Battlements / Crest (Y=5)
+                    const g5 = mkGrid();
+                    g5[1][1] = '#f59e0b'; g5[1][3] = '#64748b'; g5[1][4] = '#64748b'; g5[1][6] = '#f59e0b';
+                    g5[6][1] = '#f59e0b'; g5[6][3] = '#64748b'; g5[6][4] = '#64748b'; g5[6][6] = '#f59e0b';
+                    g5[3][1] = '#64748b'; g5[4][1] = '#64748b'; g5[3][6] = '#64748b'; g5[4][6] = '#64748b';
+                    l.push({ id: 205, name: 'طبقة 5: شرفات الحماية والتاج الذهبي (Y=5)', y: 5, grid: g5 });
+
+                    return l;
+                })()
+            },
+            {
+                id: 'preset-pixel-heart',
+                name: '💖 قلب بكسل ثلاثي الأبعاد (Pixel Heart)',
+                gridSize: 8,
+                centerOffset: { x: 0, y: 0, z: 0 },
+                layers: (function() {
+                    const l = [];
+                    const mkGrid = () => Array(8).fill(null).map(() => Array(8).fill(null));
+
+                    // L1: Base Dark Frame (Y=1)
+                    const g1 = mkGrid();
+                    g1[2][2] = '#db2777'; g1[2][5] = '#db2777';
+                    g1[3][1] = '#db2777'; g1[3][3] = '#db2777'; g1[3][4] = '#db2777'; g1[3][6] = '#db2777';
+                    g1[4][1] = '#db2777'; g1[4][6] = '#db2777';
+                    g1[5][2] = '#db2777'; g1[5][5] = '#db2777';
+                    g1[6][3] = '#db2777'; g1[6][4] = '#db2777';
+                    l.push({ id: 301, name: 'طبقة 1: الإطار الأساسي (Y=1)', y: 1, grid: g1 });
+
+                    // L2: Vibrant Red Core (Y=2)
+                    const g2 = mkGrid();
+                    g2[2][2] = '#e11d48'; g2[2][3] = '#e11d48'; g2[2][4] = '#e11d48'; g2[2][5] = '#e11d48';
+                    g2[3][1] = '#e11d48'; g2[3][2] = '#ffffff'; g2[3][3] = '#e11d48'; g2[3][4] = '#e11d48'; g2[3][5] = '#e11d48'; g2[3][6] = '#e11d48';
+                    g2[4][1] = '#e11d48'; g2[4][2] = '#e11d48'; g2[4][3] = '#e11d48'; g2[4][4] = '#e11d48'; g2[4][5] = '#e11d48'; g2[4][6] = '#e11d48';
+                    g2[5][2] = '#e11d48'; g2[5][3] = '#e11d48'; g2[5][4] = '#e11d48'; g2[5][5] = '#e11d48';
+                    g2[6][3] = '#e11d48'; g2[6][4] = '#e11d48';
+                    l.push({ id: 302, name: 'طبقة 2: القلب القرمزي النابض (Y=2)', y: 2, grid: g2 });
+
+                    // L3: Soft Pink Infill (Y=3)
+                    const g3 = mkGrid();
+                    g3[3][2] = '#f472b6'; g3[3][3] = '#f472b6'; g3[3][4] = '#f472b6'; g3[3][5] = '#f472b6';
+                    g3[4][2] = '#f472b6'; g3[4][3] = '#f472b6'; g3[4][4] = '#f472b6'; g3[4][5] = '#f472b6';
+                    g3[5][3] = '#f472b6'; g3[5][4] = '#f472b6';
+                    l.push({ id: 303, name: 'طبقة 3: التدرج الوردي العالي (Y=3)', y: 3, grid: g3 });
+
+                    return l;
+                })()
+            },
+            {
+                id: 'preset-blank',
+                name: '📐 نموذج فارغ (Blank Grid)',
+                gridSize: 8,
+                centerOffset: { x: 0, y: 0, z: 0 },
+                layers: [
+                    {
+                        id: 401,
+                        name: 'طبقة 1 (Y=1)',
+                        y: 1,
+                        grid: Array(8).fill(null).map(() => Array(8).fill(null))
+                    }
+                ]
+            }
+        ];
+
+        let savedModels = [];
+        let currentModelId = 'preset-sakura-tree';
+
+        function loadSavedModelsFromStorage() {
+            try {
+                const stored = localStorage.getItem('vx_saved_models_v3');
+                if (stored) {
+                    savedModels = JSON.parse(stored);
+                }
+            } catch (e) {}
+
+            if (!savedModels || !Array.isArray(savedModels) || savedModels.length === 0) {
+                savedModels = JSON.parse(JSON.stringify(BUILTIN_PRESETS));
+                saveModelsToStorage();
+            }
+        }
+
+        function saveModelsToStorage() {
+            try {
+                localStorage.setItem('vx_saved_models_v3', JSON.stringify(savedModels));
+            } catch (e) {}
+        }
+
+        function populateModelDropdown() {
+            const selectEl = document.getElementById('select-model');
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+
+            savedModels.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                if (m.id === currentModelId) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // =========================================================================
+        // 9. LAYERS & CUSTOM VOXEL DATA SYSTEM
+        // =========================================================================
+        let layers = [];
+        let activeLayerIndex = 0;
+        let activeColor = '#f472b6';
+        let currentTool = 'brush';
+        let onionSkinEnabled = false;
+        let activeMode = 'layers';
+        let isMouseDownOnGrid = false;
+
+        const customVoxelsGroup = new THREE.Group();
+        scene.add(customVoxelsGroup);
+        const customVoxelMeshes = [];
+
+        // 3D Visual Layer Plane Guide Wireframe
+        const layerGuideGroup = new THREE.Group();
+        scene.add(layerGuideGroup);
+
+        function updateGridGuide3D() {
+            while (layerGuideGroup.children.length > 0) {
+                const child = layerGuideGroup.children[0];
+                layerGuideGroup.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            }
+
+            const offset = (GRID_SIZE % 2 === 0) ? -0.5 : 0;
+            const newGuideGrid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0xffffff, 0x52525b);
+            newGuideGrid.position.set(offset, 0.5, offset);
+            layerGuideGroup.add(newGuideGrid);
+
+            const newGuidePlaneGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+            const newGuidePlaneMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.08,
+                side: THREE.DoubleSide
+            });
+            const newGuidePlane = new THREE.Mesh(newGuidePlaneGeo, newGuidePlaneMat);
+            newGuidePlane.rotation.x = Math.PI / 2;
+            newGuidePlane.position.set(offset, 0.5, offset);
+            layerGuideGroup.add(newGuidePlane);
+
+            updateLayerGuidePosition();
+        }
+
+        const ghostBoxMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.85
+        });
+        const ghostBox = new THREE.Mesh(SHARED_BOX_GEO, ghostBoxMat);
+        ghostBox.visible = false;
+        scene.add(ghostBox);
+
+        function updateLayerGuidePosition() {
+            const currentLayer = layers[activeLayerIndex];
+            if (currentLayer && activeMode === 'layers') {
+                layerGuideGroup.visible = true;
+                layerGuideGroup.position.set(centerOffset.x, currentLayer.y + centerOffset.y, centerOffset.z);
+            } else {
+                layerGuideGroup.visible = false;
+            }
+            requestRender();
+        }
+
+        function createNewLayer(customY = null) {
+            let nextY = 1;
+            if (customY !== null) {
+                nextY = customY;
+            } else if (layers.length > 0) {
+                const maxY = Math.max(...layers.map(l => l.y));
+                nextY = maxY + 1;
+            }
+
+            const newLayer = {
+                id: Date.now() + Math.random(),
+                name: `طبقة ${layers.length + 1} (Y=${nextY})`,
+                y: nextY,
+                grid: Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null))
+            };
+            return newLayer;
+        }
+
+        function syncCurrentModelData() {
+            const cur = savedModels.find(m => m.id === currentModelId);
+            if (cur) {
+                cur.gridSize = GRID_SIZE;
+                cur.centerOffset = { ...centerOffset };
+                cur.layers = JSON.parse(JSON.stringify(layers));
+                saveModelsToStorage();
+            }
+        }
+
+        // =========================================================================
+        // 10. TRANSITION ANIMATION ENGINE (MORPH & STAGGERED DISSOLVE)
+        // =========================================================================
+        let isTransitioning = false;
+
+        function getVoxelListFromModel(model) {
+            const list = [];
+            const offset = Math.floor(model.gridSize / 2);
+            model.layers.forEach(l => {
+                for (let r = 0; r < l.grid.length; r++) {
+                    for (let c = 0; c < l.grid[r].length; c++) {
+                        const hex = l.grid[r][c];
+                        if (hex) {
+                            list.push({
+                                x: c - offset + (model.centerOffset?.x || 0),
+                                y: l.y + (model.centerOffset?.y || 0),
+                                z: r - offset + (model.centerOffset?.z || 0),
+                                color: new THREE.Color(hex),
+                                hex: hex
+                            });
+                        }
+                    }
+                }
+            });
+            return list;
+        }
+
+        function switchModel(targetId) {
+            if (isTransitioning) return;
+            const target = savedModels.find(m => m.id === targetId);
+            if (!target) return;
+
+            syncCurrentModelData();
+
+            const animModeEl = document.getElementById('select-anim-mode');
+            const mode = animModeEl ? animModeEl.value : 'morph';
+
+            if (mode === 'off' || typeof gsap === 'undefined' || DeviceDetector.isLowEnd) {
+                applyModelDataInstantly(target);
+                return;
+            }
+
+            const sourceVoxels = getVoxelListFromModel({
+                gridSize: GRID_SIZE,
+                centerOffset: centerOffset,
+                layers: layers
+            });
+            const targetVoxels = getVoxelListFromModel(target);
+
+            if (sourceVoxels.length === 0 || targetVoxels.length === 0) {
+                applyModelDataInstantly(target);
+                return;
+            }
+
+            isTransitioning = true;
+            wakeAnimation();
+            playVoxelSound(2, 480);
+
+            if (mode === 'morph') {
+                executeMorphTransition(sourceVoxels, targetVoxels, target);
+            } else {
+                executeStaggerTransition(sourceVoxels, targetVoxels, target);
+            }
+        }
+
+        const animDummy = new THREE.Object3D();
+        const animColor = new THREE.Color();
+
+        function executeMorphTransition(sourceVoxels, targetVoxels, targetModel) {
+            // Spatial sorting: matches nearby voxels to create fluid physical motion
+            const sortFn = (a, b) => {
+                if (Math.abs(a.y - b.y) > 0.01) return a.y - b.y;
+                if (Math.abs(a.z - b.z) > 0.01) return a.z - b.z;
+                return a.x - b.x;
+            };
+            const sortedSrc = [...sourceVoxels].sort(sortFn);
+            const sortedDst = [...targetVoxels].sort(sortFn);
+
+            const maxCount = Math.max(sortedSrc.length, sortedDst.length);
+            const pairs = [];
+
+            for (let i = 0; i < maxCount; i++) {
+                const hasSrc = i < sortedSrc.length;
+                const hasDst = i < sortedDst.length;
+
+                if (hasSrc && hasDst) {
+                    const src = sortedSrc[i];
+                    const dst = sortedDst[i];
+                    pairs.push({
+                        srcPos: new THREE.Vector3(src.x, src.y, src.z),
+                        dstPos: new THREE.Vector3(dst.x, dst.y, dst.z),
+                        srcColor: src.color.clone(),
+                        dstColor: dst.color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else if (!hasSrc && hasDst) {
+                    // Emerging voxel: starts at center/bottom with the TARGET color already
+                    const dst = sortedDst[i];
+                    const startPos = new THREE.Vector3(dst.x, dst.y - 0.4, dst.z);
+                    pairs.push({
+                        srcPos: startPos,
+                        dstPos: new THREE.Vector3(dst.x, dst.y, dst.z),
+                        srcColor: dst.color.clone(),
+                        dstColor: dst.color.clone(),
+                        srcScale: 0.001,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else {
+                    // Dissolving voxel: shrinks down with SOURCE color smoothly
+                    const src = sortedSrc[i];
+                    const endPos = new THREE.Vector3(src.x, src.y - 0.4, src.z);
+                    pairs.push({
+                        srcPos: new THREE.Vector3(src.x, src.y, src.z),
+                        dstPos: endPos,
+                        srcColor: src.color.clone(),
+                        dstColor: src.color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 0.001,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                }
+            }
+
+            // Remove previous custom meshes
+            while (customVoxelsGroup.children.length > 0) {
+                const child = customVoxelsGroup.children[0];
+                customVoxelsGroup.remove(child);
+                if (child.material) child.material.dispose();
+            }
+            customVoxelMeshes.length = 0;
+
+            const mat = new THREE.MeshStandardMaterial({
+                roughness: 0.65,
+                metalness: 0.08
+            });
+            const transMesh = new THREE.InstancedMesh(SHARED_BOX_GEO, mat, maxCount);
+            transMesh.castShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.receiveShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            transMesh.frustumCulled = false;
+
+            // Frame 0 setup: populate all initial matrices and colors immediately before scene insertion
+            for (let i = 0; i < maxCount; i++) {
+                const p = pairs[i];
+                animDummy.position.copy(p.srcPos);
+                animDummy.scale.set(p.srcScale, p.srcScale, p.srcScale);
+                animDummy.rotation.set(0, 0, 0);
+                animDummy.updateMatrix();
+                transMesh.setMatrixAt(i, animDummy.matrix);
+                transMesh.setColorAt(i, p.srcColor);
+            }
+            transMesh.instanceMatrix.needsUpdate = true;
+            if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+
+            customVoxelsGroup.add(transMesh);
+            customVoxelMeshes.push(transMesh);
+
+            const progress = { val: 0 };
+            gsap.to(progress, {
+                val: 1,
+                duration: 1.3,
+                ease: 'power2.inOut',
+                onUpdate: () => {
+                    const t = progress.val;
+                    for (let i = 0; i < maxCount; i++) {
+                        const p = pairs[i];
+                        const start = p.stagger;
+                        const end = start + 0.75;
+                        const localT = THREE.MathUtils.clamp((t - start) / (end - start), 0, 1);
+                        const easeT = gsap.parseEase('power2.inOut')(localT);
+
+                        const arc = Math.sin(easeT * Math.PI) * 1.8;
+                        const curX = THREE.MathUtils.lerp(p.srcPos.x, p.dstPos.x, easeT);
+                        const curY = THREE.MathUtils.lerp(p.srcPos.y, p.dstPos.y, easeT) + arc;
+                        const curZ = THREE.MathUtils.lerp(p.srcPos.z, p.dstPos.z, easeT);
+                        const curScale = THREE.MathUtils.lerp(p.srcScale, p.dstScale, easeT);
+
+                        animDummy.position.set(curX, curY, curZ);
+                        animDummy.scale.set(curScale, curScale, curScale);
+                        animDummy.rotation.set(0, Math.sin(easeT * Math.PI) * Math.PI, 0);
+                        animDummy.updateMatrix();
+                        transMesh.setMatrixAt(i, animDummy.matrix);
+
+                        // True gradual RGB color interpolation
+                        animColor.copy(p.srcColor).lerp(p.dstColor, easeT);
+                        transMesh.setColorAt(i, animColor);
+                    }
+                    transMesh.instanceMatrix.needsUpdate = true;
+                    if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+                    wakeAnimation();
+                },
+                onComplete: () => {
+                    isTransitioning = false;
+                    applyModelDataInstantly(targetModel, false);
+                    showToast(`✨ اكتمل تحويل المورف إلى "${targetModel.name}" بنجاح!`);
+                }
+            });
+        }
+
+        function executeStaggerTransition(sourceVoxels, targetVoxels, targetModel) {
+            const tl = gsap.timeline({
+                onComplete: () => {
+                    isTransitioning = false;
+                    applyModelDataInstantly(targetModel, false);
+                    showToast(`✨ تم إظهار مجسم "${targetModel.name}" بتتابع جميل!`);
+                }
+            });
+
+            const shrinkObj = { scale: 1 };
+            tl.to(shrinkObj, {
+                scale: 0.001,
+                duration: 0.5,
+                ease: 'power2.in',
+                onUpdate: () => {
+                    customVoxelsGroup.scale.set(shrinkObj.scale, shrinkObj.scale, shrinkObj.scale);
+                    wakeAnimation();
+                }
+            });
+
+            tl.add(() => {
+                applyModelDataInstantly(targetModel, false);
+                customVoxelsGroup.scale.set(0.001, 0.001, 0.001);
+            });
+
+            const growObj = { scale: 0.001 };
+            tl.to(growObj, {
+                scale: 1,
+                duration: 0.7,
+                ease: 'elastic.out(1, 0.6)',
+                onUpdate: () => {
+                    customVoxelsGroup.scale.set(growObj.scale, growObj.scale, growObj.scale);
+                    wakeAnimation();
+                }
+            });
+        }
+
+        function applyModelDataInstantly(targetModel, toast = true) {
+            currentModelId = targetModel.id;
+            GRID_SIZE = targetModel.gridSize || 8;
+            centerOffset = { ...(targetModel.centerOffset || { x: 0, y: 0, z: 0 }) };
+            layers = JSON.parse(JSON.stringify(targetModel.layers));
+            activeLayerIndex = 0;
+
+            updateGridGuide3D();
+            renderLayerSelectOptions();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            updateStatsUI();
+            updateGridSizeUI();
+            updateCenterOffsetUI();
+            populateModelDropdown();
+            populateLeafLayerOptions();
+
+            if (toast) showToast(`🗂️ تم تحميل مجسم "${targetModel.name}"!`);
+            requestRender();
+        }
+
+        // =========================================================================
+        // 11. CUSTOM IN-APP MODAL ENGINE & MODEL ACTIONS
+        // =========================================================================
+        const AppModal = {
+            backdrop: null,
+            box: null,
+            titleEl: null,
+            msgEl: null,
+            inputContainer: null,
+            inputEl: null,
+            btnConfirm: null,
+            btnCancel: null,
+            btnClose: null,
+            onConfirmCallback: null,
+            onCancelCallback: null,
+
+            init() {
+                this.backdrop = document.getElementById('app-modal-backdrop');
+                this.box = document.getElementById('app-modal-box');
+                this.titleEl = document.getElementById('app-modal-title');
+                this.msgEl = document.getElementById('app-modal-message');
+                this.inputContainer = document.getElementById('app-modal-input-container');
+                this.inputEl = document.getElementById('app-modal-input');
+                this.btnConfirm = document.getElementById('btn-modal-confirm');
+                this.btnCancel = document.getElementById('btn-modal-cancel');
+                this.btnClose = document.getElementById('btn-modal-close');
+
+                this.btnConfirm?.addEventListener('click', () => {
+                    const val = this.inputEl?.value;
+                    const cb = this.onConfirmCallback;
+                    this.close();
+                    if (cb) cb(val);
+                });
+
+                this.btnCancel?.addEventListener('click', () => {
+                    const cb = this.onCancelCallback;
+                    this.close();
+                    if (cb) cb();
+                });
+
+                this.btnClose?.addEventListener('click', () => {
+                    const cb = this.onCancelCallback;
+                    this.close();
+                    if (cb) cb();
+                });
+
+                this.inputEl?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.btnConfirm?.click();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.close();
+                    }
+                });
+            },
+
+            show({ title, message, isPrompt = false, defaultValue = '', confirmText = 'تأكيد', confirmClass = '!bg-white !text-black', showCancel = true, onConfirm, onCancel }) {
+                if (!this.backdrop) this.init();
+                this.onConfirmCallback = onConfirm;
+                this.onCancelCallback = onCancel;
+
+                if (this.titleEl) this.titleEl.innerHTML = title;
+                if (this.msgEl) this.msgEl.innerHTML = message;
+
+                if (isPrompt) {
+                    if (this.inputContainer) this.inputContainer.classList.remove('hidden');
+                    if (this.inputEl) {
+                        this.inputEl.value = defaultValue;
+                        setTimeout(() => this.inputEl.focus(), 60);
+                    }
+                } else {
+                    if (this.inputContainer) this.inputContainer.classList.add('hidden');
+                }
+
+                if (this.btnConfirm) {
+                    this.btnConfirm.textContent = confirmText;
+                    this.btnConfirm.className = `mono-btn !h-7 !px-3 text-xs font-bold ${confirmClass}`;
+                }
+
+                if (this.btnCancel) {
+                    this.btnCancel.style.display = showCancel ? 'inline-flex' : 'none';
+                }
+
+                if (this.backdrop) {
+                    this.backdrop.classList.remove('hidden');
+                    requestAnimationFrame(() => {
+                        this.backdrop.classList.remove('opacity-0');
+                        if (this.box) this.box.classList.remove('scale-95');
+                    });
+                }
+            },
+
+            confirm(title, message, onConfirm, options = {}) {
+                this.show({
+                    title: `<span>🗑️</span> <span>${title}</span>`,
+                    message: message,
+                    confirmText: options.confirmText || 'حذف نهائي',
+                    confirmClass: options.confirmClass || '!bg-rose-600 !text-white hover:!bg-rose-700 !border-rose-600',
+                    onConfirm: onConfirm
+                });
+            },
+
+            prompt(title, message, defaultValue, onConfirm) {
+                this.show({
+                    title: `<span>✏️</span> <span>${title}</span>`,
+                    message: message,
+                    isPrompt: true,
+                    defaultValue: defaultValue,
+                    confirmText: 'حفظ وتطبيق',
+                    confirmClass: '!bg-emerald-600 !text-white hover:!bg-emerald-500 !border-emerald-600',
+                    onConfirm: onConfirm
+                });
+            },
+
+            alert(title, message) {
+                this.show({
+                    title: `<span>ℹ️</span> <span>${title}</span>`,
+                    message: message,
+                    showCancel: false,
+                    confirmText: 'حسناً',
+                    confirmClass: '!bg-white !text-black'
+                });
+            },
+
+            close() {
+                if (!this.backdrop) return;
+                this.backdrop.classList.add('opacity-0');
+                if (this.box) this.box.classList.add('scale-95');
+                setTimeout(() => {
+                    this.backdrop.classList.add('hidden');
+                }, 150);
+            }
+        };
+
+        document.getElementById('select-model')?.addEventListener('change', (e) => {
+            switchModel(e.target.value);
+        });
+
+        document.getElementById('btn-new-model')?.addEventListener('click', () => {
+            if (isTransitioning) return;
+            const defName = `مجسم جديد ${savedModels.length + 1}`;
+            AppModal.prompt('إنشاء مجسم جديد', 'أدخل اسم المجسم الجديد الذي ترغب بإنشائه:', defName, (name) => {
+                if (!name || !name.trim()) return;
+                syncCurrentModelData();
+                const newModel = {
+                    id: 'model-' + Date.now(),
+                    name: name.trim(),
+                    gridSize: 8,
+                    centerOffset: { x: 0, y: 0, z: 0 },
+                    layers: [
+                        {
+                            id: Date.now(),
+                            name: 'طبقة 1 (Y=1)',
+                            y: 1,
+                            grid: Array(8).fill(null).map(() => Array(8).fill(null))
+                        }
+                    ]
+                };
+                savedModels.push(newModel);
+                saveModelsToStorage();
+                populateModelDropdown();
+                switchModel(newModel.id);
+                showToast(`➕ تم إنشاء المجسم "${name}" بنجاح!`);
+            });
+        });
+
+        document.getElementById('btn-duplicate-model')?.addEventListener('click', () => {
+            if (isTransitioning) return;
+            syncCurrentModelData();
+            const cur = savedModels.find(m => m.id === currentModelId);
+            if (!cur) return;
+            const dup = JSON.parse(JSON.stringify(cur));
+            dup.id = 'model-' + Date.now();
+            dup.name = `نسخة من ${cur.name}`;
+            savedModels.push(dup);
+            saveModelsToStorage();
+            populateModelDropdown();
+            switchModel(dup.id);
+            showToast(`📋 تم تكرار المجسم بنجاح!`);
+        });
+
+        document.getElementById('btn-rename-model')?.addEventListener('click', () => {
+            if (isTransitioning) return;
+            const cur = savedModels.find(m => m.id === currentModelId);
+            if (!cur) return;
+            AppModal.prompt('إعادة تسمية المجسم', 'أدخل الاسم الجديد للمجسم الحالي:', cur.name, (newName) => {
+                if (newName && newName.trim()) {
+                    cur.name = newName.trim();
+                    saveModelsToStorage();
+                    populateModelDropdown();
+                    showToast(`✏️ تم تعديل اسم المجسم إلى "${cur.name}"`);
+                }
+            });
+        });
+
+        document.getElementById('btn-delete-model')?.addEventListener('click', () => {
+            if (isTransitioning) return;
+            if (savedModels.length <= 1) {
+                AppModal.alert('تنبيه', 'لا يمكن حذف المجسم الوحيد المتبقي.');
+                return;
+            }
+            const modelToDelete = savedModels.find(m => m.id === currentModelId);
+            if (!modelToDelete) return;
+            
+            AppModal.confirm('حذف المجسم', `هل أنت متأكد من رغبتك في حذف المجسم "<strong>${modelToDelete.name}</strong>" نهائياً؟`, () => {
+                // 1. Identify next model to switch to (adjacent or first available)
+                const currentIndex = savedModels.findIndex(m => m.id === modelToDelete.id);
+                const remainingModels = savedModels.filter(m => m.id !== modelToDelete.id);
+                const nextIndex = Math.min(Math.max(0, currentIndex - 1), remainingModels.length - 1);
+                const nextModel = remainingModels[nextIndex];
+
+                // 2. Remove the deleted model and persist
+                savedModels = remainingModels;
+                saveModelsToStorage();
+
+                // 3. Transition directly to nextModel WITHOUT syncing the deleted model's layers!
+                const animModeEl = document.getElementById('select-anim-mode');
+                const mode = animModeEl ? animModeEl.value : 'morph';
+
+                if (mode === 'morph' && typeof gsap !== 'undefined' && !DeviceDetector.isLowEnd) {
+                    const sourceVoxels = getVoxelListFromModel({
+                        gridSize: GRID_SIZE,
+                        centerOffset: centerOffset,
+                        layers: layers
+                    });
+                    const targetVoxels = getVoxelListFromModel(nextModel);
+
+                    isTransitioning = true;
+                    wakeAnimation();
+                    playVoxelSound(2, 480);
+                    executeMorphTransition(sourceVoxels, targetVoxels, nextModel);
+                } else {
+                    applyModelDataInstantly(nextModel, false);
+                }
+
+                populateModelDropdown();
+                showToast(`🗑️ تم حذف المجسم "${modelToDelete.name}" بنجاح!`);
+            });
+        });
+
+        // 12. DEDICATED 3D ISLAND TO QR CODE MORPH & PRESENTATION MODE
+        // =========================================================================
+        let isQRModeActive = false;
+        let lastQRVoxels = [];
+
+        function getIslandVoxelList() {
+            const list = [];
+            islandVoxelWorld.forEach(v => {
+                const blockDef = BLOCK_TYPES[v.type] || BLOCK_TYPES.GRASS;
+                const baseColor = new THREE.Color(blockDef.color);
+                const jitter = (Math.sin(v.x * 3.1 + v.y * 7.7 + v.z * 5.3) * 0.04);
+                const col = baseColor.clone().offsetHSL(0, 0, jitter);
+                list.push({
+                    x: v.x,
+                    y: v.y,
+                    z: v.z,
+                    color: col
+                });
+            });
+            return list;
+        }
+
+        function computeQRVoxelData(urlText) {
+            if (typeof qrcode === 'undefined') return null;
+            const qr = qrcode(0, 'M');
+            qr.addData(urlText);
+            qr.make();
+            const size = qr.getModuleCount();
+
+            const fg1Hex = document.getElementById('input-qr-fg1')?.value || '#0a0512';
+            const fg2Hex = document.getElementById('input-qr-fg2')?.value || '#ec4899';
+            const gradType = document.getElementById('select-qr-gradient')?.value || 'linear';
+            const bg1Hex = document.getElementById('input-qr-bg1')?.value || '#ffffff';
+            const bg2Hex = document.getElementById('input-qr-bg2')?.value || '#fbcfe8';
+
+            const fg1 = new THREE.Color(fg1Hex);
+            const fg2 = new THREE.Color(fg2Hex);
+            const bg1 = new THREE.Color(bg1Hex);
+            const bg2 = new THREE.Color(bg2Hex);
+
+            const margin = 2;
+            const totalSize = size + margin * 2;
+            const offset = Math.floor(totalSize / 2);
+            const maxDist = Math.sqrt((size / 2) * (size / 2) + (size / 2) * (size / 2)) || 1;
+
+            const list = [];
+
+            // 1. Base Plate at Y = 0
+            for (let r = 0; r < totalSize; r++) {
+                for (let c = 0; c < totalSize; c++) {
+                    const t = r / (totalSize - 1 || 1);
+                    const curBg = new THREE.Color().copy(bg1).lerp(bg2, t);
+                    list.push({
+                        x: c - offset,
+                        y: 0,
+                        z: r - offset,
+                        color: curBg
+                    });
+                }
+            }
+
+            // 2. Dark Foreground Modules at Y = 1
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (qr.isDark(r, c)) {
+                        let t = 0;
+                        if (gradType === 'linear') {
+                            t = r / (size - 1 || 1);
+                        } else if (gradType === 'radial') {
+                            const dx = c - size / 2;
+                            const dy = r - size / 2;
+                            t = Math.min(1, Math.sqrt(dx * dx + dy * dy) / maxDist);
+                        }
+                        const curFg = new THREE.Color().copy(fg1).lerp(fg2, t);
+                        list.push({
+                            x: (c + margin) - offset,
+                            y: 1,
+                            z: (r + margin) - offset,
+                            color: curFg
+                        });
+                    }
+                }
+            }
+
+            return { voxels: list, size: totalSize };
+        }
+
+        function enterQRMode() {
+            if (isTransitioning) return;
+            const inputUrl = document.getElementById('input-qr-url');
+            const urlText = inputUrl ? inputUrl.value.trim() : 'https://google.com';
+            if (!urlText) {
+                alert('يرجى كتابة رابط صالح أولاً.');
+                return;
+            }
+
+            const qrData = computeQRVoxelData(urlText);
+            if (!qrData) {
+                alert('مكتبة توليد الـ QR قيد التحميل، يرجى المحاولة بعد قليل.');
+                return;
+            }
+
+            isTransitioning = true;
+            wakeAnimation();
+            playVoxelSound(5, 580);
+
+            // Collect full world: island + custom model
+            const islandVoxels = getIslandVoxelList();
+            const customVoxels = getVoxelListFromModel({
+                gridSize: GRID_SIZE,
+                centerOffset: centerOffset,
+                layers: layers
+            });
+
+            const sourceVoxels = [...islandVoxels, ...customVoxels];
+            const targetVoxels = qrData.voxels;
+            lastQRVoxels = targetVoxels;
+
+            // Hide normal island and custom layers during morph
+            islandMeshes.forEach(m => m.visible = false);
+            while (customVoxelsGroup.children.length > 0) {
+                const ch = customVoxelsGroup.children[0];
+                customVoxelsGroup.remove(ch);
+                if (ch.material) ch.material.dispose();
+            }
+            customVoxelMeshes.length = 0;
+
+            // Sort spatially
+            const sortFn = (a, b) => {
+                if (Math.abs(a.y - b.y) > 0.01) return a.y - b.y;
+                if (Math.abs(a.z - b.z) > 0.01) return a.z - b.z;
+                return a.x - b.x;
+            };
+            const sortedSrc = [...sourceVoxels].sort(sortFn);
+            const sortedDst = [...targetVoxels].sort(sortFn);
+
+            const maxCount = Math.max(sortedSrc.length, sortedDst.length);
+            const pairs = [];
+
+            for (let i = 0; i < maxCount; i++) {
+                const hasSrc = i < sortedSrc.length;
+                const hasDst = i < sortedDst.length;
+
+                if (hasSrc && hasDst) {
+                    pairs.push({
+                        srcPos: new THREE.Vector3(sortedSrc[i].x, sortedSrc[i].y, sortedSrc[i].z),
+                        dstPos: new THREE.Vector3(sortedDst[i].x, sortedDst[i].y, sortedDst[i].z),
+                        srcColor: sortedSrc[i].color.clone(),
+                        dstColor: sortedDst[i].color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else if (!hasSrc && hasDst) {
+                    const dst = sortedDst[i];
+                    pairs.push({
+                        srcPos: new THREE.Vector3(dst.x, dst.y - 1.0, dst.z),
+                        dstPos: new THREE.Vector3(dst.x, dst.y, dst.z),
+                        srcColor: dst.color.clone(),
+                        dstColor: dst.color.clone(),
+                        srcScale: 0.001,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else {
+                    const src = sortedSrc[i];
+                    pairs.push({
+                        srcPos: new THREE.Vector3(src.x, src.y, src.z),
+                        dstPos: new THREE.Vector3(src.x, src.y - 1.0, src.z),
+                        srcColor: src.color.clone(),
+                        dstColor: src.color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 0.001,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                }
+            }
+
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.65, metalness: 0.08 });
+            const transMesh = new THREE.InstancedMesh(SHARED_BOX_GEO, mat, maxCount);
+            transMesh.castShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.receiveShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            transMesh.frustumCulled = false;
+
+            for (let i = 0; i < maxCount; i++) {
+                const p = pairs[i];
+                animDummy.position.copy(p.srcPos);
+                animDummy.scale.set(p.srcScale, p.srcScale, p.srcScale);
+                animDummy.rotation.set(0, 0, 0);
+                animDummy.updateMatrix();
+                transMesh.setMatrixAt(i, animDummy.matrix);
+                transMesh.setColorAt(i, p.srcColor);
+            }
+            transMesh.instanceMatrix.needsUpdate = true;
+            if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+
+            customVoxelsGroup.add(transMesh);
+            customVoxelMeshes.push(transMesh);
+
+            const progress = { val: 0 };
+            gsap.to(progress, {
+                val: 1,
+                duration: 1.4,
+                ease: 'power2.inOut',
+                onUpdate: () => {
+                    const t = progress.val;
+                    for (let i = 0; i < maxCount; i++) {
+                        const p = pairs[i];
+                        const start = p.stagger;
+                        const end = start + 0.75;
+                        const localT = THREE.MathUtils.clamp((t - start) / (end - start), 0, 1);
+                        const easeT = gsap.parseEase('power2.inOut')(localT);
+
+                        const arc = Math.sin(easeT * Math.PI) * 2.2;
+                        const curX = THREE.MathUtils.lerp(p.srcPos.x, p.dstPos.x, easeT);
+                        const curY = THREE.MathUtils.lerp(p.srcPos.y, p.dstPos.y, easeT) + arc;
+                        const curZ = THREE.MathUtils.lerp(p.srcPos.z, p.dstPos.z, easeT);
+                        const curScale = THREE.MathUtils.lerp(p.srcScale, p.dstScale, easeT);
+
+                        animDummy.position.set(curX, curY, curZ);
+                        animDummy.scale.set(curScale, curScale, curScale);
+                        animDummy.rotation.set(0, Math.sin(easeT * Math.PI) * Math.PI, 0);
+                        animDummy.updateMatrix();
+                        transMesh.setMatrixAt(i, animDummy.matrix);
+
+                        animColor.copy(p.srcColor).lerp(p.dstColor, easeT);
+                        transMesh.setColorAt(i, animColor);
+                    }
+                    transMesh.instanceMatrix.needsUpdate = true;
+                    if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+                    wakeAnimation();
+                },
+                onComplete: () => {
+                    isTransitioning = false;
+                    isQRModeActive = true;
+                    updateQRUIState();
+                    setCameraPreset('top');
+                    showToast('📱 تم تحويل الجزيرة بالكامل إلى كود QR بنجاح!');
+                }
+            });
+        }
+
+        function exitQRMode() {
+            if (isTransitioning || !isQRModeActive) return;
+
+            isTransitioning = true;
+            wakeAnimation();
+            playVoxelSound(3, 440);
+
+            const sourceVoxels = [...lastQRVoxels];
+            const islandVoxels = getIslandVoxelList();
+            const customVoxels = getVoxelListFromModel({
+                gridSize: GRID_SIZE,
+                centerOffset: centerOffset,
+                layers: layers
+            });
+            const targetVoxels = [...islandVoxels, ...customVoxels];
+
+            while (customVoxelsGroup.children.length > 0) {
+                const ch = customVoxelsGroup.children[0];
+                customVoxelsGroup.remove(ch);
+                if (ch.material) ch.material.dispose();
+            }
+            customVoxelMeshes.length = 0;
+
+            const sortFn = (a, b) => {
+                if (Math.abs(a.y - b.y) > 0.01) return a.y - b.y;
+                if (Math.abs(a.z - b.z) > 0.01) return a.z - b.z;
+                return a.x - b.x;
+            };
+            const sortedSrc = [...sourceVoxels].sort(sortFn);
+            const sortedDst = [...targetVoxels].sort(sortFn);
+
+            const maxCount = Math.max(sortedSrc.length, sortedDst.length);
+            const pairs = [];
+
+            for (let i = 0; i < maxCount; i++) {
+                const hasSrc = i < sortedSrc.length;
+                const hasDst = i < sortedDst.length;
+
+                if (hasSrc && hasDst) {
+                    pairs.push({
+                        srcPos: new THREE.Vector3(sortedSrc[i].x, sortedSrc[i].y, sortedSrc[i].z),
+                        dstPos: new THREE.Vector3(sortedDst[i].x, sortedDst[i].y, sortedDst[i].z),
+                        srcColor: sortedSrc[i].color.clone(),
+                        dstColor: sortedDst[i].color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else if (!hasSrc && hasDst) {
+                    const dst = sortedDst[i];
+                    pairs.push({
+                        srcPos: new THREE.Vector3(dst.x, dst.y - 1.0, dst.z),
+                        dstPos: new THREE.Vector3(dst.x, dst.y, dst.z),
+                        srcColor: dst.color.clone(),
+                        dstColor: dst.color.clone(),
+                        srcScale: 0.001,
+                        dstScale: 1.0,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                } else {
+                    const src = sortedSrc[i];
+                    pairs.push({
+                        srcPos: new THREE.Vector3(src.x, src.y, src.z),
+                        dstPos: new THREE.Vector3(src.x, src.y - 1.0, src.z),
+                        srcColor: src.color.clone(),
+                        dstColor: src.color.clone(),
+                        srcScale: 1.0,
+                        dstScale: 0.001,
+                        stagger: (i / maxCount) * 0.25
+                    });
+                }
+            }
+
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.65, metalness: 0.08 });
+            const transMesh = new THREE.InstancedMesh(SHARED_BOX_GEO, mat, maxCount);
+            transMesh.castShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.receiveShadow = PERF_PROFILES[currentTierKey].shadows;
+            transMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            transMesh.frustumCulled = false;
+
+            for (let i = 0; i < maxCount; i++) {
+                const p = pairs[i];
+                animDummy.position.copy(p.srcPos);
+                animDummy.scale.set(p.srcScale, p.srcScale, p.srcScale);
+                animDummy.rotation.set(0, 0, 0);
+                animDummy.updateMatrix();
+                transMesh.setMatrixAt(i, animDummy.matrix);
+                transMesh.setColorAt(i, p.srcColor);
+            }
+            transMesh.instanceMatrix.needsUpdate = true;
+            if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+
+            customVoxelsGroup.add(transMesh);
+            customVoxelMeshes.push(transMesh);
+
+            const progress = { val: 0 };
+            gsap.to(progress, {
+                val: 1,
+                duration: 1.4,
+                ease: 'power2.inOut',
+                onUpdate: () => {
+                    const t = progress.val;
+                    for (let i = 0; i < maxCount; i++) {
+                        const p = pairs[i];
+                        const start = p.stagger;
+                        const end = start + 0.75;
+                        const localT = THREE.MathUtils.clamp((t - start) / (end - start), 0, 1);
+                        const easeT = gsap.parseEase('power2.inOut')(localT);
+
+                        const arc = Math.sin(easeT * Math.PI) * 2.2;
+                        const curX = THREE.MathUtils.lerp(p.srcPos.x, p.dstPos.x, easeT);
+                        const curY = THREE.MathUtils.lerp(p.srcPos.y, p.dstPos.y, easeT) + arc;
+                        const curZ = THREE.MathUtils.lerp(p.srcPos.z, p.dstPos.z, easeT);
+                        const curScale = THREE.MathUtils.lerp(p.srcScale, p.dstScale, easeT);
+
+                        animDummy.position.set(curX, curY, curZ);
+                        animDummy.scale.set(curScale, curScale, curScale);
+                        animDummy.rotation.set(0, Math.sin(easeT * Math.PI) * Math.PI, 0);
+                        animDummy.updateMatrix();
+                        transMesh.setMatrixAt(i, animDummy.matrix);
+
+                        animColor.copy(p.srcColor).lerp(p.dstColor, easeT);
+                        transMesh.setColorAt(i, animColor);
+                    }
+                    transMesh.instanceMatrix.needsUpdate = true;
+                    if (transMesh.instanceColor) transMesh.instanceColor.needsUpdate = true;
+                    wakeAnimation();
+                },
+                onComplete: () => {
+                    isTransitioning = false;
+                    isQRModeActive = false;
+                    updateQRUIState();
+
+                    // Restore island & custom model
+                    islandMeshes.forEach(m => m.visible = true);
+                    update3DCustomVoxels();
+                    setCameraPreset('iso');
+                    showToast('🌴 تم الرجوع إلى الجزيرة والمجسمات بنجاح!');
+                }
+            });
+        }
+
+        function updateQRUIState() {
+            const banner = document.getElementById('qr-active-banner');
+            const defaultBtns = document.getElementById('qr-buttons-default');
+            const activeBtns = document.getElementById('qr-buttons-active');
+            const badge = document.getElementById('qr-status-badge');
+
+            if (isQRModeActive) {
+                if (banner) banner.classList.remove('hidden');
+                if (defaultBtns) defaultBtns.classList.add('hidden');
+                if (activeBtns) activeBtns.classList.remove('hidden');
+                if (badge) {
+                    badge.textContent = 'نشط ✅';
+                    badge.className = 'text-[9px] font-mono px-1.5 py-0.2 bg-cyan-950 border border-cyan-700 text-cyan-300 rounded-sm font-bold';
+                }
+            } else {
+                if (banner) banner.classList.add('hidden');
+                if (defaultBtns) defaultBtns.classList.remove('hidden');
+                if (activeBtns) activeBtns.classList.add('hidden');
+                if (badge) {
+                    badge.textContent = 'QR 3D';
+                    badge.className = 'text-[9px] font-mono px-1.5 py-0.2 bg-zinc-900 border border-zinc-700 text-zinc-300 rounded-sm';
+                }
+            }
+        }
+
+        document.getElementById('btn-generate-qr')?.addEventListener('click', enterQRMode);
+        document.getElementById('btn-update-qr')?.addEventListener('click', enterQRMode);
+        document.getElementById('btn-exit-qr')?.addEventListener('click', exitQRMode);
+        document.getElementById('btn-banner-exit-qr')?.addEventListener('click', exitQRMode);
+
+        document.querySelectorAll('.qr-url-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const inp = document.getElementById('input-qr-url');
+                if (inp) inp.value = btn.dataset.url;
+            });
+        });
+
+        // 13. 2D PIXEL EDITOR & DRAWING TOOLS
+        // =========================================================================
+        const pixelGridEl = document.getElementById('pixel-grid');
+        const selectLayerEl = document.getElementById('select-layer');
+        const labelLayerHeightEl = document.getElementById('label-layer-height');
+
+        function renderLayerSelectOptions() {
+            selectLayerEl.innerHTML = '';
+            layers.forEach((layer, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = layer.name;
+                if (idx === activeLayerIndex) opt.selected = true;
+                selectLayerEl.appendChild(opt);
+            });
+            const currentLayer = layers[activeLayerIndex];
+            if (currentLayer && labelLayerHeightEl) {
+                const actualY = currentLayer.y + centerOffset.y;
+                labelLayerHeightEl.textContent = `Y: ${actualY} (${actualY >= 1 ? 'فوق الجزيرة' : 'مستوى سفلي'})`;
+            }
+            populateLeafLayerOptions();
+        }
+
+        function render2DGrid() {
+            pixelGridEl.innerHTML = '';
+            pixelGridEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, minmax(0, 1fr))`;
+
+            const currentLayer = layers[activeLayerIndex];
+            if (!currentLayer) return;
+
+            const prevLayer = (activeLayerIndex > 0) ? layers[activeLayerIndex - 1] : null;
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'pixel-cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+
+                    const color = currentLayer.grid[r][c];
+                    if (color) {
+                        cell.style.backgroundColor = color;
+                        cell.style.borderColor = 'rgba(255,255,255,0.4)';
+                        cell.style.boxShadow = `0 0 6px ${color}55`;
+                    } else {
+                        cell.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                        cell.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                        cell.style.boxShadow = 'none';
+
+                        if (onionSkinEnabled && prevLayer && prevLayer.grid[r] && prevLayer.grid[r][c]) {
+                            cell.classList.add('onion-preview');
+                            cell.style.setProperty('--onion-color', prevLayer.grid[r][c]);
+                        }
+                    }
+
+                    cell.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        isMouseDownOnGrid = true;
+                        applyToolToCell(r, c);
+                    });
+
+                    cell.addEventListener('mouseenter', () => {
+                        if (isMouseDownOnGrid) {
+                            applyToolToCell(r, c);
+                        }
+                    });
+
+                    // Mobile touch support on 2D grid
+                    cell.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        applyToolToCell(r, c);
+                    }, { passive: false });
+
+                    pixelGridEl.appendChild(cell);
+                }
+            }
+        }
+
+        window.addEventListener('mouseup', () => {
+            isMouseDownOnGrid = false;
+        });
+
+        function applyToolToCell(r, c) {
+            const currentLayer = layers[activeLayerIndex];
+            if (!currentLayer) return;
+
+            if (currentTool === 'brush') {
+                currentLayer.grid[r][c] = activeColor;
+                playVoxelSound(currentLayer.y, 440);
+            } else if (currentTool === 'eraser') {
+                currentLayer.grid[r][c] = null;
+                playVoxelSound(currentLayer.y, 220);
+            } else if (currentTool === 'fill') {
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        currentLayer.grid[row][col] = activeColor;
+                    }
+                }
+                playVoxelSound(currentLayer.y, 520);
+            }
+
+            render2DGrid();
+            update3DCustomVoxels();
+            updateStatsUI();
+            syncCurrentModelData();
+            requestRender();
+        }
+
+        // =========================================================================
+        // 14. 3D CUSTOM VOXELS REBUILD WITH INTERNAL OCCLUSION CULLING
+        // =========================================================================
+        function update3DCustomVoxels() {
+            while (customVoxelsGroup.children.length > 0) {
+                const child = customVoxelsGroup.children[0];
+                customVoxelsGroup.remove(child);
+                if (child.material) child.material.dispose();
+            }
+            customVoxelMeshes.length = 0;
+
+            const colorGroups = {};
+            let totalBlocks = 0;
+            const offset = Math.floor(GRID_SIZE / 2);
+
+            // Fast spatial map to detect occluded inner voxels in dense 3D builds
+            const voxelOccupancy = new Map();
+            layers.forEach((layer) => {
+                const wy = layer.y + centerOffset.y;
+                for (let r = 0; r < layer.grid.length; r++) {
+                    for (let c = 0; c < layer.grid[r].length; c++) {
+                        if (layer.grid[r][c]) {
+                            totalBlocks++;
+                            const wx = c - offset + centerOffset.x;
+                            const wz = r - offset + centerOffset.z;
+                            voxelOccupancy.set(`${wx},${wy},${wz}`, layer.grid[r][c]);
+                        }
+                    }
+                }
+            });
+
+            // Safe culling: do not cull custom voxels if totalBlocks <= 3500, preserving all faces intact
+            const shouldCull = totalBlocks > 3500;
+
+            layers.forEach((layer) => {
+                const wy = layer.y + centerOffset.y;
+                const rows = layer.grid.length;
+                for (let r = 0; r < rows; r++) {
+                    const cols = layer.grid[r].length;
+                    for (let c = 0; c < cols; c++) {
+                        const hexColor = layer.grid[r][c];
+                        if (hexColor) {
+                            const wx = c - offset + centerOffset.x;
+                            const wz = r - offset + centerOffset.z;
+
+                            // Skip rendering completely hidden inside voxels only for extreme dense builds (>3500 blocks)
+                            const isFullyOccluded = shouldCull && (
+                                voxelOccupancy.has(`${wx+1},${wy},${wz}`) &&
+                                voxelOccupancy.has(`${wx-1},${wy},${wz}`) &&
+                                voxelOccupancy.has(`${wx},${wy+1},${wz}`) &&
+                                voxelOccupancy.has(`${wx},${wy-1},${wz}`) &&
+                                voxelOccupancy.has(`${wx},${wy},${wz+1}`) &&
+                                voxelOccupancy.has(`${wx},${wy},${wz-1}`)
+                            );
+
+                            if (!isFullyOccluded) {
+                                if (!colorGroups[hexColor]) colorGroups[hexColor] = [];
+                                colorGroups[hexColor].push({ x: wx, y: wy, z: wz, r: r, c: c, layer: layer });
+                            }
+                        }
+                    }
+                }
+            });
+
+            const dummy = new THREE.Object3D();
+
+            Object.keys(colorGroups).forEach((hexColor) => {
+                const voxels = colorGroups[hexColor];
+                const count = voxels.length;
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(hexColor),
+                    roughness: 0.65,
+                    metalness: 0.08
+                });
+
+                const instMesh = new THREE.InstancedMesh(SHARED_BOX_GEO, mat, count);
+                instMesh.castShadow = PERF_PROFILES[currentTierKey].shadows;
+                instMesh.receiveShadow = PERF_PROFILES[currentTierKey].shadows;
+                instMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                instMesh.frustumCulled = false;
+
+                for (let i = 0; i < count; i++) {
+                    const v = voxels[i];
+                    dummy.position.set(v.x, v.y, v.z);
+                    dummy.updateMatrix();
+                    instMesh.setMatrixAt(i, dummy.matrix);
+                }
+
+                instMesh.instanceMatrix.needsUpdate = true;
+                instMesh.userData = { isCustom: true, hexColor: hexColor, voxels: voxels };
+                customVoxelsGroup.add(instMesh);
+                customVoxelMeshes.push(instMesh);
+            });
+
+            updateStatsUI(totalBlocks);
+            requestRender();
+        }
+
+        function updateStatsUI(forcedCount = null) {
+            let total = 0;
+            if (forcedCount !== null) {
+                total = forcedCount;
+            } else {
+                layers.forEach(l => {
+                    for (let r = 0; r < l.grid.length; r++) {
+                        for (let c = 0; c < l.grid[r].length; c++) {
+                            if (l.grid[r][c]) total++;
+                        }
+                    }
+                });
+            }
+            document.getElementById('stat-blocks-count').textContent = `المكعبات: ${total}`;
+            document.getElementById('stat-layers-count').textContent = `الطبقات: ${layers.length}`;
+        }
+
+        // =========================================================================
+        // 15. DYNAMIC DIMENSIONS & CENTER POSITION
+        // =========================================================================
+        function setGridDimensions(newSize) {
+            newSize = parseInt(newSize, 10);
+            if (isNaN(newSize) || newSize < 3 || newSize > 32 || newSize === GRID_SIZE) return;
+            
+            const oldSize = GRID_SIZE;
+            const oldOffset = Math.floor(oldSize / 2);
+            const newOffset = Math.floor(newSize / 2);
+
+            layers.forEach(layer => {
+                const newGrid = Array(newSize).fill(null).map(() => Array(newSize).fill(null));
+                for (let r = 0; r < oldSize; r++) {
+                    for (let c = 0; c < oldSize; c++) {
+                        const color = layer.grid[r][c];
+                        if (color) {
+                            const wx = c - oldOffset;
+                            const wz = r - oldOffset;
+                            const newC = wx + newOffset;
+                            const newR = wz + newOffset;
+                            if (newC >= 0 && newC < newSize && newR >= 0 && newR < newSize) {
+                                newGrid[newR][newC] = color;
+                            }
+                        }
+                    }
+                }
+                layer.grid = newGrid;
+            });
+
+            GRID_SIZE = newSize;
+            updateGridGuide3D();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateGridSizeUI();
+            syncCurrentModelData();
+            showToast(`📐 تم ضبط الأبعاد إلى ${GRID_SIZE}×${GRID_SIZE}`);
+            playVoxelSound(2, 520);
+        }
+
+        function updateGridSizeUI() {
+            document.getElementById('stat-grid-size').textContent = `${GRID_SIZE}×${GRID_SIZE}`;
+            document.getElementById('mode-layers-label').textContent = `الطبقات (${GRID_SIZE}×${GRID_SIZE})`;
+            
+            document.querySelectorAll('.grid-size-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.size, 10) === GRID_SIZE);
+            });
+
+            const selectEl = document.getElementById('select-grid-size');
+            if (selectEl) selectEl.value = GRID_SIZE.toString();
+
+            const offset = Math.floor(GRID_SIZE / 2);
+            const startX = -offset + centerOffset.x;
+            const endX = (GRID_SIZE - 1) - offset + centerOffset.x;
+            const startZ = -offset + centerOffset.z;
+            const endZ = (GRID_SIZE - 1) - offset + centerOffset.z;
+
+            document.getElementById('label-x-start').textContent = `X: ${startX >= 0 ? '+' : ''}${startX}`;
+            document.getElementById('label-x-end').textContent = `X: ${endX >= 0 ? '+' : ''}${endX}`;
+            document.getElementById('label-z-start').textContent = `Z: ${startZ >= 0 ? '+' : ''}${startZ}`;
+            document.getElementById('label-z-end').textContent = `Z: ${endZ >= 0 ? '+' : ''}${endZ}`;
+
+            const currentLayer = layers[activeLayerIndex];
+            if (currentLayer && labelLayerHeightEl) {
+                const actualY = currentLayer.y + centerOffset.y;
+                labelLayerHeightEl.textContent = `Y: ${actualY} (${actualY >= 1 ? 'فوق الجزيرة' : 'مستوى سفلي'})`;
+            }
+        }
+
+        function updateCenterOffsetUI() {
+            const fmt = (n) => (n > 0 ? `+${n}` : `${n}`);
+            const badge = document.getElementById('badge-center-offset');
+            if (badge) {
+                badge.textContent = `X: ${fmt(centerOffset.x)} | Y: ${fmt(centerOffset.y)} | Z: ${fmt(centerOffset.z)}`;
+            }
+            const vpCoords = document.getElementById('viewport-coords-label');
+            if (vpCoords) {
+                vpCoords.textContent = `المركز: (${fmt(centerOffset.x)}, ${fmt(centerOffset.y)}, ${fmt(centerOffset.z)})`;
+            }
+            updateGridSizeUI();
+            populateLeafLayerOptions();
+        }
+
+        function moveCenter(dx, dy, dz) {
+            centerOffset.x += dx;
+            centerOffset.y += dy;
+            centerOffset.z += dz;
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            updateCenterOffsetUI();
+            syncCurrentModelData();
+            playVoxelSound(2, 560);
+            const fmt = (n) => (n > 0 ? `+${n}` : `${n}`);
+            showToast(`🕹️ تم تحريك المركز إلى (${fmt(centerOffset.x)}, ${fmt(centerOffset.y)}, ${fmt(centerOffset.z)})`);
+        }
+
+        function resetCenter() {
+            centerOffset = { x: 0, y: 0, z: 0 };
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            updateCenterOffsetUI();
+            syncCurrentModelData();
+            playVoxelSound(1, 480);
+            showToast('🎯 تم إعادة مركز الطبقات إلى المنتصف الافتراضي (0, 0, 0)');
+        }
+
+        // =========================================================================
+        // 16. 3D RAYCASTING & DIRECT / FREE VIEW INTERACTION
+        // =========================================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let pointerDownPos = { x: 0, y: 0, time: 0 };
+
+        function getCanvasNormalizedMouse(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                y: -((e.clientY - rect.top) / rect.height) * 2 + 1,
+                isInside: (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom)
+            };
+        }
+
+        function onWindowPointerMove(e) {
+            if (activeMode !== 'direct') {
+                ghostBox.visible = false;
+                return;
+            }
+
+            const norm = getCanvasNormalizedMouse(e);
+            if (!norm.isInside) {
+                ghostBox.visible = false;
+                return;
+            }
+
+            mouse.x = norm.x;
+            mouse.y = norm.y;
+
+            raycaster.setFromCamera(mouse, camera);
+            const targets = [...customVoxelMeshes, ...islandMeshes];
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const instanceId = hit.instanceId;
+                const mesh = hit.object;
+
+                let targetCenter = new THREE.Vector3();
+                if (mesh.userData && mesh.userData.voxels && mesh.userData.voxels[instanceId]) {
+                    const v = mesh.userData.voxels[instanceId];
+                    targetCenter.set(v.x, v.y, v.z);
+                } else if (hit.point) {
+                    targetCenter.set(Math.round(hit.point.x), Math.round(hit.point.y), Math.round(hit.point.z));
+                }
+
+                if (hit.face) {
+                    const placePos = targetCenter.clone().add(hit.face.normal);
+                    ghostBox.position.copy(placePos);
+                    ghostBox.visible = true;
+                    requestRender();
+                    return;
+                }
+            }
+            ghostBox.visible = false;
+            requestRender();
+        }
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        canvas.addEventListener('pointerdown', (e) => {
+            pointerDownPos = { x: e.clientX, y: e.clientY, time: performance.now() };
+            wakeAnimation();
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            const dx = e.clientX - pointerDownPos.x;
+            const dy = e.clientY - pointerDownPos.y;
+            const dist = Math.hypot(dx, dy);
+            const duration = performance.now() - pointerDownPos.time;
+
+            if (dist > 6 || duration > 350) return;
+
+            const norm = getCanvasNormalizedMouse(e);
+            if (!norm.isInside) return;
+            mouse.x = norm.x;
+            mouse.y = norm.y;
+
+            raycaster.setFromCamera(mouse, camera);
+            const targets = [...customVoxelMeshes, ...islandMeshes];
+            const intersects = raycaster.intersectObjects(targets);
+
+            // In Free View Mode -> Click Triggers Shockwave Ripple Wave
+            if (activeMode === 'view') {
+                if (intersects.length > 0) {
+                    shockwaveEngine.add(intersects[0].point);
+                } else {
+                    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(centerOffset.y));
+                    const pt = new THREE.Vector3();
+                    if (raycaster.ray.intersectPlane(groundPlane, pt)) {
+                        shockwaveEngine.add(pt);
+                    }
+                }
+                return;
+            }
+
+            // In Direct 3D Editing Mode
+            if (activeMode === 'direct') {
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const instanceId = hit.instanceId;
+                    const mesh = hit.object;
+
+                    // RIGHT CLICK -> BUILD VOXEL
+                    if (e.button === 2) {
+                        let targetCenter = new THREE.Vector3();
+                        if (mesh.userData && mesh.userData.voxels && mesh.userData.voxels[instanceId]) {
+                            const v = mesh.userData.voxels[instanceId];
+                            targetCenter.set(v.x, v.y, v.z);
+                        } else {
+                            targetCenter.set(Math.round(hit.point.x), Math.round(hit.point.y), Math.round(hit.point.z));
+                        }
+
+                        if (hit.face) {
+                            const newPos = targetCenter.clone().add(hit.face.normal);
+                            placeVoxelAtWorldCoord(Math.round(newPos.x), Math.round(newPos.y), Math.round(newPos.z), activeColor);
+                        }
+                    }
+                    // LEFT CLICK -> BREAK CUSTOM VOXEL
+                    else if (e.button === 0) {
+                        if (mesh.userData && mesh.userData.isCustom && mesh.userData.voxels && mesh.userData.voxels[instanceId]) {
+                            const v = mesh.userData.voxels[instanceId];
+                            removeVoxelAtWorldCoord(v.x, v.y, v.z);
+                        }
+                    }
+                } else if (e.button === 2) {
+                    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(1 + centerOffset.y));
+                    const pt = new THREE.Vector3();
+                    if (raycaster.ray.intersectPlane(groundPlane, pt)) {
+                        placeVoxelAtWorldCoord(Math.round(pt.x), 1 + centerOffset.y, Math.round(pt.z), activeColor);
+                    }
+                }
+            }
+        });
+
+        function placeVoxelAtWorldCoord(wx, wy, wz, color) {
+            const localWy = wy - centerOffset.y;
+            let layer = layers.find(l => l.y === localWy);
+            if (!layer) {
+                layer = createNewLayer(localWy);
+                layers.push(layer);
+                layers.sort((a, b) => a.y - b.y);
+            }
+
+            const offset = Math.floor(GRID_SIZE / 2);
+            const localWx = wx - centerOffset.x;
+            const localWz = wz - centerOffset.z;
+            const c = localWx + offset;
+            const r = localWz + offset;
+
+            if (c >= 0 && c < GRID_SIZE && r >= 0 && r < GRID_SIZE) {
+                layer.grid[r][c] = color;
+            }
+
+            activeLayerIndex = layers.indexOf(layer);
+            renderLayerSelectOptions();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            syncCurrentModelData();
+            playVoxelSound(localWy, 550);
+            showToast(`🧱 تم وضع مكعب فوكسل عند (${wx}, ${wy}, ${wz})`);
+        }
+
+        function removeVoxelAtWorldCoord(wx, wy, wz) {
+            const offset = Math.floor(GRID_SIZE / 2);
+            const localWx = wx - centerOffset.x;
+            const localWz = wz - centerOffset.z;
+            const localWy = wy - centerOffset.y;
+            const c = localWx + offset;
+            const r = localWz + offset;
+
+            const layer = layers.find(l => l.y === localWy);
+            if (layer && c >= 0 && c < GRID_SIZE && r >= 0 && r < GRID_SIZE) {
+                layer.grid[r][c] = null;
+            }
+
+            render2DGrid();
+            update3DCustomVoxels();
+            syncCurrentModelData();
+            playVoxelSound(localWy, 240);
+            showToast(`🔨 تم حذف المكعب عند (${wx}, ${wy}, ${wz})`);
+        }
+
+        window.addEventListener('pointermove', onWindowPointerMove);
+
+        // =========================================================================
+        // 17. JSON EXPORT & IMPORT
+        // =========================================================================
+        function exportModelToJSON() {
+            let totalBlocks = 0;
+            const customVoxelsList = [];
+            const offset = Math.floor(GRID_SIZE / 2);
+
+            layers.forEach(l => {
+                for (let r = 0; r < l.grid.length; r++) {
+                    for (let c = 0; c < l.grid[r].length; c++) {
+                        const color = l.grid[r][c];
+                        if (color) {
+                            totalBlocks++;
+                            customVoxelsList.push({
+                                x: c - offset + centerOffset.x,
+                                y: l.y + centerOffset.y,
+                                z: r - offset + centerOffset.z,
+                                color: color,
+                                layerId: l.id
+                            });
+                        }
+                    }
+                }
+            });
+
+            const currentModel = savedModels.find(m => m.id === currentModelId);
+
+            const exportData = {
+                title: currentModel ? currentModel.name : "Voxel Island Art Creation",
+                generator: "Voxel Island 3D Studio",
+                version: "3.5",
+                gridSize: GRID_SIZE,
+                centerOffset: { x: centerOffset.x, y: centerOffset.y, z: centerOffset.z },
+                exportedAt: new Date().toISOString(),
+                totalBlocks: totalBlocks,
+                totalLayers: layers.length,
+                layers: layers.map(l => ({
+                    id: l.id,
+                    name: l.name,
+                    y: l.y,
+                    grid: l.grid
+                })),
+                customVoxels: customVoxelsList
+            };
+
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `voxel-island-${(currentModel ? currentModel.name : 'model').replace(/\\s+/g, '_')}-${GRID_SIZE}x${GRID_SIZE}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`💾 تم تصدير ملف JSON بنجاح (${totalBlocks} مكعب)!`);
+        }
+
+        function importModelFromJSON(jsonText) {
+            try {
+                const data = JSON.parse(jsonText);
+                if (!data.layers || !Array.isArray(data.layers)) {
+                    AppModal.alert('خطأ في الملف', 'ملف JSON غير صالح أو لا يحتوي على بنية الطبقات المناسبة.');
+                    return;
+                }
+
+                let newGridSize = GRID_SIZE;
+                if (data.gridSize && typeof data.gridSize === 'number' && data.gridSize >= 3 && data.gridSize <= 32) {
+                    newGridSize = data.gridSize;
+                } else if (data.layers[0] && Array.isArray(data.layers[0].grid)) {
+                    newGridSize = data.layers[0].grid.length;
+                }
+
+                let newOffset = { x: 0, y: 0, z: 0 };
+                if (data.centerOffset && typeof data.centerOffset === 'object') {
+                    newOffset.x = Number(data.centerOffset.x) || 0;
+                    newOffset.y = Number(data.centerOffset.y) || 0;
+                    newOffset.z = Number(data.centerOffset.z) || 0;
+                }
+
+                const newLayers = data.layers.map((l, idx) => ({
+                    id: l.id || Date.now() + idx,
+                    name: l.name || `طبقة ${idx + 1} (Y=${l.y || idx + 1})`,
+                    y: (typeof l.y === 'number') ? l.y : (idx + 1),
+                    grid: Array.isArray(l.grid) && l.grid.length === newGridSize ? l.grid : Array(newGridSize).fill(null).map(() => Array(newGridSize).fill(null))
+                }));
+
+                newLayers.sort((a, b) => a.y - b.y);
+
+                const importedModel = {
+                    id: 'model-import-' + Date.now(),
+                    name: data.title || `مجسم مستورد (${newLayers.length} طبقات)`,
+                    gridSize: newGridSize,
+                    centerOffset: newOffset,
+                    layers: newLayers
+                };
+
+                savedModels.push(importedModel);
+                saveModelsToStorage();
+                populateModelDropdown();
+                switchModel(importedModel.id);
+                showToast(`📂 تم استيراد المجسم بنجاح (${newLayers.length} طبقات)!`);
+                playVoxelSound(3, 580);
+            } catch (err) {
+                AppModal.alert('خطأ', 'حدث خطأ أثناء قراءة ملف الـ JSON: ' + err.message);
+            }
+        }
+
+        document.getElementById('btn-export-json-card')?.addEventListener('click', exportModelToJSON);
+        document.getElementById('file-import-json-card')?.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                importModelFromJSON(event.target.result);
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        // =========================================================================
+        // 18. UI EVENT LISTENERS, MODES, & MOBILE DRAWER
+        // =========================================================================
+        const cardPixelEditor = document.getElementById('card-pixel-editor');
+        const cardDirectInstructions = document.getElementById('card-direct-instructions');
+        const cardFreeviewControls = document.getElementById('card-freeview-controls');
+        const viewModeBanner = document.getElementById('view-mode-banner');
+        const sidebarControls = document.getElementById('sidebar-controls');
+        const mobileToggleBtn = document.getElementById('btn-mobile-sidebar-toggle');
+        const mobileCloseBtn = document.getElementById('btn-close-mobile-drawer');
+
+        // Mobile Drawer Toggle
+        function toggleMobileDrawer() {
+            if (!sidebarControls) return;
+            sidebarControls.classList.toggle('drawer-open');
+            const isOpen = sidebarControls.classList.contains('drawer-open');
+            const toggleText = document.getElementById('mobile-toggle-text');
+            const toggleIcon = document.getElementById('mobile-toggle-icon');
+            if (toggleText) toggleText.textContent = isOpen ? 'إغلاق' : 'الأدوات';
+            if (toggleIcon) toggleIcon.textContent = isOpen ? '✕' : '⚙️';
+        }
+
+        mobileToggleBtn?.addEventListener('click', toggleMobileDrawer);
+        mobileCloseBtn?.addEventListener('click', toggleMobileDrawer);
+
+        // Center / Layer Movement Directional Buttons
+        document.getElementById('btn-move-z-dec')?.addEventListener('click', () => moveCenter(0, 0, -1));
+        document.getElementById('btn-move-z-inc')?.addEventListener('click', () => moveCenter(0, 0, 1));
+        document.getElementById('btn-move-x-dec')?.addEventListener('click', () => moveCenter(-1, 0, 0));
+        document.getElementById('btn-move-x-inc')?.addEventListener('click', () => moveCenter(1, 0, 0));
+        document.getElementById('btn-move-y-inc')?.addEventListener('click', () => moveCenter(0, 1, 0));
+        document.getElementById('btn-move-y-dec')?.addEventListener('click', () => moveCenter(0, -1, 0));
+        document.getElementById('btn-move-reset')?.addEventListener('click', resetCenter);
+
+        function setMode(mode) {
+            activeMode = mode;
+            document.querySelectorAll('#mode-layers, #mode-direct, #mode-view').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`mode-${mode}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            if (mode === 'layers') {
+                if (cardPixelEditor) cardPixelEditor.classList.remove('hidden');
+                if (cardDirectInstructions) cardDirectInstructions.classList.add('hidden');
+                if (cardFreeviewControls) cardFreeviewControls.classList.add('hidden');
+                if (viewModeBanner) viewModeBanner.classList.add('hidden');
+                updateLayerGuidePosition();
+            } else if (mode === 'direct') {
+                if (cardPixelEditor) cardPixelEditor.classList.add('hidden');
+                if (cardDirectInstructions) cardDirectInstructions.classList.remove('hidden');
+                if (cardFreeviewControls) cardFreeviewControls.classList.add('hidden');
+                if (viewModeBanner) viewModeBanner.classList.add('hidden');
+                layerGuideGroup.visible = false;
+            } else if (mode === 'view') {
+                if (cardPixelEditor) cardPixelEditor.classList.add('hidden');
+                if (cardDirectInstructions) cardDirectInstructions.classList.add('hidden');
+                if (cardFreeviewControls) cardFreeviewControls.classList.remove('hidden');
+                if (viewModeBanner) viewModeBanner.classList.remove('hidden');
+                layerGuideGroup.visible = false;
+                ghostBox.visible = false;
+            }
+            requestRender();
+        }
+
+        document.getElementById('mode-layers')?.addEventListener('click', () => setMode('layers'));
+        document.getElementById('mode-direct')?.addEventListener('click', () => setMode('direct'));
+        document.getElementById('mode-view')?.addEventListener('click', () => setMode('view'));
+
+        // Camera Angle Presets
+        function setCameraPreset(preset) {
+            document.querySelectorAll('#cam-iso, #cam-top, #cam-front').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById(`cam-${preset}`);
+            if (btn) btn.classList.add('active');
+
+            const tx = centerOffset.x;
+            const ty = centerOffset.y;
+            const tz = centerOffset.z;
+
+            if (preset === 'iso') {
+                camera.position.set(24 + tx, 18 + ty, 26 + tz);
+                controls.target.set(tx, 2 + ty, tz);
+            } else if (preset === 'top') {
+                camera.position.set(tx, 34 + ty, tz + 0.001);
+                controls.target.set(tx, ty, tz);
+            } else if (preset === 'front') {
+                camera.position.set(tx, 10 + ty, 32 + tz);
+                controls.target.set(tx, 2 + ty, tz);
+            }
+            controls.update();
+            requestRender();
+            showToast(`🎥 زاوية الكاميرا: ${preset === 'iso' ? 'منظور مائل' : (preset === 'top' ? 'عرض علوي (QR)' : 'عرض أمامي')}`);
+        }
+
+        document.getElementById('cam-iso')?.addEventListener('click', () => setCameraPreset('iso'));
+        document.getElementById('cam-top')?.addEventListener('click', () => setCameraPreset('top'));
+        document.getElementById('cam-front')?.addEventListener('click', () => setCameraPreset('front'));
+
+        // Grid Dimension Picker Buttons & Select
+        document.querySelectorAll('.grid-size-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setGridDimensions(btn.dataset.size);
+            });
+        });
+
+        document.getElementById('select-grid-size')?.addEventListener('change', (e) => {
+            setGridDimensions(e.target.value);
+        });
+
+        selectLayerEl?.addEventListener('change', (e) => {
+            activeLayerIndex = parseInt(e.target.value, 10);
+            renderLayerSelectOptions();
+            render2DGrid();
+            updateLayerGuidePosition();
+        });
+
+        document.getElementById('btn-add-layer')?.addEventListener('click', () => {
+            const newLayer = createNewLayer();
+            layers.push(newLayer);
+            layers.sort((a, b) => a.y - b.y);
+            activeLayerIndex = layers.indexOf(newLayer);
+            renderLayerSelectOptions();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            syncCurrentModelData();
+            showToast(`➕ تمت إضافة طبقة جديدة عند Y=${newLayer.y}`);
+        });
+
+        document.getElementById('btn-delete-layer')?.addEventListener('click', () => {
+            if (layers.length <= 1) {
+                layers[0].grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+                render2DGrid();
+                update3DCustomVoxels();
+                syncCurrentModelData();
+                showToast('🧼 تم مسح محتوى الطبقة');
+                return;
+            }
+            layers.splice(activeLayerIndex, 1);
+            if (activeLayerIndex >= layers.length) activeLayerIndex = layers.length - 1;
+            renderLayerSelectOptions();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            syncCurrentModelData();
+            showToast('🗑️ تم حذف الطبقة');
+        });
+
+        document.getElementById('btn-prev-layer')?.addEventListener('click', () => {
+            if (activeLayerIndex > 0) {
+                activeLayerIndex--;
+                renderLayerSelectOptions();
+                render2DGrid();
+                updateLayerGuidePosition();
+            }
+        });
+
+        document.getElementById('btn-next-layer')?.addEventListener('click', () => {
+            if (activeLayerIndex < layers.length - 1) {
+                activeLayerIndex++;
+                renderLayerSelectOptions();
+                render2DGrid();
+                updateLayerGuidePosition();
+            }
+        });
+
+        document.getElementById('btn-duplicate-layer')?.addEventListener('click', () => {
+            const current = layers[activeLayerIndex];
+            if (!current) return;
+            const newY = Math.max(...layers.map(l => l.y)) + 1;
+            const clonedGrid = current.grid.map(row => [...row]);
+            const clonedLayer = {
+                id: Date.now() + Math.random(),
+                name: `نسخة طبقة (Y=${newY})`,
+                y: newY,
+                grid: clonedGrid
+            };
+            layers.push(clonedLayer);
+            layers.sort((a, b) => a.y - b.y);
+            activeLayerIndex = layers.indexOf(clonedLayer);
+            renderLayerSelectOptions();
+            render2DGrid();
+            update3DCustomVoxels();
+            updateLayerGuidePosition();
+            syncCurrentModelData();
+            showToast('📋 تم تكرار الطبقة بنجاح');
+        });
+
+        document.getElementById('btn-clear-layer')?.addEventListener('click', () => {
+            const current = layers[activeLayerIndex];
+            if (current) {
+                current.grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+                render2DGrid();
+                update3DCustomVoxels();
+                syncCurrentModelData();
+                showToast('🧼 تم مسح محتوى الطبقة');
+            }
+        });
+
+        const btnOnionSkin = document.getElementById('btn-onion-skin');
+        btnOnionSkin?.addEventListener('click', () => {
+            onionSkinEnabled = !onionSkinEnabled;
+            btnOnionSkin.classList.toggle('active', onionSkinEnabled);
+            render2DGrid();
+            showToast(onionSkinEnabled ? '🧅 تم تفعيل شفافية الطبقة السفلية' : '🧅 تم إيقاف الشفافية');
+        });
+
+        function setTool(toolName) {
+            currentTool = toolName;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            const activeToolBtn = document.getElementById(`tool-${toolName}`);
+            if (activeToolBtn) activeToolBtn.classList.add('active');
+        }
+        document.getElementById('tool-brush')?.addEventListener('click', () => setTool('brush'));
+        document.getElementById('tool-eraser')?.addEventListener('click', () => setTool('eraser'));
+        document.getElementById('tool-fill')?.addEventListener('click', () => setTool('fill'));
+
+        // --- CUSTOM COLOR PICKER & PALETTE SYSTEM ---
+        const activeColorPreview = document.getElementById('active-color-preview');
+        const inputHexCode = document.getElementById('input-hex-code');
+        const inputColorPicker = document.getElementById('input-color-picker');
+        const btnAddCustomColor = document.getElementById('btn-add-custom-color');
+        const recentColorsContainer = document.getElementById('recent-colors-container');
+        const customPaletteCount = document.getElementById('custom-palette-count');
+
+        let customColors = ['#F472B6', '#FBCFE8', '#DB2777', '#E11D48', '#38BDF8', '#22C55E', '#F59E0B', '#FFFFFF'];
+
+        function renderRecentColors() {
+            if (!recentColorsContainer) return;
+            recentColorsContainer.innerHTML = '';
+            customColors.forEach((colorHex) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full aspect-square border border-zinc-700 rounded-sm hover:scale-110 hover:border-white transition-all cursor-pointer';
+                btn.style.backgroundColor = colorHex;
+                btn.title = `لون مخصص: ${colorHex}`;
+                if (colorHex.toUpperCase() === activeColor.toUpperCase()) {
+                    btn.classList.add('ring-2', 'ring-white', 'border-white');
+                }
+                btn.addEventListener('click', () => {
+                    setActiveColor(colorHex);
+                });
+                recentColorsContainer.appendChild(btn);
+            });
+            if (customPaletteCount) {
+                customPaletteCount.textContent = `${customColors.length}/8`;
+            }
+        }
+
+        function formatHex(hex) {
+            if (!hex) return '#FFFFFF';
+            hex = hex.trim();
+            if (!hex.startsWith('#')) hex = '#' + hex;
+            if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                return hex.toUpperCase();
+            }
+            if (/^#[0-9A-Fa-f]{3}$/.test(hex)) {
+                const r = hex[1], g = hex[2], b = hex[3];
+                return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+            }
+            return null;
+        }
+
+        function addCustomColor(hex) {
+            const cleanHex = formatHex(hex);
+            if (!cleanHex) return;
+            customColors = [cleanHex, ...customColors.filter(c => c.toUpperCase() !== cleanHex.toUpperCase())].slice(0, 8);
+            renderRecentColors();
+            showToast(`🎨 تم حفظ اللون ${cleanHex} في لوحة الألوان المخصصة!`);
+        }
+
+        function setActiveColor(hex) {
+            const cleanHex = formatHex(hex);
+            if (!cleanHex) return;
+            activeColor = cleanHex;
+            if (activeColorPreview) activeColorPreview.style.backgroundColor = cleanHex;
+            if (inputColorPicker) inputColorPicker.value = cleanHex;
+            if (inputHexCode) inputHexCode.value = cleanHex.replace('#', '');
+            if (currentTool === 'eraser') setTool('brush');
+            renderRecentColors();
+        }
+
+        inputColorPicker?.addEventListener('input', (e) => setActiveColor(e.target.value));
+        inputHexCode?.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (val.length === 6 || val.length === 3) {
+                setActiveColor('#' + val);
+            }
+        });
+        inputHexCode?.addEventListener('change', (e) => {
+            const formatted = formatHex(e.target.value);
+            if (formatted) setActiveColor(formatted);
+            else if (inputHexCode) inputHexCode.value = activeColor.replace('#', '');
+        });
+
+        btnAddCustomColor?.addEventListener('click', () => {
+            addCustomColor(activeColor);
+        });
+
+        document.querySelectorAll('.color-swatch').forEach(btn => {
+            btn.addEventListener('click', () => setActiveColor(btn.dataset.color));
+        });
+
+        const ENV_PRESETS = {
+            day: { bg: 0x7dd3fc, fog: 0x7dd3fc, fogDensity: 0.008, ambient: 0xffffff, sunColor: 0xfffaed, sunIntensity: 1.45, exposure: 1.05 },
+            sunset: { bg: 0x2b0d1e, fog: 0x2b0d1e, fogDensity: 0.015, ambient: 0xf43f5e, sunColor: 0xfb923c, sunIntensity: 1.8, exposure: 1.25 },
+            night: { bg: 0x05050f, fog: 0x05050f, fogDensity: 0.015, ambient: 0x38bdf8, sunColor: 0x818cf8, sunIntensity: 0.35, exposure: 1.4 }
+        };
+
+        function setEnvironment(envKey) {
+            const p = ENV_PRESETS[envKey] || ENV_PRESETS.day;
+            scene.background.setHex(p.bg);
+            scene.fog.color.setHex(p.fog);
+            if (scene.fog) scene.fog.density = p.fogDensity || 0.01;
+            ambientLight.color.setHex(p.ambient);
+            sunLight.color.setHex(p.sunColor);
+            sunLight.intensity = p.sunIntensity;
+            renderer.toneMappingExposure = p.exposure;
+            document.querySelectorAll('.env-btn').forEach(b => b.classList.toggle('active', b.dataset.env === envKey));
+            requestRender();
+        }
+
+        document.querySelectorAll('.env-btn').forEach(btn => {
+            btn.addEventListener('click', () => setEnvironment(btn.dataset.env));
+        });
+
+        const autoRotateBtn = document.getElementById('btn-auto-rotate');
+        autoRotateBtn?.addEventListener('click', () => {
+            controls.autoRotate = !controls.autoRotate;
+            autoRotateBtn.classList.toggle('active', controls.autoRotate);
+            if (controls.autoRotate) wakeAnimation();
+        });
+
+        document.getElementById('btn-reset-cam')?.addEventListener('click', () => {
+            camera.position.set(24 + centerOffset.x, 18 + centerOffset.y, 26 + centerOffset.z);
+            controls.target.set(centerOffset.x, 2 + centerOffset.y, centerOffset.z);
+            controls.update();
+            requestRender();
+        });
+
+        document.getElementById('btn-screenshot')?.addEventListener('click', () => {
+            layerGuideGroup.visible = false;
+            ghostBox.visible = false;
+            renderer.render(scene, camera);
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `voxel-island-creation-${GRID_SIZE}x${GRID_SIZE}.png`;
+            link.href = dataURL;
+            link.click();
+            updateLayerGuidePosition();
+            showToast('📷 تم التقاط صورة عالية الدقة!');
+        });
+
+        let toastTimeout;
+        const studioToast = document.getElementById('studio-toast');
+        const toastMessage = document.getElementById('toast-message');
+        function showToast(msg) {
+            if (!studioToast || !toastMessage) return;
+            toastMessage.textContent = msg;
+            studioToast.classList.remove('hidden');
+            studioToast.classList.add('flex');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                studioToast.classList.add('hidden');
+                studioToast.classList.remove('flex');
+            }, 3000);
+        }
+
+        // =========================================================================
+        // 19. ULTRA-SMOOTH 60 FPS RENDER LOOP & APP INITIALIZATION
+        // =========================================================================
+        let clock = new THREE.Clock();
+        let fpsFrames = 0;
+        let fpsLastTime = performance.now();
+        const fpsBadge = document.getElementById('fps-badge');
+
+        function wakeAnimation() {}
+        function requestRender() {}
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Live FPS Counter
+            fpsFrames++;
+            const now = performance.now();
+            if (now - fpsLastTime >= 1000) {
+                const fps = Math.round((fpsFrames * 1000) / (now - fpsLastTime));
+                if (fpsBadge) {
+                    fpsBadge.textContent = `${fps} FPS`;
+                    if (fps < 35) fpsBadge.className = 'px-1.5 py-0.2 bg-rose-950 border border-rose-700 text-rose-300 font-mono text-[9px] rounded-sm font-bold';
+                    else if (fps < 50) fpsBadge.className = 'px-1.5 py-0.2 bg-amber-950 border border-amber-700 text-amber-300 font-mono text-[9px] rounded-sm font-bold';
+                    else fpsBadge.className = 'px-1.5 py-0.2 bg-emerald-950 border border-emerald-700 text-emerald-300 font-mono text-[9px] rounded-sm font-bold';
+                }
+                fpsFrames = 0;
+                fpsLastTime = now;
+            }
+
+            const dt = Math.min(clock.getDelta(), 0.1);
+            const time = clock.getElapsedTime();
+
+            // 1. Update Ripple Waves (Direct TypedArray Y Offset)
+            const hasWaves = shockwaveEngine.update(dt);
+            if (hasWaves && !isTransitioning) {
+                const allMeshes = [...customVoxelMeshes, ...islandMeshes];
+                const meshCount = allMeshes.length;
+                for (let m = 0; m < meshCount; m++) {
+                    const mesh = allMeshes[m];
+                    if (mesh.userData && mesh.userData.voxels) {
+                        const array = mesh.instanceMatrix.array;
+                        const voxels = mesh.userData.voxels;
+                        const count = voxels.length;
+                        let dirty = false;
+                        for (let i = 0; i < count; i++) {
+                            const v = voxels[i];
+                            const waveY = shockwaveEngine.getYOffset(v.x, v.y, v.z);
+                            const targetY = v.y + waveY;
+                            const idx = i * 16 + 13;
+                            if (Math.abs(array[idx] - targetY) > 0.001) {
+                                array[idx] = targetY;
+                                dirty = true;
+                            }
+                        }
+                        if (dirty) mesh.instanceMatrix.needsUpdate = true;
+                    }
+                }
+            }
+
+            // 2. Update Targeted Falling Leaves
+            if (leafSystem && leafSystem.active) {
+                leafSystem.update(dt, time);
+            }
+
+            // 3. Update Camera Controls & Render Frame
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function initApp() {
+            renderIsland();
+            loadSavedModelsFromStorage();
+            populateModelDropdown();
+
+            // Start with current or first model
+            const startModel = savedModels.find(m => m.id === currentModelId) || savedModels[0];
+            if (startModel) {
+                applyModelDataInstantly(startModel, false);
+            }
+
+            // Auto-apply optimal tier for device and initialize sky
+            applyPerformanceTier(currentTierKey, false);
+            setEnvironment('day');
+
+            renderRecentColors();
+            setActiveColor('#F472B6');
+            updateSoundUI();
+            resizeViewport();
+            animate();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+        </script>
+
+    <!-- ==================== CUSTOM IN-APP MODAL SYSTEM (Never blocked by browser) ==================== -->
+    <div id="app-modal-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-200">
+        <div id="app-modal-box" class="mono-card max-w-sm w-full p-4 bg-zinc-950 border border-zinc-700 shadow-2xl rounded-sm flex flex-col gap-3 transform scale-95 transition-transform duration-200">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+                <h3 id="app-modal-title" class="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                    <span>⚠️</span> <span>تأكيد الإجراء</span>
+                </h3>
+                <button id="btn-modal-close" class="icon-btn !w-6 !h-6 !text-xs text-zinc-400 hover:text-white">✕</button>
+            </div>
+
+            <!-- Modal Body / Message -->
+            <div class="text-xs text-zinc-300 leading-relaxed" id="app-modal-message">
+                هل أنت متأكد من تنفيذ هذا الإجراء؟
+            </div>
+
+            <!-- Optional Input Field (for Prompts) -->
+            <div id="app-modal-input-container" class="hidden space-y-1">
+                <input type="text" id="app-modal-input" class="w-full bg-black border border-zinc-700 text-white text-xs px-2.5 py-1.5 rounded-sm focus:outline-none focus:border-white">
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                <button id="btn-modal-cancel" class="mono-btn !h-7 !px-3 text-xs text-zinc-400 hover:text-white">
+                    إلغاء
+                </button>
+                <button id="btn-modal-confirm" class="mono-btn !h-7 !px-3 text-xs font-bold !bg-white !text-black hover:!bg-zinc-200">
+                    تأكيد
+                </button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
